@@ -1,1 +1,0 @@
-h:\prg\dcu32pas\dcu32int.exe "-UJ:\Runimage\Delphi50\Lib" %1 %2 %3
