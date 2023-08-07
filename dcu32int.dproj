@@ -108,11 +108,7 @@
         <VerInfo_Build>82</VerInfo_Build>
         <VerInfo_MinorVer>20</VerInfo_MinorVer>
         <DCC_DebugDCUs>true</DCC_DebugDCUs>
-<<<<<<< HEAD
         <Debugger_RunParams>-KDCP.dcu -U*</Debugger_RunParams>
-=======
-        <Debugger_RunParams>DCP.dcu -S -U*</Debugger_RunParams>
->>>>>>> ed0dda0782a29d397687698c721e3dd97f9a0175
         <VerInfo_Keys>CompanyName=AX;FileDescription=Parser of Delphi 2.0-8.0, 2005-2006 (.net and WIN32), 2007-2010 (WIN32 only),  XE (WIN32 only), XE2-XE7 (WIN32,WIN64,OSX32), Kylix 1.0-3.0;FileVersion=1.20.1.82;InternalName=DCU32INT;LegalCopyright=Copyright ©2000-2015, Alexei E. Hmelnov;LegalTrademarks=;OriginalFilename=DCU32INT;ProductName=DCU32INT;ProductVersion=1.20.1;Comments=;ProgramID=com.embarcadero.$(MSBuildProjectName)</VerInfo_Keys>
         <VerInfo_Locale>1033</VerInfo_Locale>
         <Debugger_CWD>C:\Desenv\Tools\IDR\dcu</Debugger_CWD>

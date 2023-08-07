@@ -662,17 +662,10 @@ begin
     if KMode then
       begin
         ProcessKB;
-<<<<<<< HEAD
         ExitCode := 0;
       end
     else
       ExitCode := ProcessFile(DCUName);
-=======
-        Halt(0);
-      end
-    else
-      Halt(ProcessFile(DCUName));
->>>>>>> ed0dda0782a29d397687698c721e3dd97f9a0175
 
   finally
     KBStream.Free;
@@ -683,10 +676,7 @@ begin
     ResStrList.Free;
     ProcList.Free;
   end;
-<<<<<<< HEAD
 
   Halt(ExitCode);
-=======
->>>>>>> ed0dda0782a29d397687698c721e3dd97f9a0175
   {)phroyt}
 end.
