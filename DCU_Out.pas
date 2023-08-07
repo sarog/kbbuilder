@@ -31,7 +31,7 @@ uses
 
 type
   TIncPtr = PAnsiChar;
-  TDasmMode = (dasmSeq,dasmCtlFlow);
+  TDasmMode = (dasmSeq,dasmCtlFlow,dasmDataFlow);
   TOutFmt = (ofmtText,ofmtHTM);
 
 const
@@ -51,6 +51,7 @@ var
   ShowAuxValues: boolean=false;
   ResolveMethods: boolean=true;
   ResolveConsts: boolean=true;
+  FixCommentChars: boolean=true;
   ShowDotTypes: boolean=false;
   ShowSelf: boolean=false;
   ShowVMT: boolean=false;
@@ -80,6 +81,8 @@ procedure PutSpace;
 procedure SetShowAuxValues(V: Boolean);
 procedure OpenAux;
 procedure CloseAux;
+function HideAux: Integer; //Aux0
+procedure RestoreAux(Aux0: Integer);
 
 procedure RemOpen0;
 procedure RemOpen;
@@ -99,6 +102,10 @@ procedure PutStrConstQ(const S: AnsiString);
 procedure PutAddrDefStr(const S: AnsiString; hDef: integer);
 procedure PutMemRefStr(const S: AnsiString; Ofs: integer);
 
+procedure PutHexOffset(Ofs: LongInt);
+procedure PutInt(i: LongInt);
+procedure PutHex(i: LongInt);
+
 procedure MarkDefStart(hDef: integer);
 procedure MarkMemOfs(Ofs: integer);
 
@@ -111,14 +118,15 @@ function CharStr(Ch: AnsiChar): AnsiString;
 function WCharStr(WCh: WideChar): AnsiString;
 function BoolStr(DP: Pointer; DS: Cardinal): AnsiString;
 function StrConstStr(CP: PAnsiChar; L: integer): AnsiString;
-function ShowStrConst(DP: Pointer; DS: Cardinal; var OutS:string): integer {Size used};
-function ShowUnicodeStrConst(DP: Pointer; DS: Cardinal; var OutS:string): integer {Size used}; //Ver >=verD12
-function ShowUnicodeResStrConst(DP: Pointer; DS: Cardinal; var OutS:string): integer {Size used}; //Ver >=verD12
+function ShowStrConst(DP: Pointer; DS: Cardinal): integer {Size used};
+function ShowUnicodeStrConst(DP: Pointer; DS: Cardinal): integer {Size used}; //Ver >=verD12
+function ShowUnicodeResStrConst(DP: Pointer; DS: Cardinal): integer {Size used}; //Ver >=verD12
 function TryShowPCharConst(DP: PAnsiChar; DS: Cardinal): integer {Size used};
 function FixFloatToStr(const E: Extended): AnsiString;
 
 const
   cSoftNL=#0;
+  //cSepCh=#1;
   MaxOutWidth: Cardinal = 75;
   MaxNLOfs: Cardinal = 31 {Should be < Ord(' ')};
 
@@ -154,7 +162,6 @@ type
    protected
     FInfo: integer; FData: Pointer;
     FStarted: Boolean;
-    procedure WriteStart; virtual;
     procedure WriteEnd; virtual;
     procedure WriteCP(CP: PAnsiChar; Len: integer); virtual; abstract;
     procedure NL; virtual; abstract;
@@ -166,6 +173,7 @@ type
    public
     constructor Create;
     destructor Destroy; override;
+    procedure WriteStart; virtual;
     procedure Reset; virtual;
     property OutLineNum: integer read FOutLineNum;
     property AuxLevel: integer read FAuxLevel;
@@ -242,7 +250,7 @@ procedure ShowDump(DP,DPFile0: TIncPtr; FileSize,SizeDispl,Size: Cardinal;
 implementation
 
 uses
-  DCU32{CurUnit}, DCU_In, DCURecs;
+  DCU32{CurUnit}, DCU_In;
 
 procedure SetShowAll;
 begin
@@ -256,6 +264,7 @@ begin
   ShowAuxValues := true;
   ResolveMethods := true;
   ResolveConsts := true;
+  FixCommentChars := false;
   ShowDotTypes := true;
   ShowSelf := true;
   ShowVMT := true;
@@ -504,13 +513,19 @@ begin
     Dec(Len);
     if ch<' ' then begin
       if FNLOfs>MaxNLOfs then
-        Ch := AnsiChar(MaxNLOfs)
+        ch := AnsiChar(MaxNLOfs)
       else
-        Ch := AnsiChar(FNLOfs);
+        ch := AnsiChar(FNLOfs);
+     end 
+    else if (RemLevel>0)and FixCommentChars then begin
+      if ch='{' then
+        ch := '('
+      else if ch='}' then
+        ch := ')';
     end ;
-    Buf[BufLen] := Ch;
+    Buf[BufLen] := ch;
     Inc(BufLen);
-    if (ch<' ') then
+    if ch<' ' then
       FlushSoftNL(0);
   end ;
   FlushSoftNL(0);
@@ -744,6 +759,7 @@ begin
     Exit;
   Writer.NL;
   Writer.WriteCP(PAnsiChar(Msg),Length(Msg));
+  Writer.NL;
   Writer.Flush;
 end ;
 
@@ -885,6 +901,10 @@ var
   BP: ^Byte;
   P: Pointer;
 begin
+  if N<=0 then begin
+    Result := '';
+    Exit;
+  end ;
   SetLength(Result,N*3-1);
   P := @Result[1];
   BP := @V;
@@ -943,11 +963,6 @@ var
   FP: PFixupRec;
   K: Byte;
   //N: PName;
-  Name:string;
-  f:Boolean;
-  n:Integer;
-  fi:PFIXUP_INFO;
-  finfo:PFIXUP_INFO;
 begin
   if integer(Size)<=0 then begin
     PutS('[]');
@@ -964,12 +979,6 @@ begin
   SetHexFmtNumDigits(FmtS,2,Ofs0Displ+SizeDispl);
   W := 16;
   LP := DP;
-
-  //if (pDumpOffset <> Nil) then
-  //  pDumpOffset^ := LP - DPFile0;
-  //if (pDumpSize <> Nil) then
-  //  pDumpSize^ := Size;
-
 //  IsBig := Size>W;
   if Size<W then begin
     W := Size;
@@ -1007,55 +1016,12 @@ begin
         '(','[': CP^ := '{';
       end ;
       if FixUpNames then begin
-        FS := {$IFDEF UNICODE}AnsiStrings.{$ENDIF}Format('K%x %s',[K,CurUnit.GetAddrStr(FP^.NDX,true)]);
+        FS := {$IFDEF UNICODE}AnsiStrings.{$ENDIF}Format('&K%x %s',[K,CurUnit.GetAddrStr(FP^.NDX,true)]);
         if FixS='' then
           FixS := FS
         else
           FixS := {$IFDEF UNICODE}AnsiStrings.{$ENDIF}Format('%s, %s',[FixS,FS]);
-      end;
-
-      if (K <> fxStart) then
-      begin
-          GetMem(fInfo, sizeof(FIXUP_INFO));
-          FillChar(fInfo^, sizeof(FIXUP_INFO), 0);
-          fInfo^.FType := 'U';
-          fInfo^.Ofs := (Ofs0 - pBlockOffset) + dOfs;
-          fInfo^.Name := CurUnit.GetAddrStr(FP^.NDX,False);
-
-          if (K = fxAddr) then
-            fInfo^.FType := 'A'
-          else if (K = fxJmpAddr) then
-            fInfo^.FType := 'J'
-          else if (K = fxDataAddr) then
-            fInfo^.FType := 'D'
-          else
-            fInfo^.FType := Chr(K + $30);
-
-          if (FixupsList <> Nil) then
-          begin
-            f := False;
-            for n := 0 to FixupsList.Count - 1 do
-            begin
-              fi := FixupsList.Items[n];
-              if (fi^.Ofs = fInfo^.Ofs) And (fi^.Name = fInfo^.Name) then
-              begin
-                f := True;
-                Break;
-              end;
-            end;
-            if (f = True) then
-            begin
-              FreeMem(fInfo);
-            end
-            else
-              FixupsList.Add(fInfo)
-          end
-          else
-          begin
-            FreeMem(fInfo);
-          end;
-      end;
-
+      end ;
       Dec(FixCnt);
       Inc(FP);
     end ;
@@ -1126,10 +1092,7 @@ begin
   if Ch<' ' then
     Result := {$IFDEF UNICODE}AnsiStrings.{$ENDIF}Format('#%d',[Byte(Ch)])
   else begin
-    //crypto
-    //Result := {$IFDEF UNICODE}AnsiStrings.{$ENDIF}Format('''%s''{#$%x}',[Ch,Byte(Ch)])
-    //crypto
-    Result := {$IFDEF UNICODE}AnsiStrings.{$ENDIF}Format('#$%x',[Byte(Ch)])
+    Result := {$IFDEF UNICODE}AnsiStrings.{$ENDIF}Format('''%s''{#$%x}',[Ch,Byte(Ch)])
     //Result := Format('''*''{#$%x}',[Byte(Ch)]);
     //Result[2] := Ch; //Format works wrong with Ch when Unicode strings are on
   end ;
@@ -1198,7 +1161,7 @@ var
 
   procedure PutQuote;
   begin
-    //PutCh('''');
+    PutCh('''');
   end ;
 
 begin
@@ -1229,12 +1192,11 @@ begin
     SetLength(Result,LRes);
 end ;
 
-function ShowStrConst(DP: Pointer; DS: Cardinal; var OutS:string): integer {Size used};
+function ShowStrConst(DP: Pointer; DS: Cardinal): integer {Size used};
 var
   L: integer;
   VP: Pointer;
 begin
-  OutS := '';
   Result := -1;
   if DS<9 {Min size} then
     Exit;
@@ -1248,11 +1210,10 @@ begin
   if (PAnsiChar(VP)+L)^<>#0 then
     Exit;
   Result := L+9;
-  OutS := StrConstStr(VP,L);
   PutStrConst(StrConstStr(VP,L));
 end ;
 
-function ShowUnicodeStrConst(DP: Pointer; DS: Cardinal; var OutS:string): integer {Size used};
+function ShowUnicodeStrConst(DP: Pointer; DS: Cardinal): integer {Size used};
 //The unicode string support for ver>=verD12
 //New string header:
 //  -12:2 - Code page
@@ -1263,14 +1224,13 @@ var
   ElSz: integer;
   VP: Pointer;
 begin
-  OutS := '';
   Result := -1;
   if DS<13 {Min size} then
     Exit;
   VP := TIncPtr(DP)+SizeOf(word);
   ElSz := word(VP^);
   if ElSz=SizeOf(AnsiChar) then begin //Try to show it as an AnsiString (!!!the code page is ignored by now)
-    Result := ShowStrConst(TIncPtr(DP)+2*SizeOf(Word),DS-2*SizeOf(Word), OutS);
+    Result := ShowStrConst(TIncPtr(DP)+2*SizeOf(Word),DS-2*SizeOf(Word));
     if Result>0 then
       Inc(Result,2*SizeOf(Word));
     Exit;
@@ -1281,19 +1241,18 @@ begin
   if integer(VP^)<>-1 then
     Exit {Reference count,-1 => ~infinity};
   Inc(TIncPtr(VP),SizeOf(integer));
-  Result := ShowUnicodeResStrConst(VP,DS-2*SizeOf(integer), OutS);
+  Result := ShowUnicodeResStrConst(VP,DS-2*SizeOf(integer));
   if Result<0 then
     Exit;
   Inc(Result,2*SizeOf(integer));
 end ;
 
-function ShowUnicodeResStrConst(DP: Pointer; DS: Cardinal; var OutS:String): integer {Size used};
+function ShowUnicodeResStrConst(DP: Pointer; DS: Cardinal): integer {Size used};
 var
   L: integer;
   WS: WideString;
   S: AnsiString;
 begin
-  OutS := '';
   Result := -1;
   L := integer(DP^);
   if (DS-6<L*SizeOf(WideChar))or(L<0) then
@@ -1304,7 +1263,6 @@ begin
   SetString(WS,PWideChar(DP),L);
   S := WS;
   Result := L*SizeOf(WideChar)+6;
-  OutS := StrConstStr(PAnsiChar(S),L);
   PutStrConst(StrConstStr(PAnsiChar(S),L));
 end ;
 
@@ -1365,6 +1323,17 @@ end ;
 procedure CloseAux;
 begin
   Dec(Writer.FAuxLevel);
+end ;
+
+function HideAux: Integer; //Aux0
+begin
+  Result := Writer.FAuxLevel;
+  Writer.FAuxLevel := 0;
+end ;
+
+procedure RestoreAux(Aux0: Integer);
+begin
+  Writer.FAuxLevel := Aux0;
 end ;
 
 
@@ -1484,6 +1453,29 @@ begin
   if Ofs>=0 then
     PutStrInfoEnd;
 end ;
+
+procedure PutHexOffset(Ofs: LongInt);
+begin
+  if Ofs=0 then
+    Exit;
+  if Ofs>0 then
+    PutS('+')
+  else begin
+    PutS('-');
+    Ofs := -Ofs;
+  end ;
+  PutSFmt('$%x',[Ofs]);
+end;
+
+procedure PutInt(i: LongInt);
+begin
+  PutS(IntToStr(i));
+end;
+
+procedure PutHex(i: LongInt);
+begin
+  PutS(IntToHex(i,1));
+end;
 
 procedure MarkDefStart(hDef: integer);
 begin

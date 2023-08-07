@@ -26,12 +26,19 @@ freely, subject to the following restrictions:
 *)
 interface
 
+{$IFDEF VER100}
+{$DEFINE D3dn}
+{$ENDIF}
+{$IFDEF VER90}
+{$DEFINE D3dn}
+{$ENDIF}
 uses
   {$IFDEF UNICODE}AnsiStrings,{$ENDIF}SysUtils;
 
 type
   TDCURecTag = Byte{Char};
 
+  PNDX = ^TNDX;
   TNDX = integer;
 
   TNameRecData = packed record
@@ -40,17 +47,25 @@ type
     1: (bLen: Byte; dwLen: LongInt; lS: array[Word]of AnsiChar);
   end ;
 
+  TAnsiStrRec = record
+    CP: PAnsiChar;
+    Len: Cardinal;
+  end ;
+
   PName = ^TNameRec;
   TNameRec = object
    protected
     D: TNameRecData;
+    procedure GetStrInfo(var SR: TAnsiStrRec);
    public
     function IsEmpty: Boolean;
     function Get1stChar: AnsiChar;
     function GetStr: AnsiString;
-    function GetRightStr(dl: Cardinal): AnsiString;
+    function GetRightStr(dl: LongInt): AnsiString;
     function Eq(N: PName): Boolean;
     function EqS(const S: ShortString): Boolean;
+    function HasChar(ch: AnsiChar): Boolean;
+    function IsAuxName: Boolean;
   end ;
 
   PShortName = PShortString;
@@ -66,6 +81,8 @@ type
 
   TByteSet = set of Byte;
   TIncPtr = PAnsiChar;
+
+  PtrInt = {$IFDEF CPUX64}NativeInt{$ELSE}Integer{$ENDIF};
 
 const
   {Local flags}
@@ -86,25 +103,48 @@ const
   lfauxPropField = $80000000; //my own (AX) flag to mark the aux fields for properties
 
 type
-TDefNDX = TNDX;
+  TDefNDX = TNDX;
 
-PPNDXTbl = ^PNDXTbl;
-PNDXTbl = ^TNDXTbl;
-TNDXTbl = array[Byte]of TNDX;
+  PPNDXTbl = ^PNDXTbl;
+  PNDXTbl = ^TNDXTbl;
+  TNDXTbl = array[Byte]of TNDX;
 
-PDef = ^Pointer;
-PNameDef = ^TNameDef;
-TNameDef = packed record
-  Tag: TDCURecTag;
-  Name: TNameRec;
-end ;
+  PDef = ^Pointer;
+  PNameDef = ^TNameDef;
+  TNameDef = packed record
+    Tag: TDCURecTag;
+    Name: TNameRec;
+  end ;
 
-{$IFDEF Ver100}
-TQWORD = Comp;
-{$ELSE}
-TQWORD = Int64;
-{$ENDIF}
-PQWORD = ^TQWORD;
+  ulong = {$IFDEF D3dn}cardinal{$ELSE}LongWord{$ENDIF};
+  PUlong = ^ulong;
+
+  TDCUFileTime = Integer;
+
+  {$IFDEF D3dn}
+  TQWORD = Comp;
+  {$ELSE}
+  TQWORD = Int64;
+  {$ENDIF}
+  PQWORD = ^TQWORD;
+
+  TMemStrRef = object //Representation of string from DCU memory without copying chars
+   protected
+    FChars: PAnsiChar;
+    FLen: Cardinal;
+   public
+    function S: AnsiString;
+    property Len: Cardinal read FLen;
+  end;
+
+  TSegKind = (seg_none,seg_text{+OsX},seg_itext,seg_data{+OsX},seg_bss{+OsX},
+    seg_tls,seg_pdata,seg_xdata,seg_tbss{OsX},seg_rdata{OsX});
+
+  TSegKindTbl = array[Byte]of TSegKind;
+  PSegKindTbl = ^TSegKindTbl;
+
+function GetSegKindByName(Name: PShortName): TSegKind;
+
 
 type
   TScanState=record
@@ -115,16 +155,16 @@ var
   ScSt: TScanState;
   DefStart: Pointer;
   Tag: TDCURecTag;
-  NNNNNNNN:Integer = 0;
 
 procedure ChangeScanState(var State: TScanState; DP: Pointer; MaxSz: Cardinal);
 procedure RestoreScanState(const State: TScanState);
 
 //function IsEOF: boolean;
 
-function ReadByte: Cardinal;
 function ReadTag: TDCURecTag;
-function ReadULong: Cardinal;
+function ReadByte: Byte;
+function ReadWord: Word;
+function ReadULong: ulong;
 
 procedure SkipBlock(Sz: Cardinal);
 procedure ReadBlock(var B; Sz: Cardinal);
@@ -134,8 +174,11 @@ function ReadMem(Sz: Cardinal): Pointer;
 function ReadStr: ShortString;
 function ReadShortName: PShortName;
 function ReadName: PName;
+function StrLEnd(Str: PAnsiChar; L: Cardinal): PAnsiChar;
 
 function ReadNDXStr: AnsiString;
+function ReadNDXStrRef: TMemStrRef;
+function GetNDXStr(DP: Pointer): AnsiString;
 function ReadByteIfEQ(V: byte): Cardinal;
 function ReadByteFrom(const S: TByteSet): Integer;
 
@@ -173,7 +216,7 @@ procedure FreeName(NP: PName);
 implementation
 
 uses
-  DCU32{CurUnit};
+  DCU32{CurUnit},TypInfo;
 
 procedure DCUError(const Msg: String);
 var
@@ -245,6 +288,32 @@ begin
   ScSt := State;
 end ;
 
+{ TMemStrRef. }
+function TMemStrRef.S: AnsiString;
+begin
+  SetString(Result,FChars,FLen);
+end;
+
+function GetSegKindByName(Name: PShortName): TSegKind;
+var
+  i,L: Integer;
+  S: String;
+begin
+  Result := seg_none;
+  L := Length(Name^);
+  if (L<4)or(L>6) then
+    Exit;
+  S := 'seg_';
+  SetLength(S,L+3);
+  for i:=2 to L do
+    S[i+3] := Char(Name^[i]);
+  i := GetEnumValue(TypeInfo(TSegKind),S);
+  if i<0 then
+    i := 0;
+  Result := TSegKind(i);
+end ;
+
+
 procedure ChkSize(Sz: Cardinal);
 begin
   if integer(Sz)<0 then
@@ -258,13 +327,6 @@ begin
   Result := ScSt.CurPos>=ScSt.EndPos;
 end ;
 }
-
-function ReadByte: Cardinal;
-begin
-  ChkSize(1);
-  Result := Byte(Pointer(ScSt.CurPos)^);
-  Inc(ScSt.CurPos,1);
-end ;
 
 function ReadByteIfEQ(V: byte): Cardinal;
 begin
@@ -292,10 +354,24 @@ begin
   Result := TDCURecTag(ReadByte);
 end ;
 
-function ReadULong: Cardinal;
+function ReadByte: Byte;
+begin
+  ChkSize(1);
+  Result := Byte(Pointer(ScSt.CurPos)^);
+  Inc(ScSt.CurPos,1);
+end ;
+
+function ReadWord: Word;
+begin
+  ChkSize(2);
+  Result := Word(Pointer(ScSt.CurPos)^);
+  Inc(ScSt.CurPos,2);
+end ;
+
+function ReadULong: ulong;
 begin
   ChkSize(4);
-  Result := Cardinal(Pointer(ScSt.CurPos)^);
+  Result := ulong(Pointer(ScSt.CurPos)^);
   Inc(ScSt.CurPos,4);
 end ;
 
@@ -314,6 +390,7 @@ end ;
 
 function ReadMem(Sz: Cardinal): Pointer;
 begin
+  ChkSize(Sz);
   Result := Pointer(ScSt.CurPos);
   SkipBlock(Sz);
 end ;
@@ -335,13 +412,25 @@ var
   L: Cardinal;
 begin
   Result := Pointer(ScSt.CurPos);
-  if (Result.GetStr = 'FreeLibrary') then
-    Inc(NNNNNNNN);
   L := ReadByte;
   if (L=$FF)and(CurUnit.Ver>=verD2009)and(CurUnit.Ver<verK1) then
     L := ReadULong;
   SkipBlock(L);
 end ;
+
+function StrLEnd(Str: PAnsiChar; L: Cardinal): PAnsiChar; assembler;
+asm
+        MOV     ECX,EDX
+        MOV     EDX,EDI
+        MOV     EDI,EAX
+        XOR     AL,AL
+        REPNE   SCASB
+        JCXZ    @1
+        DEC     EDI
+  @1:
+        MOV     EAX,EDI
+        MOV     EDI,EDX
+end;
 
 function ReadNDXStr: AnsiString;
 //Was observed only in drConstAddInfo records of MSIL
@@ -354,6 +443,55 @@ begin
   SetLength(Result,L);
   ReadBlock(Result[1],L);
 end ;
+
+function ReadNDXStrRef: TMemStrRef;
+//Was observed only in drConstAddInfo records of MSIL
+//Alternative to ReadNDXStr, allows not to read the value
+var
+  L: integer;
+begin
+  L := ReadUIndex;
+  if (L<0)or(L>$100000{Heuristic}) then
+    DCUError('Too long NDX String');
+  Result.FChars := ReadMem(L);
+  Result.FLen := L;
+end ;
+
+function GetUIndex(var DP: Pointer): LongInt;
+//for GetNDXStr
+begin
+  Result := Byte(DP^);
+  case Result and $0F of
+   0,2,4,6,8,10,12,14: begin
+     Result := Result shr 1;
+     Inc(TIncPtr(DP));
+    end ;
+   1,5,9,13: begin
+     Result := Word(DP^)shr 2;
+     Inc(TIncPtr(DP),2);
+    end ;
+   3,11: begin
+     Result := ((LongInt(DP^)and $FFFFFF)shr 3); //!!!an extra byte is required to prevent errors
+     Inc(TIncPtr(DP),3);
+    end ;
+   15: begin
+     Inc(TIncPtr(DP));
+     Result := LongInt(DP^);
+     Inc(TIncPtr(DP),4);
+    end ;
+  end;
+end;
+
+function GetNDXStr(DP: Pointer): AnsiString;
+var
+  L: LongInt;
+begin
+  L := GetUIndex(DP);
+  SetLength(Result,L);
+  if L>0 then
+    System.Move(DP^,Result[1],L*SizeOf(AnsiChar));
+//  Inc(TIncPtr(DP),L);
+end;
 
 function ReadUIndex: LongInt;
 type
@@ -491,7 +629,7 @@ begin
   else if NDXHi=-1 then
     Result := {$IFDEF UNICODE}AnsiStrings.{$ENDIF}Format('-$%x',[-NDXLo])
   else if NDXHi<0 then
-    Result := {$IFDEF UNICODE}AnsiStrings.{$ENDIF}Format('-$%x%8.8x',[-NDXHi-1,-NDXLo])
+    Result := {$IFDEF UNICODE}AnsiStrings.{$ENDIF}Format('-$%x%8.8x',[-NDXHi-Ord(NdxLo<>0),-NDXLo])
   else
     Result := {$IFDEF UNICODE}AnsiStrings.{$ENDIF}Format('$%x%8.8x',[NDXHi,NDXLo])
 end ;
@@ -566,61 +704,76 @@ end ;
 { TNameRec. }
 function TNameRec.IsEmpty: Boolean;
 begin
-  Result := D.bLen=0;
+  Result := (@Self=Nil)or(D.bLen=0);
+end ;
+
+procedure TNameRec.GetStrInfo(var SR: TAnsiStrRec);
+var
+  L: Cardinal;
+begin
+  if @Self=Nil then begin
+    SR.CP := Nil;
+    SR.Len := 0;
+    Exit;
+  end ;
+  L := D.bLen;
+  if (L=$FF)and(CurUnit.Ver>=verD_XE2)and(CurUnit.Ver<verK1) then begin
+    SR.CP := @D.lS;
+    SR.Len := D.dwLen;
+   end
+  else begin
+    SR.CP := @D.S[1];
+    SR.Len := L;
+  end ;
 end ;
 
 function TNameRec.Get1stChar: AnsiChar;
 var
-  L: Cardinal;
+  SR: TAnsiStrRec;
 begin
-  L := D.bLen;
-  if L=0 then begin
+  GetStrInfo(SR);
+  if SR.Len<=0 then begin
     Result := #0;
     Exit;
   end ;
-  if (L=$FF)and(CurUnit.Ver>=verD_XE2)and(CurUnit.Ver<verK1) then begin
-    if D.dwLen=0 then
-      Result := #0 //Paranoic
-    else
-      Result := D.lS[0];
-    Exit;
-  end ;
-  Result := D.S[1];
+  Result := SR.CP[0];
 end ;
 
 function TNameRec.GetStr: AnsiString;
 var
-  L: Cardinal;
+  SR: TAnsiStrRec;
 begin
-  L := D.bLen;
-  if (L=$FF)and(CurUnit.Ver>=verD_XE2)and(CurUnit.Ver<verK1) then
-    SetString(Result,D.lS,D.dwLen)
-  else
-    Result := D.S;
+  GetStrInfo(SR);
+  SetString(Result,SR.CP,SR.Len);
 end ;
 
-function TNameRec.GetRightStr(dl: Cardinal): AnsiString;
+function TNameRec.GetRightStr(dl: LongInt): AnsiString;
 var
-  L: Cardinal;
+  L: Integer;
+  SR: TAnsiStrRec;
 begin
-  L := D.bLen;
-  if (L=$FF)and(CurUnit.Ver>=verD_XE2)and(CurUnit.Ver<verK1) then begin
-    L := D.dwLen-dL;
-    if L<=0 then
-      Result := ''
-    else
-      SetString(Result,PAnsiChar(@D.lS[dl]),L);
-   end
+  GetStrInfo(SR);
+  if @Self=Nil then begin
+    Result := '';
+    Exit;
+  end ;
+  L := SR.Len-dl;
+  if L<=0 then
+    Result := ''
   else
-    Result := System.Copy(D.S,dl+1,255);
+    SetString(Result,SR.CP+dl,L);
 end ;
 
 function TNameRec.Eq(N: PName): Boolean;
 var
-  L: Cardinal;
+  L: LongInt;
   CP,CP1: PAnsiChar;
 begin
   Result := false;
+  if (@Self=Nil)or(N=Nil) then begin
+    Result := N=@Self;
+    Exit;
+  end ;
   L := D.bLen;
   if L<>N^.D.bLen then
     Exit;
@@ -641,6 +794,38 @@ end ;
 function TNameRec.EqS(const S: ShortString): Boolean;
 begin
   Result := Eq(@S);
+end ;
+
+function TNameRec.HasChar(ch: AnsiChar): Boolean;
+var
+  i: Integer;
+  SR: TAnsiStrRec;
+begin
+  GetStrInfo(SR);
+  for i:=0 to SR.Len-1 do
+    if SR.CP[i]=ch then begin
+      Result := true;
+      Exit;
+    end;
+  Result := false;
+end ;
+
+function TNameRec.IsAuxName: Boolean;
+{ The name is aux and shouldn`t be shown if not requested }
+var
+  ch: AnsiChar;
+begin
+  Result := true;
+  ch := Get1stChar;
+  if ch='.' then
+    Exit;
+  if (CurUnit.Ver>=verD2009)and(CurUnit.Ver<verK1) then begin
+    if ch=':' then
+      Exit;
+    if HasChar('`') then
+      Exit;
+  end ;
+  Result := false;
 end ;
 
 end.

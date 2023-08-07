@@ -1,1 +1,0 @@
-h:\prg\dcu32pas\dcu32int.exe "-UH:\Files\Borland\DELPHI3\LIB" %1 %2 %3
