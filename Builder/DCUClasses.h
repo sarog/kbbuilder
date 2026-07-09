@@ -239,7 +239,7 @@ typedef struct
 typedef struct
 {
     BYTE    Len;
-    char    Name[];  //position of String
+    char    Name[255];  //position of String
 } TShortString, *PName;
 
 typedef struct
