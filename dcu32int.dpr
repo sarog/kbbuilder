@@ -1,4 +1,4 @@
-{$A+,B-,C+,D+,E-,F-,G+,H+,I+,J+,K-,L+,M-,N+,O+,P+,Q-,R-,S-,T-,U-,V+,W-,X+,Y+,Z1}
+﻿{$A+,B-,C+,D+,E-,F-,G+,H+,I+,J+,K-,L+,M-,N+,O+,P+,Q-,R-,S-,T-,U-,V+,W-,X+,Y+,Z1}
 {$APPTYPE CONSOLE}
 {$IFDEF ConditionalExpressions}
 {$WARN UNSAFE_TYPE OFF}
@@ -39,25 +39,26 @@ uses
   {$ENDIF }
   {phroyt(}
   Classes,
-  KB in 'KB.pas',
+  KB in 'src\KB.pas',
   {)phroyt}
-  DCU32 in 'DCU32.pas',
-  DCUTbl in 'DCUTbl.pas',
-  DCU_In in 'DCU_In.pas',
-  DCU_Out in 'DCU_Out.pas',
-  FixUp in 'FixUp.pas',
-  DCURecs in 'DCURecs.pas',
-  DasmDefs in 'DasmDefs.pas',
-  DasmUtil in 'DasmUtil.pas',
+  DCU32 in 'src\DCU32.pas',
+  DCUTbl in 'src\DCUTbl.pas',
+  DCU_In in 'src\DCU_In.pas',
+  DCU_Out in 'src\DCU_Out.pas',
+  FixUp in 'src\FixUp.pas',
+  DCURecs in 'src\DCURecs.pas',
+  DasmDefs in 'src\DasmDefs.pas',
+  DasmUtil in 'src\DasmUtil.pas',
   {$IFDEF XMLx86}
   x86Reg in '80x86\x86Reg.pas',
   x86Defs in '80x86\x86Defs.pas',
   x86Op in '80x86\x86Op.pas',
   {$ENDIF }
-  DasmCF in 'DasmCF.pas',
-  DCP in 'DCP.pas',
-  DasmX86 in 'DasmX86.pas',
-  DasmMSIL in 'DasmMSIL.pas';
+  DasmCF in 'src\DasmCF.pas',
+  DCP in 'src\DCP.pas',
+  DasmX86 in 'src\DasmX86.pas',
+  DasmMSIL in 'src\DasmMSIL.pas',
+  Win64SEH in 'src\Win64SEH.pas';
 
 {$R *.res}
 
@@ -666,7 +667,6 @@ begin
       end
     else
       ExitCode := ProcessFile(DCUName);
-
   finally
     KBStream.Free;
     ModuleList.Free;
@@ -676,7 +676,6 @@ begin
     ResStrList.Free;
     ProcList.Free;
   end;
-
   Halt(ExitCode);
   {)phroyt}
 end.
