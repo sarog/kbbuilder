@@ -1,4 +1,4 @@
-unit DasmX86;
+﻿unit DasmX86;
 (*
 The i80x86 disassembler registration module of the DCU32INT utility
 by Alexei Hmelnov.

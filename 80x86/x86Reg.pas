@@ -1,4 +1,4 @@
-unit x86Reg;
+﻿unit x86Reg;
 (*
 The register tables used by the 80x86 disassembler based upon the XML specification
 from http://ref.x86asm.net/.

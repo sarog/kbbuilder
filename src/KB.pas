@@ -1,4 +1,4 @@
-unit KB;
+﻿unit KB;
 
 interface
 
@@ -405,7 +405,7 @@ begin
   for n := 0 to FixupList.Count - 1 do
   begin
     finfo := PFIXUP_INFO(FixupList.Items[n]);
-    //If you need to inform that you have more to do with it, it�s not necessary
+    //If you need to inform that you have more to do with it, it’s not necessary
     if (finfo^.Ofs + 4 > Bytes) then
       continue;
     if (finfo^.Ofs < ByteNo) then

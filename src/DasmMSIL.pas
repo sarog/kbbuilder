@@ -1,4 +1,4 @@
-unit DasmMSIL;
+﻿unit DasmMSIL;
 (*
 The MSIL disassembler main module of the DCU32INT utility
 by Alexei Hmelnov.

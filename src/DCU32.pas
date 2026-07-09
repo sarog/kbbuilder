@@ -1,4 +1,4 @@
-unit DCU32;
+п»їunit DCU32;
 (*
 The DCU parser module of the DCU32INT utility by Alexei Hmelnov.
 (All the DCU data structures are described here and in the DCURecs module)
@@ -113,7 +113,7 @@ const
   drRes=$72{'r'};
   drAsm=$73{'s'}; //Found in D5 Debug versions
   drAssemblySrc=$74{'t'}; //For .net assembly the *.DCP is generated automatically, so the assembly is its source
-  drStop2=$9F{'џ'}; //!!!
+  drStop2=$9F{'Её'}; //!!!
   drConst=$25{'%'};
   drResStr=$32{'2'};
   drType=$2A{'*'};
@@ -3023,7 +3023,7 @@ begin
            break;
          {TStrConstTypeDef.Create;}
          Decl := TStrConstDecl.Create;
-        {//м.б. надо регистрировать в таблице адресов
+        {//Г¬.ГЎ. Г­Г Г¤Г® Г°ГҐГЈГЁГ±ГІГ°ГЁГ°Г®ГўГ ГІГј Гў ГІГ ГЎГ«ГЁГ¶ГҐ Г Г¤Г°ГҐГ±Г®Гў
          ReadStr;
          ReadUIndex;
          ReadUIndex;

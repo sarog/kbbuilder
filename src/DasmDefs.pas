@@ -1,4 +1,4 @@
-unit DasmDefs;
+﻿unit DasmDefs;
 (*
 The generic disassembler basic definitions module of the DCU32INT utility
 by Alexei Hmelnov.

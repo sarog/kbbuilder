@@ -1,4 +1,4 @@
-unit DasmUtil;
+п»їunit DasmUtil;
 (*
 The main i80x86 disassembler module of the DCU32INT utility by Alexei Hmelnov.
 ----------------------------------------------------------------------------
@@ -524,7 +524,7 @@ var
 begin
   Result := false;
   SExt := S and $1;
-  if not im(BWTbl[(W and 1)and not (SExt){При SExt - используется непоср. байт}])
+  if not im(BWTbl[(W and 1)and not (SExt){ГЏГ°ГЁ SExt - ГЁГ±ГЇГ®Г«ГјГ§ГіГҐГІГ±Гї Г­ГҐГЇГ®Г±Г°. ГЎГ Г©ГІ}])
   then
     Exit;
   if SExt<>0 then

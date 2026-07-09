@@ -1,4 +1,4 @@
-unit DCU_Out;
+ï»¿unit DCU_Out;
 
 interface
 (*
@@ -1067,7 +1067,7 @@ begin
     end ;
     if Ok then begin
       //Result := IntToStr(V);
-     //!!!Äîáàâèòü ïðîâåðêó íà áîëåå ïðîñòóþ çàïèñü â äåñÿòè÷íîì âèäå
+     //!!!Ã„Ã®Ã¡Ã Ã¢Ã¨Ã²Ã¼ Ã¯Ã°Ã®Ã¢Ã¥Ã°ÃªÃ³ Ã­Ã  Ã¡Ã®Ã«Ã¥Ã¥ Ã¯Ã°Ã®Ã±Ã²Ã³Ã¾ Ã§Ã Ã¯Ã¨Ã±Ã¼ Ã¢ Ã¤Ã¥Ã±Ã¿Ã²Ã¨Ã·Ã­Ã®Ã¬ Ã¢Ã¨Ã¤Ã¥
       if V>=0 then
         Result := {$IFDEF UNICODE}AnsiStrings.{$ENDIF}Format('$%x',[V])
       else

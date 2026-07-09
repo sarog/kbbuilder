@@ -1,4 +1,4 @@
-unit DCUTbl;
+﻿unit DCUTbl;
 (*
 The table of used units module of the DCU32INT utility by Alexei Hmelnov.
 It is used to obtain the necessary imported declarations. If the imported unit

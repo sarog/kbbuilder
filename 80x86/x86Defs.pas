@@ -1,4 +1,4 @@
-unit x86Defs;
+ï»¿unit x86Defs;
 (*
 The data structures used for representation of XML data in the file x86Op.pas
 by the 80x86 disassembler based upon the XML specification
@@ -195,18 +195,18 @@ type
     an_XMM7,an_XMM8,an_XMM9,an__DS___rAX_{(DS:)[rAX]},an_IA32_FMASK,an_IA32_LSTAR,
     an_IA32_STAR,an_IA32_SYSENTER_CS,an_IA32_SYSENTER_EIP,an_IA32_SYSENTER_ESP,
     an_IA32_TIME_STAMP_COUNTER,an_IA32_TSC_AUX,an_PMC,an_RBX);
-  TArgName = (an_ÑESiDIrDII{(ES:)[rDI]},an_IrDII{[rDI]},an_AH,an_AL,an_AX,an_BP,
+  TArgName = (an_Ã‘ESiDIrDII{(ES:)[rDI]},an_IrDII{[rDI]},an_AH,an_AL,an_AX,an_BP,
     an_BX,an_CS,an_CX,an_DI,an_DS,an_DX,an_eAX,an_eBP,an_EBX,an_eCX,an_EDI,an_EDX,
     an_EFlags,an_ES,an_ESiIDII{ES:[DI]},an_ESI,an_Flags,an_rAX,an_rBP,an_rCX,
     an_rDX,an_RFlags,an_SI,an_SS,an_SSiIrSPI{SS:[rSP]},an_ST,an_ST1,an_ST2,an_ST3,
-    an_ST4,an_ST5,an_ST6,an_ST7,an_ÑDSDiIrSII{(DS):[rSI]},
-    an_ÑDSiDIrBXtALI{(DS:)[rBX+AL]},an_ÑDSiDIrSII{(DS:)[rSI]},an_IrSII{[rSI]},
+    an_ST4,an_ST5,an_ST6,an_ST7,an_Ã‘DSDiIrSII{(DS):[rSI]},
+    an_Ã‘DSiDIrBXtALI{(DS:)[rBX+AL]},an_Ã‘DSiDIrSII{(DS:)[rSI]},an_IrSII{[rSI]},
     an_1,an_3,an_CL,an_DSiISII{DS:[SI]},an_ESP,an_FS,an_GS,an_SP,
-    an_ÑDSiDIrDII{(DS:)[rDI]},an_CR0,an_DR6,an_DR7,an_GDTR,an_IA32_BIOS_SIGN_ID,
+    an_Ã‘DSiDIrDII{(DS:)[rDI]},an_CR0,an_DR6,an_DR7,an_GDTR,an_IA32_BIOS_SIGN_ID,
     an_IA32_KERNEL_GSBASE,an_IDTR,an_LDTR,an_MMX0,an_MMX1,an_MMX2,an_MMX3,an_MMX4,
     an_MMX5,an_MMX6,an_MMX7,an_MSR,an_MSW,an_R11,an_RSP,an_TR,an_XCR,an_XMM0,
     an_XMM1,an_XMM10,an_XMM11,an_XMM12,an_XMM13,an_XMM14,an_XMM15,an_XMM2,an_XMM3,
-    an_XMM4,an_XMM5,an_XMM6,an_XMM7,an_XMM8,an_XMM9,an_ÑDSiDIrAXI{(DS:)[rAX]},
+    an_XMM4,an_XMM5,an_XMM6,an_XMM7,an_XMM8,an_XMM9,an_Ã‘DSiDIrAXI{(DS:)[rAX]},
     an_IA32_FMASK,an_IA32_LSTAR,an_IA32_STAR,an_IA32_SYSENTER_CS,
     an_IA32_SYSENTER_EIP,an_IA32_SYSENTER_ESP,an_IA32_TIME_STAMP_COUNTER,
     an_IA32_TSC_AUX,an_PMC,an_RBX);

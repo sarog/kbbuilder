@@ -1,4 +1,4 @@
-unit DCURecs;
+п»їunit DCURecs;
 (*
 The DCU records module of the DCU32INT utility by Alexei Hmelnov.
 It contains classes for representation of DCU declarations and
@@ -711,7 +711,7 @@ TEnumDef = class(TRangeBaseDef)
   Ndx: TNDX;
   CStart: TConstDecl;
   NameTbl: TList;
-  HasEq: Boolean; //Some const was defined by С=Сprev and not included into NameTbl
+  HasEq: Boolean; //Some const was defined by Г‘=Г‘prev and not included into NameTbl
   constructor Create;
   destructor Destroy; override;
   function ShowValue(DP: Pointer; DS: Cardinal): integer {Size used}; override;
@@ -2649,7 +2649,7 @@ begin
         //parent class unit
     end ;
     if (CurUnit.Ver>=verD2009)and(CurUnit.Ver<verK1)and(GetTag=arMethod) then begin
-      //!!!Запомнить и отобразить
+      //!!!Г‡Г ГЇГ®Г¬Г­ГЁГІГј ГЁ Г®ГІГ®ГЎГ°Г Г§ГЁГІГј
       nSkip := 0;
       if CurUnit.Ver>=verD2010 then begin
         Inc(nSkip);
@@ -5488,7 +5488,7 @@ begin
           B := ReadByte;
           MName := ReadName;
           N := ReadUIndex;
-          hMember := ReadUIndex; //!!!Не факт, что hMember
+          hMember := ReadUIndex; //!!!ГЌГҐ ГґГ ГЄГІ, Г·ГІГ® hMember
         end ;
       end ;
     end ;

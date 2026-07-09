@@ -1,4 +1,4 @@
-unit Win64SEH;
+﻿unit Win64SEH;
 (*
 The structured exception handling data structures module of
 the DCU32INT utility by Alexei Hmelnov.

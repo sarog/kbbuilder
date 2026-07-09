@@ -1,4 +1,4 @@
-unit FixUp;
+﻿unit FixUp;
 (*
 The DCU Fixup information module of the DCU32INT utility by Alexei Hmelnov.
 ----------------------------------------------------------------------------
