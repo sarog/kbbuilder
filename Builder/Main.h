@@ -17,60 +17,60 @@ int __fastcall          AddAddrDef(TDCURec* ND);
 void __fastcall         AddTypeDef(TTypeDef* TD);
 void __fastcall         AddTypeName(int hDef, int hDecl, PName Name);
 String __fastcall       CharStr(char Ch);
-BYTE __fastcall         FixTag(BYTE Tag);
+Byte __fastcall         FixTag(Byte Tag);
 void __fastcall         RegisterEmbeddedTypes(TNameDecl* Embedded, int Depth);
-void _fastcall          BindEmbeddedType(PDCURec UseRec, int hDT, DWORD* IP);
+void _fastcall          BindEmbeddedType(PDCURec UseRec, int hDT, DWord* IP);
 void __fastcall         BindEmbeddedTypes();
-void __fastcall         EnumUsedTypeList(PDCURec L, TTypeUseAction Action, DWORD* IP);
+void __fastcall         EnumUsedTypeList(PDCURec L, TTypeUseAction Action, DWord* IP);
 void __fastcall         FreeDCURecList(TDCURec* L);
 TDCURec* __fastcall     GetAddrDef(int hDef);
 String __fastcall       GetAddrStr(int hDef);
-BYTE* __fastcall        GetBlockMem(DWORD BlOfs, DWORD BlSz, DWORD* ResSz);
+Byte* __fastcall        GetBlockMem(DWord BlOfs, DWord BlSz, DWord* ResSz);
 String __fastcall       GetDCURecStr(TDCURec* D, int hDef);
 TDCURec* __fastcall     GetGlobalAddrDef(int hDef);
 TTypeDef* __fastcall    GetLocalTypeDef(int hDef);
 TTypeDef* __fastcall    GetGlobalTypeDef(int hDef);
-int __fastcall          GetStartFixup(DWORD Ofs);
+int __fastcall          GetStartFixup(DWord Ofs);
 TTypeDef* __fastcall    GetTypeDef(int hDef);
 int __fastcall          GetTypeSize(int hDef);
 PUnitImpRec __fastcall  GetUnitImpRec(int hUnit);
-bool __fastcall         MemToUInt(BYTE *DP, DWORD Sz, DWORD* Res);
+bool __fastcall         MemToUInt(Byte *DP, DWord Sz, DWord* Res);
 String __fastcall       NDXToStr(int NDXLo);
 String __fastcall       PName2String(PName Name);
-BYTE __fastcall         ReadByte();
-void __fastcall         ReadByteIfEQ(BYTE V);
+Byte __fastcall         ReadByte();
+void __fastcall         ReadByteIfEQ(Byte V);
 int __fastcall          ReadByteFrom(bool b);
-BYTE __fastcall         ReadCallKind();
+Byte __fastcall         ReadCallKind();
 int __fastcall          ReadClassInterfaces(int** PITbl);
 int __fastcall          ReadConstAddInfo(TNameDecl* LastProcDecl);
-void __fastcall         ReadDeclList(BYTE LK, TNameDecl** Result);
+void __fastcall         ReadDeclList(Byte LK, TNameDecl** Result);
 int __fastcall          ReadIndex();
 void __fastcall         ReadIndex64(PInt64Rec Res);
-BYTE* __fastcall        ReadMem(DWORD Sz);
+Byte* __fastcall        ReadMem(DWord Sz);
 PName __fastcall        ReadName();
-BYTE __fastcall         ReadTag();
+Byte __fastcall         ReadTag();
 int __fastcall          ReadUIndex();
-DWORD __fastcall        ReadULong();
+DWord __fastcall        ReadULong();
 void __fastcall         RefAddrDef(int V);
 bool __fastcall         RegTypeShow(TBaseDef* T);
 void __fastcall         RestoreFixupMemState(TFixupMemState* S);
 void __fastcall         SaveFixupMemState(TFixupMemState* S);
-void __fastcall         SetCodeRange(BYTE* ACodeStart, BYTE* ACodeBase, DWORD ABlSz);
+void __fastcall         SetCodeRange(Byte* ACodeStart, Byte* ACodeBase, DWord ABlSz);
 void __fastcall         SetProcAddInfo(int V);
-void __fastcall         ShowDataBl(DWORD Ofs0, DWORD BlOfs, DWORD BlSz);
-void __fastcall         ShowCodeBl(DWORD Ofs0, DWORD BlOfs, DWORD BlSz);
-void __fastcall         ShowDeclList(BYTE LK, TNameDecl* Decl, String& OutS);
-void __fastcall         ShowDump(BYTE* DP, BYTE* DPFile0, DWORD FileSize, DWORD SizeDispl, DWORD Size, DWORD Ofs0Displ, DWORD Ofs0, DWORD WMin, int FixCnt, TFixupRec* FixTbl);
+void __fastcall         ShowDataBl(DWord Ofs0, DWord BlOfs, DWord BlSz);
+void __fastcall         ShowCodeBl(DWord Ofs0, DWord BlOfs, DWord BlSz);
+void __fastcall         ShowDeclList(Byte LK, TNameDecl* Decl, String& OutS);
+void __fastcall         ShowDump(Byte* DP, Byte* DPFile0, DWord FileSize, DWord SizeDispl, DWord Size, DWord Ofs0Displ, DWord Ofs0, DWord WMin, int FixCnt, TFixupRec* FixTbl);
 bool __fastcall         ShowGlobalConstValue(int hDef, String& OutS);
 String __fastcall       ShowOfsQualifier(int hDef, int Ofs);
-int __fastcall          ShowGlobalTypeValue(int hDef, BYTE* DP, DWORD DS, bool AndRest, int ConstKind, String& OutS);
-int __fastcall          ShowStrConst(BYTE* DP, DWORD DS, String& OutS);
-int __fastcall          ShowUnicodeStrConst(BYTE* DP, DWORD DS, String& OutS); //Ver >=verD12
-int __fastcall          ShowUnicodeResStrConst(BYTE* DP, DWORD DS, String& OutS); //Ver >=verD12
+int __fastcall          ShowGlobalTypeValue(int hDef, Byte* DP, DWord DS, bool AndRest, int ConstKind, String& OutS);
+int __fastcall          ShowStrConst(Byte* DP, DWord DS, String& OutS);
+int __fastcall          ShowUnicodeStrConst(Byte* DP, DWord DS, String& OutS); //Ver >=verD12
+int __fastcall          ShowUnicodeResStrConst(Byte* DP, DWord DS, String& OutS); //Ver >=verD12
 String __fastcall       ShowRefOfsQualifier(int hDef, int Ofs);
 String __fastcall       ShowTypeDef(int hDef, PName N);
 String __fastcall       ShowTypeName(int hDef);
-int __fastcall          ShowTypeValue(TTypeDef* T, BYTE* DP, DWORD DS, int ConstKind, String& OutS);
+int __fastcall          ShowTypeValue(TTypeDef* T, Byte* DP, DWord DS, int ConstKind, String& OutS);
 void __fastcall         SkipBlock(int Sz);
 String __fastcall       StrConstStr(char* CP, int L);
 bool __fastcall         TypeIsVoid(int hDef);
@@ -79,8 +79,8 @@ void __fastcall         UnRegTypeShow(TBaseDef* T);
 //OffsetsInfo
 typedef struct
 {
-    DWORD       Offset;
-    DWORD       Size;
+    DWord       Offset;
+    DWord       Size;
     int         ModId;    //Modules
     int         NamId;    //Names
 } OFFSETSINFO, *POFFSETSINFO;
@@ -88,9 +88,9 @@ typedef struct
 typedef struct
 {
     int         ID;
-    WORD        ModuleID;
-    DWORD       Offset;
-    DWORD       Size;
+    Word        ModuleID;
+    DWord       Offset;
+    DWord       Size;
     String      Name;           //Unit Name
     String      Filename;       //Unit Filename
     TStringList *UsesList;      //List of Uses
@@ -98,8 +98,8 @@ typedef struct
 //Fixup info
 typedef struct
 {
-    BYTE        Type;           //A-ADR;J-JMP;D-DAT
-    DWORD       Ofs;            //Offset from RTTI data begin
+    Byte        Type;           //A-ADR;J-JMP;D-DAT
+    DWord       Ofs;            //Offset from RTTI data begin
     String      Name;           //Name
 } FIXUPINFO, *PFIXUPINFO;
 //ConstInfo
@@ -109,30 +109,30 @@ typedef struct
 typedef struct
 {
     int         ID;
-    DWORD       Offset;
-    DWORD       Size;
+    DWord       Offset;
+    DWord       Size;
     bool        Skip;
-    WORD        ModuleID;
+    Word        ModuleID;
     String      Name;
-    BYTE        Type;           //look above
+    Byte        Type;           //look above
     String      TypeDef;
     String      Value;
-    DWORD       RTTISz;         //Size of RTTI data
-    DWORD       RTTIOfs;        //Offset of RTTI data
+    DWord       RTTISz;         //Size of RTTI data
+    DWord       RTTIOfs;        //Offset of RTTI data
     TList       *Fixups;        //If VMT
 } CONSTINFO, *PCONSTINFO;
 //TypeInfo
 typedef struct
 {
     int         ID;
-    DWORD       Offset;
-    DWORD       Size;
-    WORD        ModuleID;
+    DWord       Offset;
+    DWord       Size;
+    Word        ModuleID;
     String      Name;
-    BYTE        Kind;
-    WORD        VMCnt;          //Number of class VM
-    DWORD       RTTISz;         //Size of RTTI data
-    DWORD       RTTIOfs;        //Offset of RTTI data
+    Byte        Kind;
+    Word        VMCnt;          //Number of class VM
+    DWord       RTTISz;         //Size of RTTI data
+    DWord       RTTIOfs;        //Offset of RTTI data
     String      Decl;
     TList       *Fixups;
     TList       *Fields;        //List of Fields
@@ -147,13 +147,13 @@ typedef struct
 typedef struct
 {
     int         ID;
-    DWORD       Offset;
-    DWORD       Size;
-    WORD        ModuleID;
+    DWord       Offset;
+    DWord       Size;
+    Word        ModuleID;
     String      Name;
-    BYTE        Type;           //look above
-    DWORD       DumpOfs;        //Offset of binary data
-    DWORD       DumpSz;         //Size of binary data
+    Byte        Type;           //look above
+    DWord       DumpOfs;        //Offset of binary data
+    DWord       DumpSz;         //Size of binary data
     String      AbsName;
     String      TypeDef;
 } VARINFO, *PVARINFO;
@@ -161,20 +161,20 @@ typedef struct
 typedef struct
 {
     int         ID;
-    DWORD       Offset;
-    DWORD       Size;
-    WORD        ModuleID;
+    DWord       Offset;
+    DWord       Size;
+    Word        ModuleID;
     String      Name;
-    DWORD       DumpOfs;        //Offset of binary data
-    DWORD       DumpSz;         //Size of binary data
+    DWord       DumpOfs;        //Offset of binary data
+    DWord       DumpSz;         //Size of binary data
     String      TypeDef;
     String      Context;        //Context of ResStr
 } RESSTRINFO, *PRESSTRINFO;
 //LocalDeclInfo
 typedef struct
 {
-    BYTE        Scope;
-    BYTE        Tag;
+    Byte        Scope;
+    Byte        Tag;
     int         LocFlags;
     int         Ndx;
     int         NdxB;
@@ -186,7 +186,7 @@ typedef struct
 //PropertyInfo
 typedef struct
 {
-    BYTE        Scope;
+    Byte        Scope;
     int         Index;
     int         DispId;
     String      Name;
@@ -198,8 +198,8 @@ typedef struct
 //MethodDeclInfo
 typedef struct
 {
-    BYTE        Scope;
-    BYTE        MethodKind;     //'M'-method,'P'-procedure,'F'-function,'C'-constructor,'D'-destructor
+    Byte        Scope;
+    Byte        MethodKind;     //'M'-method,'P'-procedure,'F'-function,'C'-constructor,'D'-destructor
     String      Prototype;
 } METHODDECLINFO, *PMETHODDECLINFO;
 //------------------------------------------------------------------------------

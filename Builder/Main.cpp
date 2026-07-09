@@ -8,9 +8,9 @@ extern String CallKindName[5];
 //------------------------------------------------------------------------------
 #define     NEW_VERSION
 //------------------------------------------------------------------------------
-BYTE        ActiveInfo, ActiveScope;
-DWORD       *pDumpOffset = 0;
-DWORD       *pDumpSize = 0;
+Byte        ActiveInfo, ActiveScope;
+DWord       *pDumpOffset = 0;
+DWord       *pDumpSize = 0;
 TList       *FixupsList = 0;    //List of Fixups
 TList       *FieldsList = 0;    //List of Fields ("field")
 TList       *PropertiesList = 0;//List of Properties ("property")
@@ -22,7 +22,7 @@ FILE        *fLog = 0;
 bool        ThreadVar = false;
 TList       *ModuleList = 0;    //List of Modules
 PMODULEINFO ModuleInfo = 0;
-WORD        ModuleID;
+Word        ModuleID;
 TList       *ConstList = 0;     //List of Constants
 TList       *TypeList = 0;      //List of Types
 TList       *VarList = 0;       //List of Vars
@@ -42,22 +42,22 @@ TList       *FEmbeddedTypes = 0; //contains embedding depths
 bool        IsMSIL;
 int         NDXHi;
 
-BYTE        fxStart = fxStart30;
-BYTE        fxEnd = fxEnd30;
-BYTE        fxJmpAddr = fxJmpAddr0;
+Byte        fxStart = fxStart30;
+Byte        fxEnd = fxEnd30;
+Byte        fxJmpAddr = fxJmpAddr0;
 
-BYTE        *FMemPtr = 0;   //DCUData
-BYTE        *CurPos = 0;    //Pointer to DCUData
-BYTE        *DefStart = 0;  //Start of definition
-BYTE        Tag;
-DWORD       Magic;
-DWORD       FMemSize;
-DWORD       FileSizeH;
-DWORD       FT;             //FileTime
-DWORD       Stamp;
+Byte        *FMemPtr = 0;   //DCUData
+Byte        *CurPos = 0;    //Pointer to DCUData
+Byte        *DefStart = 0;  //Start of definition
+Byte        Tag;
+DWord       Magic;
+DWord       FMemSize;
+DWord       FileSizeH;
+DWord       FT;             //FileTime
+DWord       Stamp;
 String      UnitName;
-DWORD       Flags;          //UnitFlags
-DWORD       UnitPrior;      //UnitPriority
+DWord       Flags;          //UnitFlags
+DWord       UnitPrior;      //UnitPriority
 
 TList       *FUnitImp = 0;  //List of Unit imports
 TList       *FTypes = 0;    //List of Types
@@ -68,9 +68,9 @@ TNameDecl   *FDecls = 0;
 int         FTypeDefCnt = 0;
 TList       *FTypeShowStack = 0;
 
-BYTE        *FDataBlPtr = 0;
-DWORD       FDataBlSize;
-DWORD       FDataBlOfs;
+Byte        *FDataBlPtr = 0;
+DWord       FDataBlSize;
+DWord       FDataBlOfs;
 //Fixups
 int         FFixupCnt;
 TFixupRec   *FFixupTbl = 0;
@@ -250,35 +250,35 @@ void __fastcall SkipBlock(int Sz)
     CurPos += Sz;
 }
 //------------------------------------------------------------------------------
-BYTE* __fastcall ReadMem(DWORD Sz)
+Byte* __fastcall ReadMem(DWord Sz)
 {
-    BYTE *Result = CurPos;
+    Byte *Result = CurPos;
     SkipBlock(Sz);
     return Result;
 }
 //------------------------------------------------------------------------------
 int OFFSET = 0;
-BYTE __fastcall ReadByte()
+Byte __fastcall ReadByte()
 {
 //!!!
 OFFSET = CurPos - FMemPtr;
 if (OFFSET >= 0x26CE)
 OFFSET = OFFSET;
-    BYTE Result = *CurPos;
+    Byte Result = *CurPos;
     CurPos++;
     return Result;
 }
 //------------------------------------------------------------------------------
-void __fastcall ReadByteIfEQ(BYTE V)
+void __fastcall ReadByteIfEQ(Byte V)
 {
-    BYTE  b = *CurPos;
+    Byte  b = *CurPos;
     if (b != V) return;
     CurPos++;
 }
 //------------------------------------------------------------------------------
 int __fastcall ReadByteFrom(bool V)
 {
-    BYTE  b = *CurPos;
+    Byte  b = *CurPos;
     if (V)  //FVer >= verD2010
     {
         if (b != 0 && b != 1 && b != 2 && b != 4 && b != 8 && b != 16 && b != 24 && b != 32 && b != 33 && b != 97 && b != 128 && b != 132) return -1;
@@ -291,15 +291,15 @@ int __fastcall ReadByteFrom(bool V)
     return b;
 }
 //------------------------------------------------------------------------------
-BYTE __fastcall ReadTag()
+Byte __fastcall ReadTag()
 {
     DefStart = CurPos;
     return ReadByte();
 }
 //------------------------------------------------------------------------------
-DWORD __fastcall ReadULong()
+DWord __fastcall ReadULong()
 {
-    DWORD Result = *((DWORD*)CurPos);
+    DWord Result = *((DWord*)CurPos);
     CurPos += 4;
     return Result;
 }
@@ -308,7 +308,7 @@ String __fastcall ReadStr()
 {
     String Res;
 
-    BYTE Len = ReadByte();
+    Byte Len = ReadByte();
     Res = String((char*)CurPos, Len); CurPos += Len;
     return Res;
 }
@@ -334,27 +334,27 @@ String __fastcall ReadNDXStr()
 //------------------------------------------------------------------------------
 typedef struct
 {
-    BYTE    B;
+    Byte    B;
     int     L;
 } TR4;
 
 int __fastcall ReadUIndex()
 {
 int         Result;
-BYTE        B[5];
-WORD        *W = (WORD*)B;
-DWORD       *L = (DWORD*)B;
+Byte        B[5];
+Word        *W = (Word*)B;
+DWord       *L = (DWord*)B;
 TR4         *R4 = (TR4*)B;
 
     NDXHi = 0;
     B[0] = ReadByte();
     if ((B[0] & 1) == 0)
-        Result = (DWORD)(B[0] >> 1);
+        Result = (DWord)(B[0] >> 1);
     else
     {
         B[1] = ReadByte();
         if ((B[0] & 2) == 0)
-            Result = (DWORD)(*W >> 2);
+            Result = (DWord)(*W >> 2);
         else
         {
             B[2] = ReadByte();
@@ -370,7 +370,7 @@ TR4         *R4 = (TR4*)B;
                 else
                 {
                     B[4] = ReadByte();
-                    Result = (DWORD)R4->L;
+                    Result = (DWord)R4->L;
                     if (FVer > 3 && ((B[0] & 0xF0) != 0))
                         NDXHi = ReadULong();
                 }
@@ -382,14 +382,14 @@ TR4         *R4 = (TR4*)B;
 //------------------------------------------------------------------------------
 typedef struct
 {
-    WORD    W;
+    Word    W;
     short   i;
 } TRL;
 
 int __fastcall ReadIndex()
 {
 int         Result;
-BYTE        B[8];
+Byte        B[8];
 char        *SB = B;
 short       *W = (short*)B;
 int         *L = (int*)B;
@@ -491,9 +491,9 @@ String __fastcall ExtractFileNameAnySep(String FN)
 }
 //------------------------------------------------------------------------------
 //In D10 some codes were changed, we'll try to move them back
-BYTE __fastcall FixTag(BYTE Tag)
+Byte __fastcall FixTag(Byte Tag)
 {
-BYTE    Result = Tag;
+Byte    Result = Tag;
 
     if (FVer >= verD2006 && FVer < verK1)
     {
@@ -552,7 +552,7 @@ typedef struct
     TList   *EmbeddedTypes;
 } TBindEmbeddedTypeInf, *PBindEmbeddedTypeInf;
 
-void _fastcall BindEmbeddedType(PDCURec UseRec, int hDT, DWORD* IP)
+void _fastcall BindEmbeddedType(PDCURec UseRec, int hDT, DWord* IP)
 {
     PBindEmbeddedTypeInf    betf = (PBindEmbeddedTypeInf)IP;
     int                     D;
@@ -573,7 +573,7 @@ void _fastcall BindEmbeddedType(PDCURec UseRec, int hDT, DWORD* IP)
     TD->EnumUsedTypes(BindEmbeddedType, IP);
 }
 //------------------------------------------------------------------------------
-void __fastcall EnumUsedTypeList(PDCURec L, TTypeUseAction Action, DWORD* IP)
+void __fastcall EnumUsedTypeList(PDCURec L, TTypeUseAction Action, DWord* IP)
 {
     while (L != 0)
     {
@@ -590,8 +590,8 @@ void __fastcall CheckProcedures(PDCURec D)
         if (D->InheritsFrom(__classid(TProcDecl)))
         {
             BindEmbeddedTypeInf.EmbL->Add(D);
-            EnumUsedTypeList(((PProcDecl)D)->Locals, BindEmbeddedType, (DWORD*)&BindEmbeddedTypeInf);
-            EnumUsedTypeList(((PProcDecl)D)->Embedded, BindEmbeddedType, (DWORD*)&BindEmbeddedTypeInf);
+            EnumUsedTypeList(((PProcDecl)D)->Locals, BindEmbeddedType, (DWord*)&BindEmbeddedTypeInf);
+            EnumUsedTypeList(((PProcDecl)D)->Embedded, BindEmbeddedType, (DWord*)&BindEmbeddedTypeInf);
             CheckProcedures(((PProcDecl)D)->Embedded);
             BindEmbeddedTypeInf.EmbL->Count = BindEmbeddedTypeInf.EmbL->Count - 1;
         }
@@ -621,9 +621,9 @@ void __fastcall BindEmbeddedTypes()
     FEmbeddedTypes = 0;
 }
 //------------------------------------------------------------------------------
-BYTE __fastcall ReadCallKind()
+Byte __fastcall ReadCallKind()
 {
-    BYTE Result = pcRegister;
+    Byte Result = pcRegister;
     if (Tag >= arCDecl && Tag <= arSafeCall)
     {
         Result = Tag - arCDecl + 1;
@@ -704,7 +704,7 @@ PSrcFileRec     SFR;
     for (int n = 0; n < FSrcFiles->Count; n++)
     {
         SFR = (PSrcFileRec)FSrcFiles->Items[n];
-        BYTE T = SFR->Def->Tag;
+        Byte T = SFR->Def->Tag;
         switch (T)
         {
         case drSrc:
@@ -750,12 +750,12 @@ PSrcFileRec     SFR, SFRMain = 0;
     UnitName.SetLength(CP - UnitName.c_str());
 }
 //------------------------------------------------------------------------------
-void __fastcall ReadUses(BYTE TagRq)
+void __fastcall ReadUses(Byte TagRq)
 {
 char            Ch;
 int             hUses, hPack, hImp, hUnit;
 int             ndx, ImpBase, ImpBase0, ImpReBase;
-DWORD           RTTISz;
+DWord           RTTISz;
 int             L, L1, L2;
 PName           UseName, ImpN;
 PUnitImpRec     U;
@@ -872,7 +872,7 @@ TImpDef         *IR;
     }
 }
 //------------------------------------------------------------------------------
-void __fastcall ShowUses(String PfxS, BYTE FRq)
+void __fastcall ShowUses(String PfxS, Byte FRq)
 {
     int i, Cnt;
     PUnitImpRec U;
@@ -897,10 +897,10 @@ void __fastcall ShowUses(String PfxS, BYTE FRq)
     OutLog1("\n");
 }
 //------------------------------------------------------------------------------
-void __fastcall SetDeclMem(int hDef, DWORD Ofs, DWORD Sz)
+void __fastcall SetDeclMem(int hDef, DWord Ofs, DWord Sz)
 {
     TDCURec *D;
-    DWORD Base, Rest;
+    DWord Base, Rest;
 
     D = (TDCURec*)FAddrs->Items[hDef - 1];
     Base = 0;
@@ -918,8 +918,8 @@ void __fastcall SetDeclMem(int hDef, DWORD Ofs, DWORD Sz)
 void    LoadFixups()
 {
     int i;
-    DWORD CurOfs, PrevDeclOfs, dOfs;
-    BYTE B1;
+    DWord CurOfs, PrevDeclOfs, dOfs;
+    Byte B1;
     TFixupRec *FP;
     int hPrevDecl;
 
@@ -944,7 +944,7 @@ void    LoadFixups()
     for (i = 0; i < FFixupCnt; i++)
     {
         CurOfs = (FP->OfsF & FixOfsMask);
-        B1 = ((BYTE*)(&FP->OfsF))[3];
+        B1 = ((Byte*)(&FP->OfsF))[3];
 //!!!
 //if (B1 != 12 && B1 != 1 && B1 != 2 && B1 != 3 && B1 != 5 && B1 != 13)
 //B1 = B1;
@@ -963,9 +963,9 @@ void    LoadFixups()
 void LoadCodeLines()
 {
     int i, CurL, dL;
-    DWORD CurOfs, dOfs;
+    DWord CurOfs, dOfs;
 
-    DWORD FCodeLineCnt = ReadUIndex();
+    DWord FCodeLineCnt = ReadUIndex();
     CurL = 0;
     CurOfs = 0;
     for (i = 0; i < FCodeLineCnt; i++)
@@ -981,9 +981,9 @@ void LoadLineRanges()
 {
     int i;
     int hFile, Num;
-    DWORD Line0, LineNum;
+    DWord Line0, LineNum;
 
-    DWORD FLineRangeCnt = ReadUIndex();
+    DWord FLineRangeCnt = ReadUIndex();
     Num = 0;
     for (int i = 0; i < FLineRangeCnt; i++)
     {
@@ -1281,11 +1281,11 @@ void __fastcall FillProcLocVarTbls()
 int __fastcall ReadConstAddInfo(TNameDecl* LastProcDecl)
 {
     bool    brk = false;
-    BYTE    Tag, caiStop, b, *cPos;
+    Byte    Tag, caiStop, b, *cPos;
     int     hDef, hDef1, hDef2, hDef3, hDef4, hDef5, hDT, F, IP, i, j;
     int     V1, V2, V3, V4, V5, InlineMask;
-    DWORD   Len, Len1, V, hUnit;
-    DWORD	W1, W2;
+    DWord   Len, Len1, V, hUnit;
+    DWord	W1, W2;
     int     hDef11, hDef12, hDef13, hDef14, hDef15;
     int     IP2, Z;
     String  S;
@@ -1622,12 +1622,12 @@ int __fastcall ReadConstAddInfo(TNameDecl* LastProcDecl)
 }
 //------------------------------------------------------------------------------
 int CurDeclNo = 0;
-void __fastcall ReadDeclList(BYTE LK, TNameDecl** Result)
+void __fastcall ReadDeclList(Byte LK, TNameDecl** Result)
 {
 int         TTT;
-BYTE        B;
+Byte        B;
 int         i, V, X;
-BYTE        Tag1;
+Byte        Tag1;
 bool        WasEmbEnd;
 bool        brk = false;
 TNameDecl   *Embedded;
@@ -2043,10 +2043,10 @@ String  SecNames[] = {
     "published"
 };
 
-void __fastcall ShowDeclList(BYTE LK, TNameDecl* Decl, String& OutS)
+void __fastcall ShowDeclList(Byte LK, TNameDecl* Decl, String& OutS)
 {
     bool        Visible;
-    BYTE        SK;
+    Byte        SK;
     int         DeclCnt;
     TTypeDef    *TD;
     String      SecN, S;
@@ -2231,20 +2231,20 @@ String __fastcall ShowTypeName(int hDef)
 //verD2009  C       D       1       2       5   3
 //verD2010  0       1       4       18      5   8
 void __fastcall ShowDump(
-    BYTE* DP,                       //File 0 address, show file offsets if present
-    BYTE* DPFile0,                  //Dump address
-    DWORD FileSize, DWORD SizeDispl,//used to calculate display offset digits
-    DWORD Size,                     //Dump size
-    DWORD Ofs0Displ,                //initial display offset
-    DWORD Ofs0,                     //offset in DCU data block - for fixups
-    DWORD WMin,                     //Minimal dump width (in bytes)
+    Byte* DP,                       //File 0 address, show file offsets if present
+    Byte* DPFile0,                  //Dump address
+    DWord FileSize, DWord SizeDispl,//used to calculate display offset digits
+    DWord Size,                     //Dump size
+    DWord Ofs0Displ,                //initial display offset
+    DWord Ofs0,                     //offset in DCU data block - for fixups
+    DWord WMin,                     //Minimal dump width (in bytes)
     int FixCnt, TFixupRec* FixTbl)
 {
-    BYTE *LP;
-    DWORD W;
-    DWORD LSz, dOfs, ROfs;
+    Byte *LP;
+    DWord W;
+    DWord LSz, dOfs, ROfs;
     PFixupRec FP;
-    BYTE K, B;
+    Byte K, B;
 
     if ((int)Size <= 0) return;
 
@@ -2288,7 +2288,7 @@ void __fastcall ShowDump(
         while (FixCnt > 0)
         {
             dOfs = (FP->OfsF & FixOfsMask) - Ofs0;
-            K = ((BYTE*)&FP->OfsF)[3];
+            K = ((Byte*)&FP->OfsF)[3];
             if (dOfs >= LSz && (dOfs != LSz || K != fxEnd)) break;
             if (FVer == verD2010 || FVer == verDXE1 || FVer == verDXE2)
             {
@@ -2419,7 +2419,7 @@ void __fastcall ShowDump(
     } while (Size > 0);
 }
 //------------------------------------------------------------------------------
-BYTE* __fastcall GetBlockMem(DWORD BlOfs, DWORD BlSz, DWORD* ResSz)
+Byte* __fastcall GetBlockMem(DWord BlOfs, DWord BlSz, DWord* ResSz)
 {
     *ResSz = BlSz;
     if (!FDataBlPtr || (int)BlOfs < 0 || !BlSz) return NULL;
@@ -2432,7 +2432,7 @@ BYTE* __fastcall GetBlockMem(DWORD BlOfs, DWORD BlSz, DWORD* ResSz)
     return FDataBlPtr + BlOfs;
 }
 //------------------------------------------------------------------------------
-int __fastcall GetStartFixup(DWORD Ofs)
+int __fastcall GetStartFixup(DWord Ofs)
 {
     int i, iMin, iMax;
     int d;
@@ -2454,10 +2454,10 @@ int __fastcall GetStartFixup(DWORD Ofs)
     return iMin;
 }
 //------------------------------------------------------------------------------
-void __fastcall ShowDataBl(DWORD Ofs0, DWORD BlOfs, DWORD BlSz)
+void __fastcall ShowDataBl(DWord Ofs0, DWord BlOfs, DWord BlSz)
 {
     int Fix0;
-    BYTE *DP;
+    Byte *DP;
 
     DP = GetBlockMem(BlOfs + Ofs0, BlSz - Ofs0, &BlSz);
     if (!DP) return;
@@ -2465,9 +2465,9 @@ void __fastcall ShowDataBl(DWORD Ofs0, DWORD BlOfs, DWORD BlSz)
     ShowDump(DP, FMemPtr, FMemSize, 0, BlSz, Ofs0, BlOfs + Ofs0, 0, FFixupCnt - Fix0, &FFixupTbl[Fix0]);
 }
 //------------------------------------------------------------------------------
-void __fastcall DasmCodeBlSeq(DWORD Ofs0, DWORD BlOfs, DWORD BlSz)
+void __fastcall DasmCodeBlSeq(DWord Ofs0, DWord BlOfs, DWord BlSz)
 {
-    BYTE *DP;
+    Byte *DP;
     int Fix0;
     char *FOfs0;
 
@@ -2482,9 +2482,9 @@ void __fastcall DasmCodeBlSeq(DWORD Ofs0, DWORD BlOfs, DWORD BlSz)
     ShowDump(DP, FOfs0, FMemSize, BlSz, BlSz, Ofs0, BlOfs, 0, FFixupCnt-Fix0, &FFixupTbl[Fix0]);
 }
 //------------------------------------------------------------------------------
-void __fastcall ShowCodeBl(DWORD Ofs0, DWORD BlOfs, DWORD BlSz)
+void __fastcall ShowCodeBl(DWord Ofs0, DWord BlOfs, DWord BlSz)
 {
-    DWORD Sz, CodeSz;
+    DWord Sz, CodeSz;
 
     CodeSz = BlSz;
     DasmCodeBlSeq(Ofs0, BlOfs, CodeSz);
@@ -2495,18 +2495,18 @@ void __fastcall ShowCodeBl(DWORD Ofs0, DWORD BlOfs, DWORD BlSz)
     }
 }
 //------------------------------------------------------------------------------
-bool __fastcall MemToUInt(BYTE *DP, DWORD Sz, DWORD* Res)
+bool __fastcall MemToUInt(Byte *DP, DWord Sz, DWord* Res)
 {
     switch (Sz)
     {
     case 1:
-        *Res = *((BYTE*)DP);
+        *Res = *((Byte*)DP);
         break;
     case 2:
-        *Res = *((WORD*)DP);
+        *Res = *((Word*)DP);
         break;
     case 4:
-        *Res = *((DWORD*)DP);
+        *Res = *((DWord*)DP);
         break;
     default:
         Res = 0;
@@ -2519,7 +2519,7 @@ String __fastcall CharStr(char Ch)
 {
     char buf[256];
     if (Ch < ' ')
-        sprintf(buf, "#%d", (BYTE)Ch);
+        sprintf(buf, "#%d", (Byte)Ch);
     else
         sprintf(buf, "'%c'", Ch);
     return String(buf);
@@ -2575,10 +2575,10 @@ String __fastcall StrConstStr(char* CP, int L)
     return Result;
 }
 //------------------------------------------------------------------------------
-int __fastcall ShowStrConst(BYTE* DP, DWORD DS, String& OutS)
+int __fastcall ShowStrConst(Byte* DP, DWord DS, String& OutS)
 {
     int L;
-    BYTE *VP;
+    Byte *VP;
     String Value;
     OutS = "";
 
@@ -2601,19 +2601,19 @@ int __fastcall ShowStrConst(BYTE* DP, DWORD DS, String& OutS)
 //  -10:2 - string item size
 //  -8:4 - reference count
 //  -4:4 - Length in terms of the string item size
-int __fastcall ShowUnicodeStrConst(BYTE* DP, DWORD DS, String& OutS) //Ver >=verD12
+int __fastcall ShowUnicodeStrConst(Byte* DP, DWord DS, String& OutS) //Ver >=verD12
 {
     int     ElSz, Result = -1;
-    BYTE    *VP;
+    Byte    *VP;
 
     OutS = "";
     if (DS < 13) return Result;
-    VP = DP + sizeof(WORD);
-    ElSz = *((WORD*)VP);
+    VP = DP + sizeof(Word);
+    ElSz = *((Word*)VP);
     if (ElSz == sizeof(AnsiChar)) //Try to show it as an AnsiString (!!!the code page is ignored by now)
     {
-        Result = ShowStrConst(DP + 2*sizeof(WORD), DS - 2*sizeof(WORD), OutS);
-        if (Result > 0) Result += 2*sizeof(WORD);
+        Result = ShowStrConst(DP + 2*sizeof(Word), DS - 2*sizeof(Word), OutS);
+        if (Result > 0) Result += 2*sizeof(Word);
         return Result;
     }
     if (ElSz != sizeof(WideChar)) return Result;
@@ -2626,7 +2626,7 @@ int __fastcall ShowUnicodeStrConst(BYTE* DP, DWORD DS, String& OutS) //Ver >=ver
     return Result;
 }
 //------------------------------------------------------------------------------
-int __fastcall ShowUnicodeResStrConst(BYTE* DP, DWORD DS, String& OutS) //Ver >=verD12
+int __fastcall ShowUnicodeResStrConst(Byte* DP, DWord DS, String& OutS) //Ver >=verD12
 {
     int         L, Result = -1;
     WideString  WS;
@@ -2644,7 +2644,7 @@ int __fastcall ShowUnicodeResStrConst(BYTE* DP, DWORD DS, String& OutS) //Ver >=
     OutLog2("%s", OutS.c_str());
 }
 //------------------------------------------------------------------------------
-int __fastcall ShowTypeValue(TTypeDef* T, BYTE* DP, DWORD DS, int ConstKind, String& OutS)
+int __fastcall ShowTypeValue(TTypeDef* T, Byte* DP, DWord DS, int ConstKind, String& OutS)
 {
     int Result;
     TFixupMemState MS;
@@ -2675,11 +2675,11 @@ int __fastcall ShowTypeValue(TTypeDef* T, BYTE* DP, DWORD DS, int ConstKind, Str
     return Result;
 }
 //------------------------------------------------------------------------------
-int __fastcall ShowGlobalTypeValue(int hDef, BYTE* DP, DWORD DS, bool AndRest, int ConstKind, String& OutS)
+int __fastcall ShowGlobalTypeValue(int hDef, Byte* DP, DWord DS, bool AndRest, int ConstKind, String& OutS)
 {
     TTypeDef    *T;
     int         SzShown;
-    BYTE        *FOfs0;
+    Byte        *FOfs0;
 
     OutS = "";
     if (!DP) return -1;
@@ -2737,9 +2737,9 @@ String __fastcall ShowOfsQualifier(int hDef, int Ofs)
 //------------------------------------------------------------------------------
 bool __fastcall ScanOneDCU(String Filename)
 {
-BYTE        B;
+Byte        B;
 String      S, SName;
-DWORD       L, L1, L2, Flags1;
+DWord       L, L1, L2, Flags1;
 
     FILE *fIn = fopen(Filename.c_str(), "rb");
     if (!fIn) return false;
@@ -2771,7 +2771,7 @@ DWORD       L, L1, L2, Flags1;
     fseek(fIn, 0, SEEK_END);
     FMemSize = ftell(fIn);
     fseek(fIn, 0, SEEK_SET);
-    FMemPtr = new BYTE[FMemSize];
+    FMemPtr = new Byte[FMemSize];
     fread((void*)FMemPtr, 1, FMemSize, fIn);
     fclose(fIn);
 
@@ -3134,13 +3134,13 @@ int __fastcall CompareProcsByID(void *Item1, void *Item2)
 }
 //------------------------------------------------------------------------------
 #include <dir.h>
-//Записываем длину имени (WORD) + имя + нулевой байт, возвращаем общее кол-во байт
+//Записываем длину имени (Word) + имя + нулевой байт, возвращаем общее кол-во байт
 int __fastcall WriteString(FILE* fDst, String& str)
 {
     int Bytes = 0;
-    BYTE ZeroB = 0;
+    Byte ZeroB = 0;
 
-    WORD NameLength = (WORD)str.Length();
+    Word NameLength = (Word)str.Length();
     if (fDst) fwrite(&NameLength, sizeof(NameLength), 1, fDst);
     if (NameLength)
     {
@@ -3150,22 +3150,22 @@ int __fastcall WriteString(FILE* fDst, String& str)
     return sizeof(NameLength) + NameLength + 1;
 }
 //------------------------------------------------------------------------------
-int __fastcall WriteDump(FILE* fSrc, FILE *fDst, long SrcOffset, DWORD Bytes)
+int __fastcall WriteDump(FILE* fSrc, FILE *fDst, long SrcOffset, DWord Bytes)
 {
     fseek(fSrc, SrcOffset, SEEK_SET);
     for (int m = 0; m < Bytes; m++)
     {
-        BYTE b;
+        Byte b;
         fread(&b, 1, 1, fSrc);
         fwrite(&b, 1, 1, fDst);
     }
     return Bytes;
 }
 //------------------------------------------------------------------------------
-int __fastcall WriteRelocs(FILE *fDst, TList *FixupList, DWORD Bytes, String Name)
+int __fastcall WriteRelocs(FILE *fDst, TList *FixupList, DWord Bytes, String Name)
 {
-    BYTE    Byte00 = 0;
-    DWORD   ByteFF = 0xFFFFFFFF;
+    Byte    Byte00 = 0;
+    DWord   ByteFF = 0xFFFFFFFF;
     int     ByteNo = 0;
     for (int n = 0; n < FixupList->Count; n++)
     {
@@ -3285,7 +3285,7 @@ int main(int argc, char* argv[])
 
     printf("Total files %d\n", num);
 
-    DWORD CurrOffset = 0;
+    DWord CurrOffset = 0;
     FILE *fIn;
     int charnum;
     long filelen;
@@ -3298,14 +3298,14 @@ int main(int argc, char* argv[])
     fwrite(KBSignature, 1, strlen(KBSignature) + 1, fOut); CurrOffset += strlen(KBSignature) + 1;
     fwrite(&IsMSIL, sizeof(IsMSIL), 1, fOut); CurrOffset += sizeof(IsMSIL);
     fwrite(&FVer, sizeof(FVer), 1, fOut); CurrOffset += sizeof(FVer);
-    DWORD CRC = 0xFFFFFFFF;
+    DWord CRC = 0xFFFFFFFF;
     fwrite(&CRC, sizeof(CRC), 1, fOut); CurrOffset += sizeof(CRC);
     char Description[256];
     fwrite(Description, 1, 256, fOut); CurrOffset += 256;
 #ifdef NEW_VERSION
-    DWORD Version = 2.0;
+    DWord Version = 2.0;
 #else
-    DWORD Version = 1.0;
+    DWord Version = 1.0;
 #endif
     fwrite(&Version, sizeof(Version), 1, fOut); CurrOffset += sizeof(Version);
     TDateTime CreateDT, LastModifyDT;
@@ -3320,16 +3320,16 @@ int main(int argc, char* argv[])
         ModuleInfo->ID = n;
         ModuleInfo->Offset = CurrOffset;
 
-        DWORD DataSize = 0;
+        DWord DataSize = 0;
         //ModuleID
-        fwrite(&ModuleInfo->ModuleID, sizeof(WORD), 1, fOut);
-        DataSize += sizeof(WORD);
+        fwrite(&ModuleInfo->ModuleID, sizeof(Word), 1, fOut);
+        DataSize += sizeof(Word);
         //Name
         DataSize += WriteString(fOut, ModuleInfo->Name);
         //Filename
         DataSize += WriteString(fOut, ModuleInfo->Filename);
         //UsesNum
-        WORD UsesNum = ModuleInfo->UsesList->Count;
+        Word UsesNum = ModuleInfo->UsesList->Count;
         fwrite(&UsesNum, sizeof(UsesNum), 1, fOut);
         DataSize += sizeof(UsesNum);
         //Uses
@@ -3341,20 +3341,20 @@ int main(int argc, char* argv[])
                 PMODULEINFO modInfo = (PMODULEINFO)ModuleList->Items[mm];
                 if (!modInfo->Name.AnsiCompareIC(ModuleInfo->UsesList->Strings[m]))
                 {
-                    fwrite(&modInfo->ModuleID, sizeof(WORD), 1, fOut);
+                    fwrite(&modInfo->ModuleID, sizeof(Word), 1, fOut);
                     found = true;
                     break;
                 }
             }
             if (!found)
             {
-                WORD mID = 0xFFFF;
-                fwrite(&mID, sizeof(WORD), 1, fOut);
+                Word mID = 0xFFFF;
+                fwrite(&mID, sizeof(Word), 1, fOut);
                 //Вспомогательная печать для определения замкнутого множества юнитов 
                 //if (!ModuleInfo->UsesList->Strings[m].Pos("."))
                 //    printf("-%s\n", ModuleInfo->UsesList->Strings[m]);
             }
-            DataSize += sizeof(WORD);
+            DataSize += sizeof(Word);
         }
         for (int m = 0; m < UsesNum; m++)
         {
@@ -3372,7 +3372,7 @@ int main(int argc, char* argv[])
     ConstList->Sort(CompareConstsByName);
     int ConstCount = 0;
     int MaxConstDataSize = 0;
-    WORD PrevModId = 0xFFFF;
+    Word PrevModId = 0xFFFF;
     String PrevName = "";
     for (int n = 0; n < ConstList->Count; n++)
     {
@@ -3389,7 +3389,7 @@ int main(int argc, char* argv[])
         PrevModId = constInfo->ModuleID;
         PrevName = constInfo->Name;
 
-        DWORD DataSize = 0;
+        DWord DataSize = 0;
         //ModuleID
         fwrite(&constInfo->ModuleID, sizeof(constInfo->ModuleID), 1, fOut);
         DataSize += sizeof(constInfo->ModuleID);
@@ -3405,7 +3405,7 @@ int main(int argc, char* argv[])
         //Не будем дампить константы с внутренними именами
         if (constInfo->Name.Pos("_NV_") == 1) constInfo->RTTISz = 0;
         //DumpTotal
-        DWORD DumpTotal = 0;
+        DWord DumpTotal = 0;
         if (constInfo->RTTISz)
         {
             fIn = 0;
@@ -3429,7 +3429,7 @@ int main(int argc, char* argv[])
             }
         }
         DumpTotal += sizeof(constInfo->RTTISz); //DumpSz
-        DWORD FixupNum = constInfo->Fixups->Count;
+        DWord FixupNum = constInfo->Fixups->Count;
         DumpTotal += sizeof(FixupNum);          //FixupNum
 
         fwrite(&DumpTotal, sizeof(DumpTotal), 1, fOut);
@@ -3471,7 +3471,7 @@ int main(int argc, char* argv[])
         PTYPEINFO typeInfo = (PTYPEINFO)TypeList->Items[n];
         typeInfo->ID = n;
         typeInfo->Offset = CurrOffset;
-        DWORD DataSize = 0;
+        DWord DataSize = 0;
 #ifdef NEW_VERSION
         //Size
         fwrite(&typeInfo->Size, sizeof(typeInfo->Size), 1, fOut);
@@ -3493,7 +3493,7 @@ int main(int argc, char* argv[])
         //Не будем дампить типы с внутренними именами
         if (typeInfo->Name.Pos("_NT_") == 1) typeInfo->RTTISz = 0;
         //DumpTotal
-        DWORD DumpTotal = 0;
+        DWord DumpTotal = 0;
         if (typeInfo->RTTISz)
         {
             fIn = 0;
@@ -3517,7 +3517,7 @@ int main(int argc, char* argv[])
             }
         }
         DumpTotal += sizeof(typeInfo->RTTISz);  //DumpSz
-        DWORD FixupNum = typeInfo->Fixups->Count;
+        DWord FixupNum = typeInfo->Fixups->Count;
         DumpTotal += sizeof(FixupNum);          //FixupNum
         
         fwrite(&DumpTotal, sizeof(DumpTotal), 1, fOut);
@@ -3543,8 +3543,8 @@ int main(int argc, char* argv[])
             }
         }
         //FieldsTotal
-        WORD FieldsNum = typeInfo->Fields->Count;
-        DWORD FieldsTotal = 0;
+        Word FieldsNum = typeInfo->Fields->Count;
+        DWord FieldsTotal = 0;
         for (int m = 0; m < FieldsNum; m++)
         {
             PLOCALDECLINFO linfo = (PLOCALDECLINFO)typeInfo->Fields->Items[m];
@@ -3575,8 +3575,8 @@ int main(int argc, char* argv[])
             DataSize += WriteString(fOut, linfo->TypeDef);
         }
         //PropsTotal
-        WORD PropsNum = typeInfo->Properties->Count;
-        DWORD PropsTotal = 0;
+        Word PropsNum = typeInfo->Properties->Count;
+        DWord PropsTotal = 0;
         for (int m = 0; m < PropsNum; m++)
         {
             if (typeInfo->Kind == drClassDef || typeInfo->Kind == drInterfaceDef)
@@ -3619,8 +3619,8 @@ int main(int argc, char* argv[])
             }
         }
         //MethodsTotal
-        WORD MethodsNum = typeInfo->Methods->Count;
-        DWORD MethodsTotal = 0;
+        Word MethodsNum = typeInfo->Methods->Count;
+        DWord MethodsTotal = 0;
         for (int m = 0; m < MethodsNum; m++)
         {
             PMETHODDECLINFO minfo = (PMETHODDECLINFO)typeInfo->Methods->Items[m];
@@ -3661,7 +3661,7 @@ int main(int argc, char* argv[])
         vInfo->ID = n;
         vInfo->Offset = CurrOffset;
 
-        DWORD DataSize = 0;
+        DWord DataSize = 0;
         //ModuleID
         fwrite(&vInfo->ModuleID, sizeof(vInfo->ModuleID), 1, fOut);
         DataSize += sizeof(vInfo->ModuleID);
@@ -3685,14 +3685,14 @@ int main(int argc, char* argv[])
 //--------------------------------------------------------------RESOURCE STRINGS
     int ResStrCount = ResStrList->Count;
     int MaxResStrDataSize = 0;
-    BYTE ResStrBuf[1024];
+    Byte ResStrBuf[1024];
     for (int n = 0; n < ResStrCount; n++)
     {
         PRESSTRINFO rsInfo = (PRESSTRINFO)ResStrList->Items[n];
         rsInfo->ID = n;
         rsInfo->Offset = CurrOffset;
 
-        DWORD DataSize = 0;
+        DWord DataSize = 0;
         //ModuleID
         fwrite(&rsInfo->ModuleID, sizeof(rsInfo->ModuleID), 1, fOut);
         DataSize += sizeof(rsInfo->ModuleID);
@@ -3719,7 +3719,7 @@ int main(int argc, char* argv[])
                 fseek(fIn, rsInfo->DumpOfs, SEEK_SET);
                 fread(ResStrBuf, 1, rsInfo->DumpSz, fIn);
                 fclose(fIn);
-                WORD ResStrLen = *((WORD*)(ResStrBuf + 4));
+                Word ResStrLen = *((Word*)(ResStrBuf + 4));
                 rsInfo->Context = String((char*)(ResStrBuf + 8), ResStrLen);
                 DataSize += WriteString(fOut, rsInfo->Context);
             }
@@ -3736,7 +3736,7 @@ int main(int argc, char* argv[])
     int MaxProcDataSize = 0;
     for (int n = 0; n < ProcCount; n++)
     {
-        DWORD DataSize = 0;
+        DWord DataSize = 0;
         PPROCDECLINFO pInfo = (PPROCDECLINFO)ProcList->Items[n];
         pInfo->ID = n;
         pInfo->Offset = CurrOffset;
@@ -3763,7 +3763,7 @@ int main(int argc, char* argv[])
         //TypeDef
         DataSize += WriteString(fOut, pInfo->TypeDef);
         //DumpTotal
-        DWORD DumpTotal = 0;
+        DWord DumpTotal = 0;
         if (pInfo->DumpSz)
         {
             fIn = 0;
@@ -3787,7 +3787,7 @@ int main(int argc, char* argv[])
             }
         }
         DumpTotal += sizeof(pInfo->DumpSz); //DumpSz
-        DWORD FixupNum = pInfo->Fixups->Count;
+        DWord FixupNum = pInfo->Fixups->Count;
         DumpTotal += sizeof(FixupNum);      //FixupNum
         
         fwrite(&DumpTotal, sizeof(DumpTotal), 1, fOut);
@@ -3813,8 +3813,8 @@ int main(int argc, char* argv[])
             }
         }
         //ArgsTotal
-        WORD ArgsNum = pInfo->Args->Count;
-        DWORD ArgsTotal = 0;
+        Word ArgsNum = pInfo->Args->Count;
+        DWord ArgsTotal = 0;
         for (int m = 0; m < ArgsNum; m++)
         {
             PLOCALDECLINFO lInfo = (PLOCALDECLINFO)pInfo->Args->Items[m];
@@ -3846,8 +3846,8 @@ int main(int argc, char* argv[])
             DataSize += WriteString(fOut, lInfo->TypeDef);
         }
         //LocalsTotal
-        WORD LocalsNum = pInfo->Locals->Count;
-        DWORD LocalsTotal = 0;
+        Word LocalsNum = pInfo->Locals->Count;
+        DWord LocalsTotal = 0;
         for (int m = 0; m < LocalsNum; m++)
         {
             PLOCALDECLINFO lInfo = (PLOCALDECLINFO)pInfo->Locals->Items[m];
