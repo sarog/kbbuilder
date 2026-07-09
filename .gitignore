@@ -4,4 +4,12 @@
 # User-specific files
 **/__history
 **/__recovery
-*.~pas
+
+*.dsk
+*.~*
+*.exe
+*.stat
+*.identcache
+*.conf
+*.kof
+*.dproj.local
