@@ -5,6 +5,15 @@
 **/__history
 **/__recovery
 
+.idea/
+.cmake
+build/
+Win32/
+Win64/
+dcu/
+CMakeFiles/
+CMakeCache.txt
+
 *.dsk
 *.~*
 *.exe
@@ -13,4 +22,5 @@
 *.conf
 *.kof
 *.dproj.local
+*.cbproj.local
 *.res
