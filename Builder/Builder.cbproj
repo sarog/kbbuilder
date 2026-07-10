@@ -1,15 +1,15 @@
 ﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
     <PropertyGroup>
-        <ProjectGuid>{61D5030C-EA50-4F33-BC06-8BFEDB340603}</ProjectGuid>
-        <MainSource>dcu32int.dpr</MainSource>
+        <ProjectGuid>{6E240B56-0E1F-48E5-96C2-B588F77A166C}</ProjectGuid>
+        <ProjectVersion>20.1</ProjectVersion>
+        <FrameworkType>VCL</FrameworkType>
         <Base>True</Base>
         <Config Condition="'$(Config)'==''">Debug</Config>
-        <TargetedPlatforms>3</TargetedPlatforms>
-        <AppType>Console</AppType>
-        <FrameworkType>None</FrameworkType>
-        <ProjectVersion>20.1</ProjectVersion>
         <Platform Condition="'$(Platform)'==''">Win32</Platform>
-        <ProjectName Condition="'$(ProjectName)'==''">dcu32int</ProjectName>
+        <ProjectName Condition="'$(ProjectName)'==''">Builder</ProjectName>
+        <TargetedPlatforms>1</TargetedPlatforms>
+        <AppType>Console</AppType>
+        <CC_Suffix Condition="'$(CC_Suffix)'==''">c</CC_Suffix>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Config)'=='Base' or '$(Base)'!=''">
         <Base>true</Base>
@@ -24,7 +24,12 @@
         <CfgParent>Base</CfgParent>
         <Base>true</Base>
     </PropertyGroup>
-    <PropertyGroup Condition="'$(Config)'=='Release' or '$(Cfg_1)'!=''">
+    <PropertyGroup Condition="('$(Platform)'=='Win64x' and '$(Base)'=='true') or '$(Base_Win64x)'!=''">
+        <Base_Win64x>true</Base_Win64x>
+        <CfgParent>Base</CfgParent>
+        <Base>true</Base>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(Config)'=='Debug' or '$(Cfg_1)'!=''">
         <Cfg_1>true</Cfg_1>
         <CfgParent>Base</CfgParent>
         <Base>true</Base>
@@ -35,7 +40,7 @@
         <Cfg_1>true</Cfg_1>
         <Base>true</Base>
     </PropertyGroup>
-    <PropertyGroup Condition="'$(Config)'=='Debug' or '$(Cfg_2)'!=''">
+    <PropertyGroup Condition="'$(Config)'=='Release' or '$(Cfg_2)'!=''">
         <Cfg_2>true</Cfg_2>
         <CfgParent>Base</CfgParent>
         <Base>true</Base>
@@ -47,179 +52,196 @@
         <Base>true</Base>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Base)'!=''">
-        <SanitizedProjectName>dcu32int</SanitizedProjectName>
-        <DCC_ConsoleTarget>true</DCC_ConsoleTarget>
-        <VerInfo_AutoGenVersion>true</VerInfo_AutoGenVersion>
-        <VerInfo_Build>79</VerInfo_Build>
-        <DCC_UsePackage>IBEVNT30;VCLDB30;VCL30;VCLX30;INETDB30;INET30;VCLDBX30;VCLSMP30;QRPT30;TEEUI30;TEEDB30;TEE30;DSS30;$(DCC_UsePackage)</DCC_UsePackage>
-        <DCC_ImageBase>00400000</DCC_ImageBase>
-        <VerInfo_MinorVer>15</VerInfo_MinorVer>
-        <DCC_Namespace>System;Xml;Data;Datasnap;Web;Soap;Winapi;$(DCC_Namespace)</DCC_Namespace>
-        <DCC_Alignment>1</DCC_Alignment>
-        <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
-        <DCC_Define>I64;$(DCC_Define)</DCC_Define>
-        <DCC_K>false</DCC_K>
-        <DCC_F>false</DCC_F>
-        <DCC_N>true</DCC_N>
-        <VerInfo_Release>1</VerInfo_Release>
-        <DCC_S>false</DCC_S>
-        <DCC_SymbolReferenceInfo>1</DCC_SymbolReferenceInfo>
-        <VerInfo_Keys>CompanyName=AX;FileDescription=Parser of Delphi 2.0-8.0, 2005-2006 (.net and WIN32), 2007-2010 (WIN32 only),  XE (WIN32 only), XE2-XE7 (WIN32,WIN64,OSX32), Kylix 1.0-3.0;FileVersion=1.20.1.79;InternalName=DCU32INT;LegalCopyright=Copyright ©2000-2015, Alexei E. Hmelnov;LegalTrademarks=;OriginalFilename=DCU32INT;ProductName=DCU32INT;ProductVersion=1.20.1;Comments=</VerInfo_Keys>
-        <DCC_DcuOutput>..\dcu</DCC_DcuOutput>
-        <DCC_E>false</DCC_E>
-        <VerInfo_Locale>1049</VerInfo_Locale>
-        <Icon_MainIcon>$(BDS)\bin\delphi_PROJECTICON.ico</Icon_MainIcon>
-        <Icns_MainIcns>$(BDS)\bin\delphi_PROJECTICNS.icns</Icns_MainIcns>
+        <DCC_CBuilderOutput>JPHNE</DCC_CBuilderOutput>
+        <IntermediateOutputDir>.\$(Platform)\$(Config)</IntermediateOutputDir>
+        <FinalOutputDir>.\$(Platform)\$(Config)</FinalOutputDir>
+        <BCC_wpar>false</BCC_wpar>
+        <BCC_OptimizeForSpeed>true</BCC_OptimizeForSpeed>
+        <BCC_ExtendedErrorInfo>true</BCC_ExtendedErrorInfo>
+        <ILINK_TranslatedLibraryPath>$(BDSLIB)\$(PLATFORM)\release\$(LANGDIR);$(ILINK_TranslatedLibraryPath)</ILINK_TranslatedLibraryPath>
+        <ProjectType>CppConsoleApplication</ProjectType>
+        <DCC_Namespace>System;Xml;Data;Datasnap;Web;Soap;Vcl;Vcl.Imaging;Vcl.Touch;Vcl.Samples;Vcl.Shell;$(DCC_Namespace)</DCC_Namespace>
+        <AllPackageLibs>rtl.lib;vcl.lib</AllPackageLibs>
+        <IncludePath>.\Builder\;$(IncludePath)</IncludePath>
+        <Multithreaded>true</Multithreaded>
+        <ILINK_LibraryPath>.\Builder\;$(ILINK_LibraryPath)</ILINK_LibraryPath>
+        <_TCHARMapping>wchar_t</_TCHARMapping>
+        <SanitizedProjectName>Builder</SanitizedProjectName>
+        <BCC_ZeroLengthEmptyBaseClass>true</BCC_ZeroLengthEmptyBaseClass>
+        <BCC_ZeroLengthEmptyMemberFuncs>true</BCC_ZeroLengthEmptyMemberFuncs>
+        <VerInfo_Locale>1033</VerInfo_Locale>
+        <VerInfo_Keys>CompanyName=;FileDescription=$(MSBuildProjectName);FileVersion=1.0.0.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProgramID=com.embarcadero.$(MSBuildProjectName);ProductName=$(MSBuildProjectName);ProductVersion=1.0.0.0;Comments=</VerInfo_Keys>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Base_Win32)'!=''">
-        <VerInfo_Build>82</VerInfo_Build>
-        <VerInfo_MinorVer>16</VerInfo_MinorVer>
-        <Manifest_File>None</Manifest_File>
-        <Icon_MainIcon>dcu32int_Icon1.ico</Icon_MainIcon>
-        <DCC_Namespace>System.Win;Data.Win;Datasnap.Win;Web.Win;Soap.Win;Xml.Win;Bde;$(DCC_Namespace)</DCC_Namespace>
-        <VerInfo_Locale>1033</VerInfo_Locale>
-        <VerInfo_Keys>CompanyName=;FileVersion=1.20.1.96;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductVersion=1.0.0.0;Comments=;ProgramID=com.embarcadero.$(MSBuildProjectName);FileDescription=$(MSBuildProjectName);ProductName=$(MSBuildProjectName)</VerInfo_Keys>
-    </PropertyGroup>
-    <PropertyGroup Condition="'$(Base_Win64)'!=''">
-        <VerInfo_Locale>1033</VerInfo_Locale>
-        <VerInfo_IncludeVerInfo>false</VerInfo_IncludeVerInfo>
-        <VerInfo_Keys>CompanyName=;FileVersion=1.0.0.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductVersion=1.0.0.0;Comments=;ProgramID=com.embarcadero.$(MSBuildProjectName);FileDescription=$(MSBuildProjectName);ProductName=$(MSBuildProjectName)</VerInfo_Keys>
-        <DCC_Namespace>System.Win;Data.Win;Datasnap.Win;Web.Win;Soap.Win;Xml.Win;$(DCC_Namespace)</DCC_Namespace>
-        <Icon_MainIcon>dcu32int_Icon.ico</Icon_MainIcon>
-    </PropertyGroup>
-    <PropertyGroup Condition="'$(Cfg_1)'!=''">
-        <DCC_LocalDebugSymbols>false</DCC_LocalDebugSymbols>
-        <DCC_DebugInformation>0</DCC_DebugInformation>
-        <DCC_SymbolReferenceInfo>0</DCC_SymbolReferenceInfo>
-        <DCC_Define>RELEASE;$(DCC_Define)</DCC_Define>
-    </PropertyGroup>
-    <PropertyGroup Condition="'$(Cfg_1_Win32)'!=''">
-        <VerInfo_Build>82</VerInfo_Build>
-        <VerInfo_MinorVer>16</VerInfo_MinorVer>
-        <VerInfo_Keys>CompanyName=;FileVersion=1.16.1.82;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductVersion=1.0.0.0;Comments=;ProgramID=com.embarcadero.$(MSBuildProjectName);FileDescription=$(MSBuildProjectName);ProductName=$(MSBuildProjectName)</VerInfo_Keys>
-        <VerInfo_Locale>1033</VerInfo_Locale>
-    </PropertyGroup>
-    <PropertyGroup Condition="'$(Cfg_2)'!=''">
-        <DCC_Define>DEBUG;$(DCC_Define)</DCC_Define>
-        <DCC_Optimize>false</DCC_Optimize>
-        <DCC_GenerateStackFrames>true</DCC_GenerateStackFrames>
-    </PropertyGroup>
-    <PropertyGroup Condition="'$(Cfg_2_Win32)'!=''">
-        <DCC_Define>XMLx86;$(DCC_Define)</DCC_Define>
-        <VerInfo_Build>82</VerInfo_Build>
-        <VerInfo_MinorVer>20</VerInfo_MinorVer>
-        <DCC_DebugDCUs>true</DCC_DebugDCUs>
-        <Debugger_RunParams>-KDCP.dcu -U*</Debugger_RunParams>
-        <VerInfo_Keys>CompanyName=AX;FileDescription=Parser of Delphi 2.0-8.0, 2005-2006 (.net and WIN32), 2007-2010 (WIN32 only),  XE (WIN32 only), XE2-XE7 (WIN32,WIN64,OSX32), Kylix 1.0-3.0;FileVersion=1.20.1.82;InternalName=DCU32INT;LegalCopyright=Copyright ©2000-2015, Alexei E. Hmelnov;LegalTrademarks=;OriginalFilename=DCU32INT;ProductName=DCU32INT;ProductVersion=1.20.1;Comments=;ProgramID=com.embarcadero.$(MSBuildProjectName)</VerInfo_Keys>
-        <VerInfo_Locale>1033</VerInfo_Locale>
-        <Debugger_CWD>C:\Desenv\Tools\IDR\dcu</Debugger_CWD>
-        <DCC_UnitSearchPath>.\src;$(DCC_UnitSearchPath)</DCC_UnitSearchPath>
-        <Icon_MainIcon>dcu32int_Icon1.ico</Icon_MainIcon>
+        <PackageImports>adortl;appanalytics;bcbie;bcbsmp;bindcomp;bindcompdbx;bindcompfmx;bindcompvcl;bindcompvclsmp;bindcompvclwinx;bindengine;CloudService;CustomIPTransport;DataSnapClient;DataSnapCommon;DataSnapConnectors;DatasnapConnectorsFreePascal;DataSnapFireDAC;DataSnapIndy10ServerTransport;DataSnapNativeClient;DataSnapProviderClient;DataSnapServer;DataSnapServerMidas;dbexpress;dbrtl;dbxcds;DbxClientDriver;DbxCommonDriver;DBXDb2Driver;DBXFirebirdDriver;DBXInformixDriver;DBXInterBaseDriver;DBXMSSQLDriver;DBXMySQLDriver;DBXOdbcDriver;DBXOracleDriver;DBXSqliteDriver;DBXSybaseASADriver;DBXSybaseASEDriver;dsnap;dsnapcon;dsnapxml;emsclient;emsclientfiredac;emsedge;emshosting;emsserverresource;FireDAC;FireDACADSDriver;FireDACASADriver;FireDACCommon;FireDACCommonDriver;FireDACCommonODBC;FireDACDb2Driver;FireDACDBXDriver;FireDACDSDriver;FireDACIBDriver;FireDACInfxDriver;FireDACMongoDBDriver;FireDACMSAccDriver;FireDACMSSQLDriver;FireDACMySQLDriver;FireDACODBCDriver;FireDACOracleDriver;FireDACPgDriver;FireDACSqliteDriver;FireDACTDataDriver;fmx;fmxase;fmxdae;fmxFireDAC;fmxobj;FMXTee;FmxTeeUI;IndyCore;IndyIPClient;IndyIPCommon;IndyIPServer;IndyProtocols;IndySystem;inet;inetdb;inetdbxpress;RESTBackendComponents;RESTComponents;rtl;Skia;soapmidas;soaprtl;soapserver;Tee;TeeDB;TeeUI;tethering;vcl;vclactnband;vcldb;vcldsnap;vcledge;vclFireDAC;vclie;vclimg;VCLRESTComponents;VclSmp;vcltouch;vclwinx;vclx;xmlrtl;$(PackageImports)</PackageImports>
+        <DCC_Namespace>Winapi;System.Win;Data.Win;Datasnap.Win;Web.Win;Soap.Win;Xml.Win;Bde;$(DCC_Namespace)</DCC_Namespace>
+        <BT_BuildType>Debug</BT_BuildType>
+        <UWP_CppLogo44>$(BDS)\bin\Artwork\Windows\UWP\cppreg_UwpDefault_44.png</UWP_CppLogo44>
+        <UWP_CppLogo150>$(BDS)\bin\Artwork\Windows\UWP\cppreg_UwpDefault_150.png</UWP_CppLogo150>
+        <IncludePath>$(BDSINCLUDE)\windows\vcl;$(IncludePath)</IncludePath>
+        <Manifest_File>(None)</Manifest_File>
+        <BCC_PCHName_Clang>BuilderPCH1.h</BCC_PCHName_Clang>
         <AppDPIAwarenessMode>none</AppDPIAwarenessMode>
     </PropertyGroup>
+    <PropertyGroup Condition="'$(Base_Win64)'!=''">
+        <PackageImports>adortl;appanalytics;bcbie;bcbsmp;bindcomp;bindcompdbx;bindcompfmx;bindcompvcl;bindcompvclsmp;bindcompvclwinx;bindengine;CloudService;CustomIPTransport;DataSnapClient;DataSnapCommon;DataSnapConnectors;DatasnapConnectorsFreePascal;DataSnapFireDAC;DataSnapIndy10ServerTransport;DataSnapNativeClient;DataSnapProviderClient;DataSnapServer;DataSnapServerMidas;dbexpress;dbrtl;dbxcds;DbxClientDriver;DbxCommonDriver;DBXDb2Driver;DBXFirebirdDriver;DBXInformixDriver;DBXInterBaseDriver;DBXMSSQLDriver;DBXMySQLDriver;DBXOdbcDriver;DBXOracleDriver;DBXSqliteDriver;DBXSybaseASADriver;DBXSybaseASEDriver;dsnap;dsnapcon;dsnapxml;emsclient;emsclientfiredac;emsedge;emshosting;emsserverresource;FireDAC;FireDACADSDriver;FireDACASADriver;FireDACCommon;FireDACCommonDriver;FireDACCommonODBC;FireDACDb2Driver;FireDACDBXDriver;FireDACDSDriver;FireDACIBDriver;FireDACInfxDriver;FireDACMongoDBDriver;FireDACMSAccDriver;FireDACMSSQLDriver;FireDACMySQLDriver;FireDACODBCDriver;FireDACOracleDriver;FireDACPgDriver;FireDACSqliteDriver;FireDACTDataDriver;fmx;fmxase;fmxdae;fmxFireDAC;fmxobj;FMXTee;FmxTeeUI;IndyCore;IndyIPClient;IndyIPCommon;IndyIPServer;IndyProtocols;IndySystem;inet;inetdb;inetdbxpress;RESTBackendComponents;RESTComponents;rtl;Skia;soapmidas;soaprtl;soapserver;Tee;TeeDB;TeeUI;tethering;vcl;vclactnband;vcldb;vcldsnap;vcledge;vclFireDAC;vclie;vclimg;VCLRESTComponents;VclSmp;vcltouch;vclwinx;vclx;xmlrtl;$(PackageImports)</PackageImports>
+        <UWP_CppLogo44>$(BDS)\bin\Artwork\Windows\UWP\cppreg_UwpDefault_44.png</UWP_CppLogo44>
+        <UWP_CppLogo150>$(BDS)\bin\Artwork\Windows\UWP\cppreg_UwpDefault_150.png</UWP_CppLogo150>
+        <IncludePath>$(BDSINCLUDE)\windows\vcl;$(IncludePath)</IncludePath>
+        <BCC_PCHName_Clang>BuilderPCH1.h</BCC_PCHName_Clang>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(Base_Win64x)'!=''">
+        <PackageImports>adortl;bindcomp;bindcompdbx;bindcompfmx;bindcompvcl;bindcompvclsmp;bindcompvclwinx;bindengine;CustomIPTransport;dbexpress;dbrtl;dbxcds;DbxClientDriver;DbxCommonDriver;DBXDb2Driver;DBXFirebirdDriver;DBXInformixDriver;DBXInterBaseDriver;DBXMSSQLDriver;DBXMySQLDriver;DBXOdbcDriver;DBXOracleDriver;DBXSqliteDriver;DBXSybaseASADriver;DBXSybaseASEDriver;dsnap;dsnapcon;dsnapxml;FireDAC;FireDACADSDriver;FireDACASADriver;FireDACCommon;FireDACCommonDriver;FireDACCommonODBC;FireDACDb2Driver;FireDACDBXDriver;FireDACIBDriver;FireDACInfxDriver;FireDACMongoDBDriver;FireDACMSAccDriver;FireDACMSSQLDriver;FireDACMySQLDriver;FireDACODBCDriver;FireDACOracleDriver;FireDACPgDriver;FireDACSqliteDriver;FireDACTDataDriver;fmx;fmxase;fmxdae;fmxFireDAC;fmxobj;IndyCore;IndyIPClient;IndyIPCommon;IndyIPServer;IndyProtocols;IndySystem;inet;RESTBackendComponents;RESTComponents;rtl;Skia;vcl;vclactnband;vcldb;vcldsnap;vcledge;vclFireDAC;vclie;vclimg;VCLRESTComponents;VclSmp;vcltouch;vclwinx;vclx;xmlrtl;$(PackageImports)</PackageImports>
+        <UWP_CppLogo44>$(BDS)\bin\Artwork\Windows\UWP\cppreg_UwpDefault_44.png</UWP_CppLogo44>
+        <UWP_CppLogo150>$(BDS)\bin\Artwork\Windows\UWP\cppreg_UwpDefault_150.png</UWP_CppLogo150>
+        <BCC_PCHName_Clang>BuilderPCH1.h</BCC_PCHName_Clang>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(Cfg_1)'!=''">
+        <BCC_OptimizeForSpeed>false</BCC_OptimizeForSpeed>
+        <BCC_DisableOptimizations>true</BCC_DisableOptimizations>
+        <DCC_Optimize>false</DCC_Optimize>
+        <DCC_DebugInfoInExe>true</DCC_DebugInfoInExe>
+        <Defines>_DEBUG;$(Defines)</Defines>
+        <BCC_InlineFunctionExpansion>false</BCC_InlineFunctionExpansion>
+        <BCC_UseRegisterVariables>None</BCC_UseRegisterVariables>
+        <DCC_Define>DEBUG</DCC_Define>
+        <BCC_DebugLineNumbers>true</BCC_DebugLineNumbers>
+        <TASM_DisplaySourceLines>true</TASM_DisplaySourceLines>
+        <BCC_StackFrames>true</BCC_StackFrames>
+        <ILINK_FullDebugInfo>true</ILINK_FullDebugInfo>
+        <TASM_Debugging>Full</TASM_Debugging>
+        <BCC_SourceDebuggingOn>true</BCC_SourceDebuggingOn>
+        <BCC_EnableCPPExceptions>true</BCC_EnableCPPExceptions>
+        <BCC_DisableFramePtrElimOpt>true</BCC_DisableFramePtrElimOpt>
+        <BCC_DisableSpellChecking>true</BCC_DisableSpellChecking>
+        <CLANG_UnwindTables>true</CLANG_UnwindTables>
+        <ILINK_LibraryPath>$(BDSLIB)\$(PLATFORM)\debug;$(ILINK_LibraryPath)</ILINK_LibraryPath>
+        <ILINK_TranslatedLibraryPath>$(BDSLIB)\$(PLATFORM)\debug\$(LANGDIR);$(ILINK_TranslatedLibraryPath)</ILINK_TranslatedLibraryPath>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(Cfg_1_Win32)'!=''">
+        <LinkPackageStatics>rtl.lib;vcl.lib</LinkPackageStatics>
+        <BCC_UseClassicCompiler>false</BCC_UseClassicCompiler>
+        <ILINK_LibraryPath>$(BDSLIB)\$(PLATFORM)$(CC_SUFFIX)\debug;$(ILINK_LibraryPath)</ILINK_LibraryPath>
+        <_TCHARMapping>char</_TCHARMapping>
+        <BCC_DataAlignment>Byte</BCC_DataAlignment>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(Cfg_2)'!=''">
+        <Defines>NDEBUG;$(Defines)</Defines>
+        <TASM_Debugging>None</TASM_Debugging>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(Cfg_2_Win32)'!=''">
+        <BCC_UseClassicCompiler>false</BCC_UseClassicCompiler>
+    </PropertyGroup>
     <ItemGroup>
-        <DelphiCompile Include="$(MainSource)">
-            <MainSource>MainSource</MainSource>
-        </DelphiCompile>
-        <DCCReference Include="src\KB.pas"/>
-        <DCCReference Include="src\DCU32.pas"/>
-        <DCCReference Include="src\DCUTbl.pas"/>
-        <DCCReference Include="src\DCU_In.pas"/>
-        <DCCReference Include="src\DCU_Out.pas"/>
-        <DCCReference Include="src\FixUp.pas"/>
-        <DCCReference Include="src\DCURecs.pas"/>
-        <DCCReference Include="src\DasmDefs.pas"/>
-        <DCCReference Include="src\DasmUtil.pas"/>
-        <DCCReference Include="80x86\x86Reg.pas"/>
-        <DCCReference Include="80x86\x86Defs.pas"/>
-        <DCCReference Include="80x86\x86Op.pas"/>
-        <DCCReference Include="src\DasmCF.pas"/>
-        <DCCReference Include="src\DCP.pas"/>
-        <DCCReference Include="src\DasmX86.pas"/>
-        <DCCReference Include="src\DasmMSIL.pas"/>
-        <DCCReference Include="src\Win64SEH.pas"/>
+        <PCHCompile Include="BuilderPCH1.h">
+            <BuildOrder>0</BuildOrder>
+            <PCH>true</PCH>
+        </PCHCompile>
+        <CppCompile Include="DCUClasses.cpp">
+            <BuildOrder>2</BuildOrder>
+        </CppCompile>
+        <None Include="DCUClasses.h">
+            <BuildOrder>3</BuildOrder>
+        </None>
+        <CppCompile Include="Main.cpp">
+            <BuildOrder>1</BuildOrder>
+        </CppCompile>
+        <None Include="Main.h">
+            <BuildOrder>4</BuildOrder>
+        </None>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>
-        <BuildConfiguration Include="Release">
+        <BuildConfiguration Include="Debug">
             <Key>Cfg_1</Key>
             <CfgParent>Base</CfgParent>
         </BuildConfiguration>
-        <BuildConfiguration Include="Debug">
+        <BuildConfiguration Include="Release">
             <Key>Cfg_2</Key>
             <CfgParent>Base</CfgParent>
         </BuildConfiguration>
     </ItemGroup>
     <ProjectExtensions>
-        <Borland.Personality>Delphi.Personality.12</Borland.Personality>
-        <Borland.ProjectType/>
+        <Borland.Personality>CPlusPlusBuilder.Personality.12</Borland.Personality>
+        <Borland.ProjectType>CppConsoleApplication</Borland.ProjectType>
         <BorlandProject>
-            <Delphi.Personality>
-                <Source>
-                    <Source Name="MainSource">dcu32int.dpr</Source>
-                </Source>
-                <VersionInfo>
-                    <VersionInfo Name="IncludeVerInfo">True</VersionInfo>
-                    <VersionInfo Name="AutoIncBuild">True</VersionInfo>
-                    <VersionInfo Name="MajorVer">1</VersionInfo>
-                    <VersionInfo Name="MinorVer">15</VersionInfo>
-                    <VersionInfo Name="Release">1</VersionInfo>
-                    <VersionInfo Name="Build">108</VersionInfo>
-                    <VersionInfo Name="Debug">False</VersionInfo>
-                    <VersionInfo Name="PreRelease">False</VersionInfo>
-                    <VersionInfo Name="Special">False</VersionInfo>
-                    <VersionInfo Name="Private">False</VersionInfo>
-                    <VersionInfo Name="DLL">False</VersionInfo>
-                    <VersionInfo Name="Locale">1049</VersionInfo>
-                    <VersionInfo Name="CodePage">1251</VersionInfo>
-                </VersionInfo>
-                <VersionInfoKeys>
-                    <VersionInfoKeys Name="CompanyName">AX</VersionInfoKeys>
-                    <VersionInfoKeys Name="FileDescription">Parser of Delphi 2.0-8.0, 2005(.net and WIN32), 2006-2010 (WIN32 only),  XE (WIN32 only), XE2, Kylix 1.0-3.0</VersionInfoKeys>
-                    <VersionInfoKeys Name="FileVersion">1.15.1.108</VersionInfoKeys>
-                    <VersionInfoKeys Name="InternalName">DCU32INT</VersionInfoKeys>
-                    <VersionInfoKeys Name="LegalCopyright">Copyright ©2000-2012, Alexei E. Hmelnov</VersionInfoKeys>
-                    <VersionInfoKeys Name="LegalTrademarks"/>
-                    <VersionInfoKeys Name="OriginalFilename">DCU32INT</VersionInfoKeys>
-                    <VersionInfoKeys Name="ProductName">DCU32INT</VersionInfoKeys>
-                    <VersionInfoKeys Name="ProductVersion">1.10.1</VersionInfoKeys>
-                    <VersionInfoKeys Name="Comments"/>
-                </VersionInfoKeys>
+            <CPlusPlusBuilder.Personality>
+                <ProjectProperties>
+                    <ProjectProperties Name="AutoShowDeps">False</ProjectProperties>
+                    <ProjectProperties Name="ManagePaths">True</ProjectProperties>
+                    <ProjectProperties Name="VerifyPackages">True</ProjectProperties>
+                    <ProjectProperties Name="IndexFiles">False</ProjectProperties>
+                </ProjectProperties>
                 <Excluded_Packages>
                     <Excluded_Packages Name="$(BDSBIN)\bcboffice2k290.bpl">Embarcadero C++Builder Office 2000 Servers Package</Excluded_Packages>
                     <Excluded_Packages Name="$(BDSBIN)\bcbofficexp290.bpl">Embarcadero C++Builder Office XP Servers Package</Excluded_Packages>
                     <Excluded_Packages Name="$(BDSBIN)\dcloffice2k290.bpl">Microsoft Office 2000 Sample Automation Server Wrapper Components</Excluded_Packages>
                     <Excluded_Packages Name="$(BDSBIN)\dclofficexp290.bpl">Microsoft Office XP Sample Automation Server Wrapper Components</Excluded_Packages>
                 </Excluded_Packages>
-            </Delphi.Personality>
-            <Platforms>
-                <Platform value="Win32">True</Platform>
-                <Platform value="Win64">True</Platform>
-            </Platforms>
-            <ModelSupport>False</ModelSupport>
-            <Deployment Version="3">
-                <DeployFile LocalName="$(BDS)\Redist\osx32\libcgunwind.1.0.dylib" Class="DependencyModule">
+            </CPlusPlusBuilder.Personality>
+            <Deployment Version="4">
+                <DeployFile Condition="'$(DynamicRTL)'=='true'" LocalName="$(BDS)\Redist\osx32\libcgcrtl.dylib" Class="DependencyModule">
                     <Platform Name="OSX32">
                         <Overwrite>true</Overwrite>
                     </Platform>
                 </DeployFile>
-                <DeployFile LocalName="$(BDS)\Redist\iossimulator\libcgunwind.1.0.dylib" Class="DependencyModule">
-                    <Platform Name="iOSSimulator">
-                        <Overwrite>true</Overwrite>
-                    </Platform>
-                </DeployFile>
-                <DeployFile LocalName="$(BDS)\Redist\iossimulator\libpcre.dylib" Class="DependencyModule">
-                    <Platform Name="iOSSimulator">
-                        <Overwrite>true</Overwrite>
-                    </Platform>
-                </DeployFile>
-                <DeployFile LocalName="$(BDS)\Redist\osx32\libcgsqlite3.dylib" Class="DependencyModule"/>
-                <DeployFile LocalName="$(BDS)\Redist\osx32\libcgunwind.1.0.dylib" Class="DependencyModule">
+                <DeployFile Condition="'$(DynamicRTL)'=='true'" LocalName="$(BDS)\Redist\osx32\libcgstl.dylib" Class="DependencyModule">
                     <Platform Name="OSX32">
                         <Overwrite>true</Overwrite>
                     </Platform>
                 </DeployFile>
-                <DeployFile LocalName="dcu32int.exe" Configuration="Debug" Class="ProjectOutput"/>
+                <DeployFile Condition="'$(UsingDelphiRTL)'=='true'" LocalName="$(BDS)\bin64\borlndmm.dll" Class="DependencyModule">
+                    <Platform Name="Win64">
+                        <Overwrite>true</Overwrite>
+                    </Platform>
+                </DeployFile>
+                <DeployFile Condition="'$(DynamicRTL)'=='true' And '$(Multithreaded)'!='true'" LocalName="$(BDS)\bin64\cc64290.dll" Class="DependencyModule">
+                    <Platform Name="Win64">
+                        <Overwrite>true</Overwrite>
+                    </Platform>
+                </DeployFile>
+                <DeployFile Condition="'$(DynamicRTL)'=='true' And '$(Multithreaded)'=='true'" LocalName="$(BDS)\bin64\cc64290mt.dll" Class="DependencyModule">
+                    <Platform Name="Win64">
+                        <Overwrite>true</Overwrite>
+                    </Platform>
+                </DeployFile>
+                <DeployFile Condition="'$(UsingDelphiRTL)'=='true'" LocalName="$(BDS)\bin\borlndmm.dll" Class="DependencyModule">
+                    <Platform Name="Win32">
+                        <Overwrite>true</Overwrite>
+                    </Platform>
+                </DeployFile>
+                <DeployFile Condition="'$(DynamicRTL)'=='true' And '$(Multithreaded)'!='true'" LocalName="$(BDS)\bin\cc32290.dll" Class="DependencyModule">
+                    <Platform Name="Win32">
+                        <Overwrite>true</Overwrite>
+                    </Platform>
+                </DeployFile>
+                <DeployFile Condition="'$(DynamicRTL)'=='true' And '$(Multithreaded)'=='true'" LocalName="$(BDS)\bin\cc32290mt.dll" Class="DependencyModule">
+                    <Platform Name="Win32">
+                        <Overwrite>true</Overwrite>
+                    </Platform>
+                </DeployFile>
+                <DeployFile Condition="'$(DynamicRTL)'=='true' And '$(Multithreaded)'!='true'" LocalName="$(BDS)\bin\cc32c290.dll" Class="DependencyModule">
+                    <Platform Name="Win32">
+                        <Overwrite>true</Overwrite>
+                    </Platform>
+                </DeployFile>
+                <DeployFile Condition="'$(DynamicRTL)'=='true' And '$(Multithreaded)'=='true'" LocalName="$(BDS)\bin\cc32c290mt.dll" Class="DependencyModule">
+                    <Platform Name="Win32">
+                        <Overwrite>true</Overwrite>
+                    </Platform>
+                </DeployFile>
+                <DeployFile LocalName=".\Win32\Debug\Builder.exe" Configuration="Debug" Class="ProjectOutput">
+                    <Platform Name="Win32">
+                        <RemoteName>Builder.exe</RemoteName>
+                        <Overwrite>true</Overwrite>
+                    </Platform>
+                </DeployFile>
+                <DeployFile LocalName=".\Win32\Debug\Builder.tds" Configuration="Debug" Class="DebugSymbols">
+                    <Platform Name="Win32">
+                        <RemoteName>Builder.tds</RemoteName>
+                        <Overwrite>true</Overwrite>
+                    </Platform>
+                </DeployFile>
                 <DeployClass Name="AdditionalDebugSymbols">
                     <Platform Name="OSX32">
                         <Operation>1</Operation>
@@ -839,22 +861,30 @@
                         <Operation>1</Operation>
                     </Platform>
                 </DeployClass>
-                <DeployClass Name="UWP_DelphiLogo150">
+                <DeployClass Name="UWP_CppLogo150">
                     <Platform Name="Win32">
                         <RemoteDir>Assets</RemoteDir>
                         <Operation>1</Operation>
                     </Platform>
                     <Platform Name="Win64">
+                        <RemoteDir>Assets</RemoteDir>
+                        <Operation>1</Operation>
+                    </Platform>
+                    <Platform Name="Win64x">
                         <RemoteDir>Assets</RemoteDir>
                         <Operation>1</Operation>
                     </Platform>
                 </DeployClass>
-                <DeployClass Name="UWP_DelphiLogo44">
+                <DeployClass Name="UWP_CppLogo44">
                     <Platform Name="Win32">
                         <RemoteDir>Assets</RemoteDir>
                         <Operation>1</Operation>
                     </Platform>
                     <Platform Name="Win64">
+                        <RemoteDir>Assets</RemoteDir>
+                        <Operation>1</Operation>
+                    </Platform>
+                    <Platform Name="Win64x">
                         <RemoteDir>Assets</RemoteDir>
                         <Operation>1</Operation>
                     </Platform>
@@ -1064,7 +1094,6 @@
                 <ProjectRoot Platform="iOSDevice32" Name="$(PROJECTNAME).app"/>
                 <ProjectRoot Platform="iOSDevice64" Name="$(PROJECTNAME).app"/>
                 <ProjectRoot Platform="iOSSimARM64" Name="$(PROJECTNAME).app"/>
-                <ProjectRoot Platform="iOSSimulator" Name="$(PROJECTNAME).app"/>
                 <ProjectRoot Platform="Linux64" Name="$(PROJECTNAME)"/>
                 <ProjectRoot Platform="OSX32" Name="$(PROJECTNAME)"/>
                 <ProjectRoot Platform="OSX64" Name="$(PROJECTNAME)"/>
@@ -1073,10 +1102,15 @@
                 <ProjectRoot Platform="Win64" Name="$(PROJECTNAME)"/>
                 <ProjectRoot Platform="Win64x" Name="$(PROJECTNAME)"/>
             </Deployment>
+            <Platforms>
+                <Platform value="Win32">True</Platform>
+                <Platform value="Win64">False</Platform>
+                <Platform value="Win64x">False</Platform>
+            </Platforms>
         </BorlandProject>
         <ProjectFileVersion>12</ProjectFileVersion>
     </ProjectExtensions>
-    <Import Condition="Exists('$(BDS)\Bin\CodeGear.Delphi.Targets')" Project="$(BDS)\Bin\CodeGear.Delphi.Targets"/>
-    <Import Condition="Exists('$(APPDATA)\Embarcadero\$(BDSAPPDATABASEDIR)\$(PRODUCTVERSION)\UserTools.proj')" Project="$(APPDATA)\Embarcadero\$(BDSAPPDATABASEDIR)\$(PRODUCTVERSION)\UserTools.proj"/>
+    <Import Project="$(BDS)\Bin\CodeGear.Cpp.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Cpp.Targets')"/>
+    <Import Project="$(APPDATA)\Embarcadero\$(BDSAPPDATABASEDIR)\$(PRODUCTVERSION)\UserTools.proj" Condition="Exists('$(APPDATA)\Embarcadero\$(BDSAPPDATABASEDIR)\$(PRODUCTVERSION)\UserTools.proj')"/>
     <Import Project="$(MSBuildProjectName).deployproj" Condition="Exists('$(MSBuildProjectName).deployproj')"/>
 </Project>

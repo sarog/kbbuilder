@@ -1,9 +1,9 @@
-//---------------------------------------------------------------------------
+п»ї//---------------------------------------------------------------------------
 #include <stdio.h>
 #include <vcl.h>
 #pragma hdrstop
 //---------------------------------------------------------------------------
-//Информация о смещениях имен и данных
+//В»РЅС„РѕСЂРјР°С†РёВ¤ Рѕ СЃРјРµС‰РµРЅРёВ¤С… РёРјРµРЅ Рё РґР°РЅРЅС‹С…
 typedef struct
 {
     DWORD	Offset;
@@ -99,7 +99,7 @@ int main(int argc, char* argv[])
     for (int n = 0; n < ModuleCount; n++)
     {
         ID = ModuleOffsets[n].NamID;
-        //Читаем данные
+        //вЂћРёС‚Р°РµРј РґР°РЅРЅС‹Рµ
         fseek(fIn, ModuleOffsets[ID].Offset, SEEK_SET);
         fread(TmpBuf, 1, ModuleOffsets[ID].Size, fIn);
         p = TmpBuf;

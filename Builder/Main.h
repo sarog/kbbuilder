@@ -10,8 +10,8 @@
 #define     OutLog2(a, b)       if (fLog) fprintf(fLog, (a), (b))
 #define     OutLog3(a, b, c)    if (fLog) fprintf(fLog, (a), (b), (c))
 #define     lfauxPropField      0x80000000
-//#define DUMP_BEG    0x80
-//#define FIXUP_BEG   0x81
+// #define DUMP_BEG    0x80
+// #define FIXUP_BEG   0x81
 //------------------------------------------------------------------------------
 int __fastcall          AddAddrDef(TDCURec* ND);
 void __fastcall         AddTypeDef(TTypeDef* TD);
@@ -65,8 +65,8 @@ bool __fastcall         ShowGlobalConstValue(int hDef, String& OutS);
 String __fastcall       ShowOfsQualifier(int hDef, int Ofs);
 int __fastcall          ShowGlobalTypeValue(int hDef, Byte* DP, DWord DS, bool AndRest, int ConstKind, String& OutS);
 int __fastcall          ShowStrConst(Byte* DP, DWord DS, String& OutS);
-int __fastcall          ShowUnicodeStrConst(Byte* DP, DWord DS, String& OutS); //Ver >=verD12
-int __fastcall          ShowUnicodeResStrConst(Byte* DP, DWord DS, String& OutS); //Ver >=verD12
+int __fastcall          ShowUnicodeStrConst(Byte* DP, DWord DS, String& OutS); // Ver >=verD12
+int __fastcall          ShowUnicodeResStrConst(Byte* DP, DWord DS, String& OutS); // Ver >=verD12
 String __fastcall       ShowRefOfsQualifier(int hDef, int Ofs);
 String __fastcall       ShowTypeDef(int hDef, PName N);
 String __fastcall       ShowTypeName(int hDef);
@@ -75,15 +75,17 @@ void __fastcall         SkipBlock(int Sz);
 String __fastcall       StrConstStr(char* CP, int L);
 bool __fastcall         TypeIsVoid(int hDef);
 void __fastcall         UnRegTypeShow(TBaseDef* T);
+
 //------------------------------------------------------------------------------
 //OffsetsInfo
 typedef struct
 {
     DWord       Offset;
     DWord       Size;
-    int         ModId;    //Modules
-    int         NamId;    //Names
+    int         ModId;    // Modules
+    int         NamId;    // Names
 } OFFSETSINFO, *POFFSETSINFO;
+
 //Module info
 typedef struct
 {
@@ -91,18 +93,20 @@ typedef struct
     Word        ModuleID;
     DWord       Offset;
     DWord       Size;
-    String      Name;           //Unit Name
-    String      Filename;       //Unit Filename
-    TStringList *UsesList;      //List of Uses
+    String      Name;           // Unit Name
+    String      Filename;       // Unit Filename
+    TStringList *UsesList;      // List of Uses
 } MODULEINFO, *PMODULEINFO;
-//Fixup info
+
+// Fixup info
 typedef struct
 {
-    Byte        Type;           //A-ADR;J-JMP;D-DAT
-    DWord       Ofs;            //Offset from RTTI data begin
-    String      Name;           //Name
+    Byte        Type;           // A-ADR;J-JMP;D-DAT
+    DWord       Ofs;            // Offset from RTTI data begin
+    String      Name;           // Name
 } FIXUPINFO, *PFIXUPINFO;
-//ConstInfo
+
+// ConstInfo
 #define CI_CONSTDECL    'C'
 #define CI_PDECL        'P'
 #define CI_VARCDECL     'V'
@@ -114,14 +118,15 @@ typedef struct
     bool        Skip;
     Word        ModuleID;
     String      Name;
-    Byte        Type;           //look above
+    Byte        Type;           // look above
     String      TypeDef;
     String      Value;
-    DWord       RTTISz;         //Size of RTTI data
-    DWord       RTTIOfs;        //Offset of RTTI data
-    TList       *Fixups;        //If VMT
+    DWord       RTTISz;         // Size of RTTI data
+    DWord       RTTIOfs;        // Offset of RTTI data
+    TList       *Fixups;        // If VMT
 } CONSTINFO, *PCONSTINFO;
-//TypeInfo
+
+// TypeInfo
 typedef struct
 {
     int         ID;
@@ -130,16 +135,17 @@ typedef struct
     Word        ModuleID;
     String      Name;
     Byte        Kind;
-    Word        VMCnt;          //Number of class VM
-    DWord       RTTISz;         //Size of RTTI data
-    DWord       RTTIOfs;        //Offset of RTTI data
+    Word        VMCnt;          // Number of class VM
+    DWord       RTTISz;         // Size of RTTI data
+    DWord       RTTIOfs;        // Offset of RTTI data
     String      Decl;
     TList       *Fixups;
-    TList       *Fields;        //List of Fields
-    TList       *Properties;    //List of Properties
-    TList       *Methods;       //List of Methods
+    TList       *Fields;        // List of Fields
+    TList       *Properties;    // List of Properties
+    TList       *Methods;       // List of Methods
 } TYPEINFO, *PTYPEINFO;
-//VarInfo
+
+// VarInfo
 #define VI_VAR          'V'
 #define VI_ABSVAR       'A'
 #define VI_SPECVAR      'S'
@@ -151,13 +157,14 @@ typedef struct
     DWord       Size;
     Word        ModuleID;
     String      Name;
-    Byte        Type;           //look above
-    DWord       DumpOfs;        //Offset of binary data
-    DWord       DumpSz;         //Size of binary data
+    Byte        Type;           // look above
+    DWord       DumpOfs;        // Offset of binary data
+    DWord       DumpSz;         // Size of binary data
     String      AbsName;
     String      TypeDef;
 } VARINFO, *PVARINFO;
-//ResourseStringInfo
+
+// ResourseStringInfo
 typedef struct
 {
     int         ID;
@@ -165,12 +172,13 @@ typedef struct
     DWord       Size;
     Word        ModuleID;
     String      Name;
-    DWord       DumpOfs;        //Offset of binary data
-    DWord       DumpSz;         //Size of binary data
+    DWord       DumpOfs;        // Offset of binary data
+    DWord       DumpSz;         // Size of binary data
     String      TypeDef;
-    String      Context;        //Context of ResStr
+    String      Context;        // Context of ResStr
 } RESSTRINFO, *PRESSTRINFO;
-//LocalDeclInfo
+
+// LocalDeclInfo
 typedef struct
 {
     Byte        Scope;
@@ -178,12 +186,13 @@ typedef struct
     int         LocFlags;
     int         Ndx;
     int         NdxB;
-    int         Case;           //for case
+    int         Case;           // for case
     String      Name;
     String      TypeDef;
     String      AbsName;
 } LOCALDECLINFO, *PLOCALDECLINFO;
-//PropertyInfo
+
+// PropertyInfo
 typedef struct
 {
     Byte        Scope;
@@ -195,11 +204,12 @@ typedef struct
     String      WriteName;
     String      StoredName;
 } PROPERTYINFO, *PPROPERTYINFO;
-//MethodDeclInfo
+
+// MethodDeclInfo
 typedef struct
 {
     Byte        Scope;
-    Byte        MethodKind;     //'M'-method,'P'-procedure,'F'-function,'C'-constructor,'D'-destructor
+    Byte        MethodKind;     // 'M'-method,'P'-procedure,'F'-function,'C'-constructor,'D'-destructor
     String      Prototype;
 } METHODDECLINFO, *PMETHODDECLINFO;
 //------------------------------------------------------------------------------

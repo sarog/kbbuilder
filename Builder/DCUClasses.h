@@ -1,31 +1,31 @@
 ﻿#ifndef DCUCLASSES_H
 #define DCUCLASSES_H
 //------------------------------------------------------------------------------
-//Delphi Versions
-#define verD2       2
-#define verD3       3
-#define verD4       4
-#define verD5       5
-#define verD6       6
-#define verD7       7
-#define verD8       8
-#define verD2005    9       //2005    D9->D2005
-#define verD2006    10      //2006, 2007  D10->D2006
-#define verD2009    12      //2009
-#define verD2010    13      //2010
-#define verDXE1     14      //2011
-#define verDXE2     15      //2012
-#define verDXE3     16      //2013
-#define verK1       100     //Kylix 1.0
-#define verK2       101     //Kylix 2.0
-#define verK3       103     //Kylix 2.0
+// Delphi Versions
+#define verD2    2
+#define verD3    3
+#define verD4    4
+#define verD5    5
+#define verD6    6
+#define verD7    7
+#define verD8    8
+#define verD2005 9   // 2005    D9->D2005
+#define verD2006 10  // 2006, 2007  D10->D2006
+#define verD2009 12  // 2009
+#define verD2010 13  // 2010
+#define verDXE1  14  // 2011
+#define verDXE2  15  // 2012
+#define verDXE3  16  // 2013
+#define verK1    100 // Kylix 1.0
+#define verK2    101 // Kylix 2.0
+#define verK3    103 // Kylix 2.0
 
-//TDCUPlatform
+// TDCUPlatform
 #define dcuplWin32  0
 #define dcuplWin64  1
 #define dcuplOsx32  2
 
-//Internal unit types
+// Internal unit types
 #define drStop              0
 #define drStop_a            0x61    //'a' - Last Tag in all files
 #define drStop1             0x63    //'c'
@@ -77,25 +77,25 @@
 #define drInterfaceDef      0x54    //'T'
 #define drWideStrDef        0x55    //'U'
 #define drWideRangeDef      0x56    //'V'
-//Various tables
+// Various tables
 #define drCodeLines         0x90
 #define drLinNum            0x91
 #define drStrucScope        0x92
 #define drSymbolRef         0x93
 #define drLocVarTbl         0x94
 #define drUnitFlags         0x96
-//ver70 or higher tags (all of unknown purpose)
+// ver70 or higher tags (all of unknown purpose)
 #define drUnitAddInfo       0x34    //'4'
 #define drInfo98            0x98
 #define drConstAddInfo      0x9C
 #define drProcAddInfo       0x9E
-//ver80 or higher tags (all of unknown purpose)
+// ver80 or higher tags (all of unknown purpose)
 #define drORec              0x6F    //'o' - goes before drCBlock in MSIL
 #define drStrConstRec       0x35    //'5'
 #define drMetaClassDef      0x57    //'W'
-//Kylix specific flags
-#define drUnit4             0x0F    //5-bytes record, was observed in QOpenBanner.dcu only
-//ver10 and higher tags
+// Kylix specific flags
+#define drUnit4             0x0F    //5-bytes record was observed in QOpenBanner.dcu only
+// ver10 and higher tags
 #define drSpecVar           0x37    //'7'
 #define arClassVarReal      0x2D    //real value
 #define arClassVar          0x36    //technical value
@@ -103,7 +103,7 @@
 #define drA1Info            0xA1
 #define drA2Info            0xA2
 #define arCopyDecl          0xA3
-//ver12 and higher tags
+// ver12 and higher tags
 #define drDynArrayDef       0x58    //'X'
 #define drTemplateArgDef    0x59    //'Y'
 #define drTemplateCall      0x5A    //'Z'
@@ -113,7 +113,7 @@
 #define drA7Info            0xA7
 #define drA8Info            0xA8
 #define drDelayedImpInfo    0xB0
-//ver13 and higher tags
+// ver13 and higher tags
 #define drUnitInlineSrc     0x76    //'v'
 #define arAnonymousBlock    0x01
 
@@ -122,7 +122,7 @@
 #define arResult            0x23    //'#'
 #define arAbsLocVar         0x24    //'$'
 #define arLabel             0x2B    //'+'
-//Fields
+// Fields
 #define arFld               0x2C    //','
 #define arMethod            0x2D    //'-'
 #define arConstr            0x2E    //'.'
@@ -134,7 +134,7 @@
 #define arStdCall           0x83
 #define arSafeCall          0x84
 
-//Fixup type constants
+// Fixup type constants
 #define fxAddr      1
 #define fxJmpAddr0  2
 #define fxDataAddr  3
@@ -154,9 +154,9 @@
 #define fxEnd100    13
 
 #define fxMaxXE     15
-#define fxMax       23 //Max over all Delphi versions;
+#define fxMax       23 // Max over all Delphi versions;
 
-//XE2 64-bit mode
+// XE2 64-bit mode
 #define fxAddr64    19
 #define fxAddrLo32  23
 
@@ -165,7 +165,7 @@
 
 #define FixOfsMask  0xFFFFFF
 
-//TDeclListKind
+// TDeclListKind
 #define dlMain          0
 #define dlMainImpl      1
 #define dlArgs          2
@@ -178,22 +178,22 @@
 #define dlUnitAddInfo   9
 #define dlA6            10
 
-//TProcCallKind
+// TProcCallKind
 #define pcRegister      0
 #define pcCdecl         1
 #define pcPascal        2
 #define pcStdCall       3
 #define pcSafeCall      4
 
-//TMethodKind
+// TMethodKind
 #define mkProc          0
 #define mkMethod        1
 #define mkConstructor   2
 #define mkDestructor    3
 
-//Local flags
-#define lfClass         1   //class procedure
-#define lfClassV8up     0x10 //class procedure for Versions 8 up
+// Local flags
+#define lfClass         1    // class procedure
+#define lfClassV8up     0x10 // class procedure for Versions 8 up
 #define lfPrivate       0
 #define lfPublic        2
 #define lfProtected     4
@@ -204,7 +204,7 @@
 #define lfVirtual       0x40
 #define lfDynamic       0x80
 
-//TDeclSecKind
+// TDeclSecKind
 #define skNone          0
 #define skLabel         1
 #define skConst         2
@@ -221,7 +221,7 @@
 
 #define drAlias         0x5A
 
-//TFloatKind
+// TFloatKind
 #define fkReal48        0
 #define fkSingle        1
 #define fkDouble        2
@@ -231,15 +231,15 @@
 //------------------------------------------------------------------------------
 typedef struct
 {
-    DWord   Lo;
-    DWord   Hi;
+    DWord Lo;
+    DWord Hi;
 } TInt64Rec, *PInt64Rec;
 
-//Pascale ShortString
+// Pascal ShortString
 typedef struct
 {
     Byte    Len;
-    char    Name[255];  //position of String
+    char    Name[255];  // position of String
 } TShortString, *PName;
 
 typedef struct
@@ -256,15 +256,15 @@ typedef struct
 
 typedef struct
 {
-    int     OfsF;   //Low 3 bytes - ofs, high 1 byte - B1
+    int     OfsF;   // Low 3 bytes - ofs, high 1 byte - B1
     DWord   Ndx;
 } TFixupRec, *PFixupRec;
 
 typedef struct
 {
-    int FixCnt;
+    int       FixCnt;
     PFixupRec Fix;
-    Byte *FixEnd;
+    Byte     *FixEnd;
 } TFixupState, *PFixupState;
 
 typedef struct
@@ -275,7 +275,7 @@ typedef struct
     Byte *CodeStart;
 } TFixupMemState, *PFixupMemState;
 
-//for verDXE1 - fix orphaned local types problem
+// for verDXE1 - fix orphaned local types problem
 class TTypeDecl;
 typedef TTypeDecl *PTypeDecl;
 typedef struct
@@ -283,14 +283,16 @@ typedef struct
     PTypeDecl   TD;
     int         Depth;
 } TEmbeddedTypeInf, *PEmbeddedTypeInf;
+
 //------------------------------------------------------------------------------
 class TDCURec;
 typedef TDCURec *PDCURec;
 typedef void __fastcall (*TTypeUseAction)(PDCURec UseRec, int hDT, DWord* IP);
+
 class TDCURec : public TObject
 {
 public:
-    __fastcall TDCURec();
+    TDCURec();
     virtual PName __fastcall GetName();
     virtual DWord __fastcall SetMem(DWord MOfs, DWord MSz);
     virtual bool __fastcall NameIsUnique();
@@ -303,22 +305,22 @@ public:
 class TBaseDef : public TDCURec
 {
 public:
-    __fastcall TBaseDef(PName AName, PNameDef ADef, int AUnit);
+    TBaseDef(PName AName, PNameDef ADef, int AUnit);
     void __fastcall ShowName(String& OutS);
     void __fastcall Show(String& OutS);
     void __fastcall ShowNamed(PName N, String& OutS);
     PName __fastcall GetName();
     DWord __fastcall SetMem(DWord MOfs, DWord MSz);
-    PName       FName;
-    PNameDef    Def;
-    int         hUnit;
-    int         hDecl;
+    PName    FName;
+    PNameDef Def;
+    int      hUnit;
+    int      hDecl;
 };
 
 class TImpDef : public TBaseDef
 {
 public:
-    __fastcall TImpDef(Byte AIK, PName AName, int AnInf, PNameDef ADef, int AUnit);
+    TImpDef(Byte AIK, PName AName, int AnInf, PNameDef ADef, int AUnit);
     void __fastcall Show(String& OutS);
     bool __fastcall NameIsUnique();
     char    ik;
@@ -326,21 +328,21 @@ public:
     int     Inf;
 };
 
-//TUnitImpFlags
+// TUnitImpFlags
 #define ufImpl  0
 #define ufDLL   1
 typedef struct
 {
-    TImpDef     *Ref;
-    PName       Name;
-    TBaseDef    *Decls;
-    Byte        Flags;
+    TImpDef  *Ref;
+    PName     Name;
+    TBaseDef *Decls;
+    Byte      Flags;
 } TUnitImpRec, *PUnitImpRec;
 
 class TDLLImpRec : public TBaseDef
 {
 public:
-    __fastcall TDLLImpRec(PName AName, int ANdx, PNameDef ADef, int AUnit);
+    TDLLImpRec(PName AName, int ANdx, PNameDef ADef, int AUnit);
     void __fastcall Show(String& OutS);
     int     Ndx;
 };
@@ -348,7 +350,7 @@ public:
 class TImpTypeDefRec : public TImpDef
 {
 public:
-    __fastcall TImpTypeDefRec(PName AName, int AnInf, DWord ARTTISz, PNameDef ADef, int AUnit);
+    TImpTypeDefRec(PName AName, int AnInf, DWord ARTTISz, PNameDef ADef, int AUnit);
     void __fastcall Show(String& OutS);
     DWord __fastcall SetMem(DWord MOfs, DWord MSz);
     DWord   RTTIOfs, RTTISz;
@@ -359,9 +361,9 @@ public:
 class TNameDecl : public TDCURec
 {
 public:
-    __fastcall TNameDecl();
-    __fastcall TNameDecl(bool All);
-    __fastcall ~TNameDecl();
+    TNameDecl();
+    TNameDecl(bool All);
+    ~TNameDecl();
     void __fastcall ShowName(String& OutS);
     void __fastcall Show(String& OutS);
     void __fastcall ShowConstAddInfo(String& OutS);
@@ -380,18 +382,18 @@ typedef TNameDecl *PNameDecl;
 class TNameFDecl : public TNameDecl
 {
 public:
-    __fastcall TNameFDecl(bool NoInf);
-    void __fastcall Show(String& OutS);
-    virtual bool __fastcall IsVisible(Byte LK);
+    TNameFDecl(bool NoInf);
+    void __fastcall Show(String& OutS) override;
+    bool __fastcall IsVisible(Byte LK) override;
     int     F, F1;
     int     Inf;
-    int     B2; //D8+
+    int     B2; // D8+
 };
 
 class TTypeDecl : public TNameFDecl
 {
 public:
-    __fastcall TTypeDecl();
+    TTypeDecl();
     bool __fastcall IsVisible(Byte LK);
     void __fastcall Show(String& OutS);
     void __fastcall EnumUsedTypes(TTypeUseAction Action, DWord *IP);
@@ -404,7 +406,7 @@ public:
 class TVarDecl : public TNameFDecl
 {
 public:
-    __fastcall TVarDecl();
+    TVarDecl();
     void __fastcall Show(String& OutS);
     void __fastcall EnumUsedTypes(TTypeUseAction Action, DWord *IP);
     Byte __fastcall GetSecKind();
@@ -414,8 +416,8 @@ public:
 
 class TVarVDecl : public TVarDecl
 {
-    //In DXE2 win64 an auxiliary variable __puiHead has memory image
-    __fastcall TVarVDecl();
+    // In DXE2 win64 an auxiliary variable __puiHead has memory image
+    TVarVDecl();
     void __fastcall Show(String& OutS);
     DWord __fastcall SetMem(DWord MOfs, DWord MSz);
     DWord   Sz;
@@ -425,7 +427,7 @@ class TVarVDecl : public TVarDecl
 class TVarCDecl : public TVarDecl
 {
 public:
-    __fastcall TVarCDecl(bool OfsValid);
+    TVarCDecl(bool OfsValid);
     void __fastcall Show(String& OutS);
     DWord __fastcall SetMem(DWord MOfs, DWord MSz);
     Byte __fastcall GetSecKind();
@@ -436,14 +438,14 @@ public:
 class TAbsVarDecl : public TVarDecl
 {
 public:
-    __fastcall TAbsVarDecl();
+    TAbsVarDecl();
     void __fastcall Show(String& OutS);
 };
 
 class TTypePDecl : public TVarCDecl
 {
 public:
-    __fastcall TTypePDecl();
+    TTypePDecl();
     void __fastcall Show(String& OutS);
     bool __fastcall IsVisible(Byte LK);
 };
@@ -451,7 +453,7 @@ public:
 class TThreadVarDecl : public TVarDecl
 {
 public:
-    __fastcall TThreadVarDecl();
+    TThreadVarDecl();
     Byte __fastcall GetSecKind();
 };
 
@@ -460,7 +462,7 @@ public:
 class TStrConstDecl : public TNameFDecl
 {
 public:
-    __fastcall TStrConstDecl();
+    TStrConstDecl();
     DWord __fastcall SetMem(DWord MOfs, DWord MSz);
     Byte __fastcall GetSecKind();
     void __fastcall MemRefFound();
@@ -488,7 +490,7 @@ public:
 class TExportDecl : public TNameDecl
 {
 public:
-    __fastcall TExportDecl();
+    TExportDecl();
     void __fastcall Show(String& OutS);
     Byte __fastcall GetSecKind();
     int     hSym, Index;
@@ -497,15 +499,15 @@ public:
 class TLocalDecl : public TNameDecl
 {
 public:
-    __fastcall TLocalDecl(Byte LK);
-    //void __fastcall ShowName(String& OutS);
+    TLocalDecl(Byte LK);
+    // void __fastcall ShowName(String& OutS);
     void __fastcall Show(String& OutS);
     void __fastcall EnumUsedTypes(TTypeUseAction Action, DWord *IP);
     Byte __fastcall GetLocFlagsSecKind();
     Byte __fastcall GetSecKind();
-    //bool __fastcall IsVisible(Byte LK);
+    // bool __fastcall IsVisible(Byte LK);
     int     LocFlags;
-    int     LocFlagsX;  //Ver>=8 private, protected, public, published
+    int     LocFlagsX;  // Ver>=8 private, protected, public, published
     int     hDT;
     int     NdxB;
     int     Ndx;
@@ -514,16 +516,16 @@ public:
 class TMethodDecl : public TLocalDecl
 {
 public:
-    __fastcall TMethodDecl(Byte LK);
+    TMethodDecl(Byte LK);
     void __fastcall Show(String& OutS);
-    bool    InIntrf;
-    int     hImport;
+    bool            InIntrf;
+    int             hImport;
 };
 
 class TClassVarDecl : public TLocalDecl
 {
 public:
-    __fastcall TClassVarDecl(Byte LK);
+    TClassVarDecl(Byte LK);
     void __fastcall Show(String& OutS);
     Byte __fastcall GetSecKind();
 };
@@ -531,13 +533,13 @@ public:
 class TPropDecl : public TNameDecl
 {
 public:
-    __fastcall TPropDecl();
+    TPropDecl();
     String __fastcall PutOp(String Name, int hOp);
     void __fastcall Show(String& OutS);
     void __fastcall EnumUsedTypes(TTypeUseAction Action, DWord *IP);
     Byte __fastcall GetSecKind();
     int     LocFlags;
-    int     LocFlagsX;  //Ver>=8 private, protected, public, published
+    int     LocFlagsX;  // Ver>=8 private, protected, public, published
     int     hDT;
     int     Ndx;
     int     hIndex;
@@ -550,23 +552,23 @@ public:
 class TDispPropDecl : public TLocalDecl
 {
 public:
-    __fastcall TDispPropDecl(Byte LK);
+    TDispPropDecl(Byte LK);
     void __fastcall Show(String& OutS);
 };
 
 class TConstDeclBase : public TNameFDecl
 {
 public:
-    __fastcall TConstDeclBase();
+    TConstDeclBase();
     void __fastcall ReadConstVal();
     void __fastcall ShowValue(String& OutS);
     void __fastcall Show(String& OutS);
     void __fastcall EnumUsedTypes(TTypeUseAction Action, DWord *IP);
     Byte __fastcall GetSecKind();
     int     hDT;
-    DWord   Kind; //hX Ver>4
-    //0 - scalar, 1 - string (offset=8), 2 - resourcestring,
-    //3-float, 4 - set,
+    DWord   Kind; // hX Ver>4
+    // 0 - scalar, 1 - string (offset=8), 2 - resourcestring,
+    // 3-float, 4 - set,
     //[ver>=verD12] 5 - Unicode string (offset=12)
     Byte    *ValPtr;
     DWord   ValSz;
@@ -576,14 +578,14 @@ public:
 class TConstDecl : public TConstDeclBase
 {
 public:
-    __fastcall TConstDecl();
+    TConstDecl();
     bool __fastcall IsVisible(Byte LK);
 };
 
 class TResStrDef : public TVarCDecl
 {
 public:
-    __fastcall TResStrDef();
+    TResStrDef();
     void __fastcall Show(String& OutS);
     Byte __fastcall GetSecKind();
     DWord   OfsR;
@@ -592,7 +594,7 @@ public:
 class TSetDeftInfo : public TNameDecl
 {
 public:
-    __fastcall TSetDeftInfo();
+    TSetDeftInfo();
     void __fastcall Show(String& OutS);
     int     hConst, hArg;
 };
@@ -600,11 +602,11 @@ public:
 class TCopyDecl : public TNameDecl
 {
 public:
-    __fastcall TCopyDecl();
+    TCopyDecl();
     void __fastcall Show(String& OutS);
     Byte __fastcall GetSecKind();
     int         hBase;
-    TNameDecl   *Base; //Just in case and for convenience
+    TNameDecl   *Base; // Just in case and for convenience
 };
 
 typedef struct
@@ -646,8 +648,8 @@ typedef struct
 class TProcDecl : public TNameFDecl
 {
 public:
-    __fastcall TProcDecl(TNameDecl* AnEmbedded, bool NoInf);
-    __fastcall ~TProcDecl();
+    TProcDecl(TNameDecl *AnEmbedded, bool NoInf);
+    ~TProcDecl();
     bool __fastcall IsUnnamed();
     DWord __fastcall SetMem(DWord MOfs, DWord MSz);
     Byte __fastcall GetSecKind();
@@ -657,7 +659,7 @@ public:
     void __fastcall Show(String& OutS);
     void __fastcall EnumUsedTypes(TTypeUseAction Action, DWord *IP);
     bool __fastcall IsVisible(Byte LK);
-    //String __fastcall GetRegDebugInfo(int ProcOfs, int hReg, int Ofs, int* hDecl);
+    // String __fastcall GetRegDebugInfo(int ProcOfs, int hReg, int Ofs, int* hDecl);
     DWord   CodeOfs, AddrBase;
     DWord   Sz;
     int     B0;
@@ -668,10 +670,10 @@ public:
     TNameDecl   *Locals;
     TNameDecl   *Embedded;
     Byte    CallKind;
-    Byte    MethodKind; //may be this information is encoded by some flag, but
-    //I can't detect it. May be it would be enough to analyse the structure of
-    //the procedure name, but this way it will be safer.
-    bool    JustData; //This flag is turned on by Fixups from String typed consts
+    Byte         MethodKind; // maybe this information is encoded by some flag, but
+    // I can't detect it. Maybe it would be enough to analyse the structure of
+    // the procedure name, but this way it will be safer.
+    bool    JustData; //This flag is turned on by Fixups from String-typed consts
     PLocVarRec  FProcLocVarTbl;
     int     FProcLocVarCnt;
     TDCURec *FTemplateArgs;
@@ -681,54 +683,54 @@ typedef TProcDecl *PProcDecl;
 class TSysProcDecl : public TNameDecl
 {
 public:
-    __fastcall TSysProcDecl();
+    TSysProcDecl();
     void __fastcall Show(String& OutS);
     Byte __fastcall GetSecKind();
-    int     F;
-    int     Ndx;
+    int             F;
+    int             Ndx;
 };
 
-//Starting from Delphi 8 Borlands begin to give complete proc. defs to system procedures
+// Starting from Delphi 8, Borland begins to give complete proc. defs to system procedures
 class TSysProc8Decl : public TProcDecl
 {
 public:
-    __fastcall TSysProc8Decl();
-    int     F;
-    int     Ndx;
+    TSysProc8Decl();
+    int F;
+    int Ndx;
 };
 
-//Ver 7.0 and higher, MSIL
+// Ver 7.0 and higher, MSIL
 class TUnitAddInfo : public TNameFDecl
 {
 public:
-    __fastcall TUnitAddInfo();
-    __fastcall ~TUnitAddInfo();
+    TUnitAddInfo();
+    ~TUnitAddInfo();
     bool __fastcall IsVisible(Byte LK);
- //FVer 8.0 and higher, MSIL
-    int     B;
-    TNameDecl   *Sub;
+    // FVer 8.0 and higher, MSIL
+    int        B;
+    TNameDecl *Sub;
 };
 
 class TSpecVar : public TVarDecl
 {
 public:
-    __fastcall TSpecVar();
+    TSpecVar();
     void __fastcall Show(String& OutS);
 };
 
 class TTypeDef : public TBaseDef
 {
 public:
-    __fastcall TTypeDef();
-    __fastcall ~TTypeDef();
+    TTypeDef();
+    ~TTypeDef();
     void __fastcall ShowBase();
     virtual int __fastcall ShowValue(Byte* DP, DWord DS, String& OutS);
     void __fastcall Show(String& OutS);
     DWord __fastcall SetMem(DWord MOfs, DWord MSz);
     virtual String __fastcall GetOfsQualifier(int Ofs);
     virtual String __fastcall GetRefOfsQualifier(int Ofs);
-    int     RTTISz; //Size of RTTI for type, if available
-    int     Sz; //Size of corresponding variable
+    int     RTTISz; // Size of RTTI for type, if available
+    int     Sz; // Size of corresponding variable
     int     hAddrDef;
     int     X;
     DWord   RTTIOfs;
@@ -737,7 +739,7 @@ public:
 class TRangeBaseDef : public TTypeDef
 {
 public:
-    __fastcall TRangeBaseDef();
+    TRangeBaseDef();
     void __fastcall GetRange(PInt64Rec Lo, PInt64Rec Hi);
     int __fastcall ShowValue(Byte* DP, DWord DS, String& OutS);
     void __fastcall Show(String& OutS);
@@ -750,14 +752,14 @@ public:
 class TRangeDef : public TRangeBaseDef
 {
 public:
-    __fastcall TRangeDef();
+    TRangeDef();
 };
 
 class TEnumDef : public TRangeBaseDef
 {
 public:
-    __fastcall TEnumDef();
-    __fastcall ~TEnumDef();
+    TEnumDef();
+    ~TEnumDef();
     int __fastcall ShowValue(Byte* DP, DWord DS, String& OutS);
     void __fastcall Show(String& OutS);
     int     Ndx;
@@ -767,7 +769,7 @@ public:
 class TFloatDef : public TTypeDef
 {
 public:
-    __fastcall TFloatDef();
+    TFloatDef();
     String __fastcall GetKindName();
     int __fastcall ShowValue(Byte* DP, DWord DS, String& OutS);
     void __fastcall Show(String& OutS);
@@ -777,7 +779,7 @@ public:
 class TPtrDef : public TTypeDef
 {
 public:
-    __fastcall TPtrDef();
+    TPtrDef();
     bool __fastcall ShowRefValue(int Ndx, DWord Ofs, String& OutS);
     int __fastcall ShowValue(Byte* DP, DWord DS, String& OutS);
     void __fastcall Show(String& OutS);
@@ -789,14 +791,14 @@ public:
 class TTextDef : public TTypeDef
 {
 public:
-    __fastcall TTextDef();
+    TTextDef();
     void __fastcall Show(String& OutS);
 };
 
 class TFileDef : public TTypeDef
 {
 public:
-    __fastcall TFileDef();
+    TFileDef();
     void __fastcall Show(String& OutS);
     void __fastcall EnumUsedTypes(TTypeUseAction Action, DWord *IP);
     int     hBaseDT;
@@ -817,7 +819,7 @@ public:
 class TArrayDef0 : public TTypeDef
 {
 public:
-    __fastcall TArrayDef0(bool IsStr);
+    TArrayDef0(bool IsStr);
     int __fastcall ShowValue(Byte* DP, DWord DS, String& OutS);
     void __fastcall Show(String& OutS);
     void __fastcall EnumUsedTypes(TTypeUseAction Action, DWord *IP);
@@ -829,14 +831,14 @@ public:
 class TArrayDef : public TArrayDef0
 {
 public:
-    __fastcall TArrayDef(bool IsStr);
+    TArrayDef(bool IsStr);
     String __fastcall GetOfsQualifier(int Ofs);
 };
 
 class TShortStrDef : public TArrayDef
 {
 public:
-    __fastcall TShortStrDef();
+    TShortStrDef();
     int __fastcall ShowValue(Byte* DP, DWord DS, String& OutS);
     void __fastcall Show(String& OutS);
     int     CP; //for Ver>=VerD12
@@ -845,7 +847,7 @@ public:
 class TStringDef : public TArrayDef
 {
 public:
-    __fastcall TStringDef();
+    TStringDef();
     bool __fastcall ShowRefValue(int Ndx, DWord Ofs, String& OutS);
     int __fastcall ShowValue(Byte* DP, DWord DS, String& OutS);
     void __fastcall Show(String& OutS);
@@ -856,7 +858,7 @@ public:
 class TVariantDef : public TTypeDef
 {
 public:
-    __fastcall TVariantDef();
+    TVariantDef();
     void __fastcall Show(String& OutS);
     Byte    B;
 };
@@ -864,7 +866,7 @@ public:
 class TObjVMTDef : public TTypeDef
 {
 public:
-    __fastcall TObjVMTDef();
+    TObjVMTDef();
     void __fastcall Show(String& OutS);
     int     hObjDT;
     int     Ndx1;
@@ -873,8 +875,8 @@ public:
 class TRecBaseDef : public TTypeDef
 {
 public:
-    __fastcall TRecBaseDef();
-    __fastcall ~TRecBaseDef();
+    TRecBaseDef();
+    ~TRecBaseDef();
     void __fastcall ReadFields(Byte LK);
     int __fastcall  ShowFieldValues(Byte* DP, DWord DS, String& OutS);
     void __fastcall EnumUsedTypes(TTypeUseAction Action, DWord *IP);
@@ -887,7 +889,7 @@ public:
 class TRecDef : public TRecBaseDef
 {
 public:
-    __fastcall TRecDef();
+    TRecDef();
     int __fastcall ShowValue(Byte* DP, DWord DS, String& OutS);
     void __fastcall Show(String& OutS);
     String __fastcall GetOfsQualifier(int Ofs);
@@ -915,7 +917,7 @@ public:
 class TObjDef : public TRecBaseDef
 {
 public:
-    __fastcall TObjDef();
+    TObjDef();
     int __fastcall ShowValue(Byte* DP, DWord DS, String& OutS);
     void __fastcall Show(String& OutS);
     void __fastcall EnumUsedTypes(TTypeUseAction Action, DWord *IP);
@@ -931,8 +933,8 @@ public:
 class TClassDef : public TRecBaseDef
 {
 public:
-    __fastcall TClassDef();
-    __fastcall ~TClassDef();
+    TClassDef();
+    ~TClassDef();
     int __fastcall ShowValue(Byte* DP, DWord DS, String& OutS);
     void __fastcall Show(String& OutS);
     int __fastcall GetParentType();
@@ -953,7 +955,7 @@ public:
 class TMetaClassDef : public TClassDef
 {
 public:
-    __fastcall TMetaClassDef();
+    TMetaClassDef();
     void __fastcall ReadBeforeIntf();
     int     hCl;
 };
@@ -961,7 +963,7 @@ public:
 class TInterfaceDef : public TRecBaseDef
 {
 public:
-    __fastcall TInterfaceDef();
+    TInterfaceDef();
     void __fastcall Show(String& OutS);
     int     hParent;
     int     VMCnt;
@@ -972,15 +974,15 @@ public:
 class TVoidDef : public TTypeDef
 {
 public:
-    __fastcall TVoidDef();
+    TVoidDef();
     void __fastcall Show(String& OutS);
 };
 
 class TA6Def : public TDCURec
 {
 public:
-  __fastcall TA6Def();
-  __fastcall ~TA6Def();
+    TA6Def();
+    ~TA6Def();
   void __fastcall Show(String& OutS);
   PNameDecl     Args;
 };
@@ -988,8 +990,8 @@ public:
 class TA7Def : public TDCURec
 {
 public:
-    __fastcall TA7Def();
-    __fastcall ~TA7Def();
+    TA7Def();
+    ~TA7Def();
     void __fastcall Show(String& OutS);
     int     hClass;
     int     Cnt;
@@ -999,7 +1001,7 @@ public:
 class TDelayedImpRec : public TNameDecl
 {
 public:
-    __fastcall TDelayedImpRec();
+    TDelayedImpRec();
     void __fastcall Show(String& OutS);
     int     Inf;
     int     F;
@@ -1008,8 +1010,8 @@ public:
 class TORecDecl : public TNameDecl
 {
 public:
-    __fastcall TORecDecl();
-    __fastcall ~TORecDecl();
+    TORecDecl();
+    ~TORecDecl();
     void __fastcall Show(String& OutS);
     int     DW;
     Byte    B0;
@@ -1020,7 +1022,7 @@ public:
 class TDynArrayDef : public TPtrDef //for Ver>=VerD12
 {
 public:
-    __fastcall TDynArrayDef();
+    TDynArrayDef();
     void __fastcall Show(String& OutS);
     String __fastcall GetRefOfsQualifier(int Ofs);
 };
@@ -1028,8 +1030,8 @@ public:
 class TTemplateArgDef : public TTypeDef //for Ver>=VerD12 - template support
 {
 public:
-    __fastcall TTemplateArgDef();
-    __fastcall ~TTemplateArgDef();
+    TTemplateArgDef();
+    ~TTemplateArgDef();
     void __fastcall Show(String& OutS);
     int     Cnt, V5;
     int     *Tbl;
@@ -1038,8 +1040,8 @@ public:
 class TTemplateCall : public TTypeDef //for Ver>=VerD12 - template support
 {
 public:
-    __fastcall TTemplateCall();
-    __fastcall ~TTemplateCall();
+    TTemplateCall();
+    ~TTemplateCall();
     void __fastcall Show(String& OutS);
     void __fastcall EnumUsedTypes(TTypeUseAction Action, DWord *IP);
     int     hDT;
