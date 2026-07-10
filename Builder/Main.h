@@ -77,72 +77,67 @@ bool __fastcall         TypeIsVoid(int hDef);
 void __fastcall         UnRegTypeShow(TBaseDef* T);
 
 //------------------------------------------------------------------------------
-//OffsetsInfo
-typedef struct
-{
-    DWord       Offset;
-    DWord       Size;
-    int         ModId;    // Modules
-    int         NamId;    // Names
+// OffsetsInfo
+typedef struct {
+    DWord Offset;
+    DWord Size;
+    int   ModId; // Modules
+    int   NamId; // Names
 } OFFSETSINFO, *POFFSETSINFO;
 
-//Module info
-typedef struct
-{
-    int         ID;
-    Word        ModuleID;
-    DWord       Offset;
-    DWord       Size;
-    String      Name;           // Unit Name
-    String      Filename;       // Unit Filename
-    TStringList *UsesList;      // List of Uses
+// Module info
+typedef struct {
+    int          ID;
+    Word         ModuleID;
+    DWord        Offset;
+    DWord        Size;
+    String       Name;     // Unit Name
+    String       Filename; // Unit Filename
+    TStringList *UsesList; // List of Uses
 } MODULEINFO, *PMODULEINFO;
 
 // Fixup info
-typedef struct
-{
-    Byte        Type;           // A-ADR;J-JMP;D-DAT
-    DWord       Ofs;            // Offset from RTTI data begin
-    String      Name;           // Name
+typedef struct {
+    Byte   Type; // A-ADR;J-JMP;D-DAT
+    DWord  Ofs;  // Offset from RTTI data begin
+    String Name; // Name
 } FIXUPINFO, *PFIXUPINFO;
 
 // ConstInfo
 #define CI_CONSTDECL    'C'
 #define CI_PDECL        'P'
 #define CI_VARCDECL     'V'
-typedef struct
-{
-    int         ID;
-    DWord       Offset;
-    DWord       Size;
-    bool        Skip;
-    Word        ModuleID;
-    String      Name;
-    Byte        Type;           // look above
-    String      TypeDef;
-    String      Value;
-    DWord       RTTISz;         // Size of RTTI data
-    DWord       RTTIOfs;        // Offset of RTTI data
-    TList       *Fixups;        // If VMT
+typedef struct {
+    int    ID;
+    DWord  Offset;
+    DWord  Size;
+    bool   Skip;
+    Word   ModuleID;
+    String Name;
+    Byte   Type; // look above
+    String TypeDef;
+    String Value;
+    DWord  RTTISz;  // Size of RTTI data
+    DWord  RTTIOfs; // Offset of RTTI data
+    TList *Fixups;  // If VMT
 } CONSTINFO, *PCONSTINFO;
 
 // TypeInfo
-typedef struct
-{
-    int         ID;
-    DWord       Offset;
-    DWord       Size;
-    Word        ModuleID;
-    String      Name;
-    Byte        Kind;
-    Word        VMCnt;          // Number of class VM
-    DWord       RTTISz;         // Size of RTTI data
-    DWord       RTTIOfs;        // Offset of RTTI data
-    String      Decl;
-    TList       *Fixups;
-    TList       *Fields;        // List of Fields
-    TList       *Properties;    // List of Properties
-    TList       *Methods;       // List of Methods
+typedef struct {
+    int    ID;
+    DWord  Offset;
+    DWord  Size;
+    Word   ModuleID;
+    String Name;
+    Byte   Kind;
+    Word   VMCnt;   // Number of class VM
+    DWord  RTTISz;  // Size of RTTI data
+    DWord  RTTIOfs; // Offset of RTTI data
+    String Decl;
+    TList *Fixups;
+    TList *Fields;     // List of Fields
+    TList *Properties; // List of Properties
+    TList *Methods;    // List of Methods
 } TYPEINFO, *PTYPEINFO;
 
 // VarInfo
@@ -150,67 +145,62 @@ typedef struct
 #define VI_ABSVAR       'A'
 #define VI_SPECVAR      'S'
 #define VI_THREADVAR    'T'
-typedef struct
-{
-    int         ID;
-    DWord       Offset;
-    DWord       Size;
-    Word        ModuleID;
-    String      Name;
-    Byte        Type;           // look above
-    DWord       DumpOfs;        // Offset of binary data
-    DWord       DumpSz;         // Size of binary data
-    String      AbsName;
-    String      TypeDef;
+typedef struct {
+    int    ID;
+    DWord  Offset;
+    DWord  Size;
+    Word   ModuleID;
+    String Name;
+    Byte   Type;    // look above
+    DWord  DumpOfs; // Offset of binary data
+    DWord  DumpSz;  // Size of binary data
+    String AbsName;
+    String TypeDef;
 } VARINFO, *PVARINFO;
 
 // ResourseStringInfo
-typedef struct
-{
-    int         ID;
-    DWord       Offset;
-    DWord       Size;
-    Word        ModuleID;
-    String      Name;
-    DWord       DumpOfs;        // Offset of binary data
-    DWord       DumpSz;         // Size of binary data
-    String      TypeDef;
-    String      Context;        // Context of ResStr
+typedef struct {
+    int    ID;
+    DWord  Offset;
+    DWord  Size;
+    Word   ModuleID;
+    String Name;
+    DWord  DumpOfs; // Offset of binary data
+    DWord  DumpSz;  // Size of binary data
+    String TypeDef;
+    String Context; // Context of ResStr
 } RESSTRINFO, *PRESSTRINFO;
 
 // LocalDeclInfo
-typedef struct
-{
-    Byte        Scope;
-    Byte        Tag;
-    int         LocFlags;
-    int         Ndx;
-    int         NdxB;
-    int         Case;           // for case
-    String      Name;
-    String      TypeDef;
-    String      AbsName;
+typedef struct {
+    Byte   Scope;
+    Byte   Tag;
+    int    LocFlags;
+    int    Ndx;
+    int    NdxB;
+    int    Case; // for case
+    String Name;
+    String TypeDef;
+    String AbsName;
 } LOCALDECLINFO, *PLOCALDECLINFO;
 
 // PropertyInfo
-typedef struct
-{
-    Byte        Scope;
-    int         Index;
-    int         DispId;
-    String      Name;
-    String      TypeDef;
-    String      ReadName;
-    String      WriteName;
-    String      StoredName;
+typedef struct {
+    Byte   Scope;
+    int    Index;
+    int    DispId;
+    String Name;
+    String TypeDef;
+    String ReadName;
+    String WriteName;
+    String StoredName;
 } PROPERTYINFO, *PPROPERTYINFO;
 
 // MethodDeclInfo
-typedef struct
-{
-    Byte        Scope;
-    Byte        MethodKind;     // 'M'-method,'P'-procedure,'F'-function,'C'-constructor,'D'-destructor
-    String      Prototype;
+typedef struct {
+    Byte   Scope;
+    Byte   MethodKind; // 'M'-method,'P'-procedure,'F'-function,'C'-constructor,'D'-destructor
+    String Prototype;
 } METHODDECLINFO, *PMETHODDECLINFO;
 //------------------------------------------------------------------------------
 #endif

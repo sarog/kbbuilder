@@ -85,33 +85,26 @@ PLocVarRec  FLocVarTbl = 0;
 bool        FLoaded;
 
 //------------------------------------------------------------------------------
-String __fastcall PName2String(PName Name)
-{
+String __fastcall PName2String(PName Name) {
     return String(Name->Name, Name->Len);
 }
 //------------------------------------------------------------------------------
-bool __fastcall TypeIsVoid(int hDef)
-{
-    TBaseDef *D;
-
+bool __fastcall TypeIsVoid(int hDef) {
     if (hDef <= 0 || hDef > FTypes->Count) return true;
-    D = (TBaseDef*)FTypes->Items[hDef - 1];
+    TBaseDef *D = (TBaseDef *) FTypes->Items[hDef - 1];
     if (!D) return true;
     return (D->ClassType() == __classid(TVoidDef));
 }
 //------------------------------------------------------------------------------
-PUnitImpRec __fastcall GetUnitImpRec(int hUnit)
-{
-    return (PUnitImpRec)(FUnitImp->Items[hUnit]);
+PUnitImpRec __fastcall GetUnitImpRec(int hUnit) {
+    return (PUnitImpRec) (FUnitImp->Items[hUnit]);
 }
 //------------------------------------------------------------------------------
 void __fastcall GetUnitImp(int hUnit) { PUnitImpRec UI = GetUnitImpRec(hUnit); }
 //------------------------------------------------------------------------------
-String __fastcall GetDCURecStr(TDCURec* D, int hDef)
-{
+String __fastcall GetDCURecStr(TDCURec* D, int hDef) {
     PName   N;
     char    ScopeCh;
-    char    *CP;
     char    Pfx[32];
     String Result;
 
@@ -120,31 +113,23 @@ String __fastcall GetDCURecStr(TDCURec* D, int hDef)
     else
         N = D->GetName();
 
-    if (!N->Len)
-    {
+    if (!N->Len) {
         strcpy(Pfx, "_N%_");
         Result = Format("_%x", ARRAYOFCONST((hDef)));
-    }
-    else if (N->Name[0] == '.')
-    {
+    } else if (N->Name[0] == '.') {
         strcpy(Pfx, "_D%_");
         Result = PName2String(N).SubString(2, 255);
-    }
-    else
-    {
+    } else {
         Pfx[0] = 0;
         Result = PName2String(N);
     }
 
-    if (Pfx != "")
-    {
-        CP = StrScan(Pfx, '%');
-        if (CP)
-        {
+    if (Pfx != "") {
+        char *CP = StrScan(Pfx, '%');
+        if (CP) {
             if (!D)
                 ScopeCh = 'N';
-            else
-            {
+            else {
                 if (D->InheritsFrom(__classid(TTypeDecl)) || D->InheritsFrom(__classid(TTypeDef)))
                     ScopeCh = 'T';
                 else if (D->InheritsFrom(__classid(TVarDecl)))
@@ -166,10 +151,9 @@ String __fastcall GetDCURecStr(TDCURec* D, int hDef)
                 else
                     ScopeCh = 'n';
             }
-            do
-            {
+            do {
                 *CP = ScopeCh;
-                CP = StrScan(CP + 1, '%');
+                CP  = StrScan(CP + 1, '%');
             } while (CP);
         }
         Result = String(Pfx) + Result;
@@ -177,42 +161,35 @@ String __fastcall GetDCURecStr(TDCURec* D, int hDef)
     return Result;
 }
 //------------------------------------------------------------------------------
-void __fastcall ChkListSize(TList* L, int hDef)
-{
+void __fastcall ChkListSize(TList *L, int hDef) {
     if (hDef <= 0) return;
-    if (hDef > L->Count)
-    {
-        if (hDef > L->Capacity)
-            L->Capacity = (hDef*3)/2;
+    if (hDef > L->Count) {
+        if (hDef > L->Capacity) L->Capacity = (hDef * 3) / 2;
         L->Count = hDef;
     }
 }
 //------------------------------------------------------------------------------
 // Two methods against circular references
-bool __fastcall RegTypeShow(TBaseDef* T)
-{
+bool __fastcall RegTypeShow(TBaseDef *T) {
     if (FTypeShowStack->IndexOf(T) >= 0) return false;
     FTypeShowStack->Add(T);
     return true;
 }
 //------------------------------------------------------------------------------
-void __fastcall UnRegTypeShow(TBaseDef* T)
-{
+void __fastcall UnRegTypeShow(TBaseDef *T) {
     int C = FTypeShowStack->Count - 1;
     FTypeShowStack->Count = C;
 }
 //------------------------------------------------------------------------------
-void __fastcall AddTypeDef(TTypeDef* TD)
-{
+void __fastcall AddTypeDef(TTypeDef* TD) {
     ChkListSize(FTypes, FTypeDefCnt + 1);
     TBaseDef *Def = (TBaseDef*)FTypes->Items[FTypeDefCnt];
-    if (Def)
-    {
+    if (Def) {
         if (Def->Def)
             OutLog2("Error: Type def #%lX override\n", FTypeDefCnt + 1);
         if (Def->hUnit != TD->hUnit)
             OutLog2("Error: Type def #%lX unit mismatch\n", FTypeDefCnt + 1);
-        TD->FName = Def->GetName();
+        TD->FName  = Def->GetName();
         Def->FName = 0;
         delete Def;
     }
@@ -220,15 +197,13 @@ void __fastcall AddTypeDef(TTypeDef* TD)
     FTypeDefCnt++;
 }
 //------------------------------------------------------------------------------
-void __fastcall SetListDefName(TList* L, int hDef, int hDecl, PName Name)
-{
+void __fastcall SetListDefName(TList* L, int hDef, int hDecl, PName Name) {
     if (!L) return;
     if (hDef <= 0) return;
     ChkListSize(L, hDef);
     hDef--;
     TBaseDef *Def = (TBaseDef *) (L->Items[hDef]);
-    if (!Def)
-    {
+    if (!Def) {
         Def = new TBaseDef(Name, 0, -1);
         L->Items[hDef] = static_cast<void *>(Def);
         Def->hDecl = hDecl;
@@ -238,18 +213,15 @@ void __fastcall SetListDefName(TList* L, int hDef, int hDecl, PName Name)
     if (!Def->hDecl) Def->hDecl = hDecl;
 }
 //------------------------------------------------------------------------------
-void __fastcall AddTypeName(int hDef, int hDecl, PName Name)
-{
+void __fastcall AddTypeName(int hDef, int hDecl, PName Name) {
     SetListDefName(FTypes, hDef, hDecl, Name);
 }
 //------------------------------------------------------------------------------
-void __fastcall SkipBlock(int Sz)
-{
+void __fastcall SkipBlock(int Sz) {
     CurPos += Sz;
 }
 //------------------------------------------------------------------------------
-Byte* __fastcall ReadMem(DWord Sz)
-{
+Byte* __fastcall ReadMem(DWord Sz) {
     Byte *Result = CurPos;
     SkipBlock(Sz);
     return Result;
@@ -265,23 +237,18 @@ Byte __fastcall ReadByte() {
     return Result;
 }
 //------------------------------------------------------------------------------
-void __fastcall ReadByteIfEQ(Byte V)
-{
-    Byte  b = *CurPos;
+void __fastcall ReadByteIfEQ(Byte V) {
+    Byte b = *CurPos;
     if (b != V) return;
     CurPos++;
 }
 //------------------------------------------------------------------------------
-int __fastcall ReadByteFrom(bool V)
-{
+int __fastcall ReadByteFrom(bool V) {
     Byte b = *CurPos;
     // FVer >= verD2010
-    if (V)
-    {
+    if (V) {
         if (b != 0 && b != 1 && b != 2 && b != 4 && b != 8 && b != 16 && b != 24 && b != 32 && b != 33 && b != 97 && b != 128 && b != 132) return -1;
-    }
-    else
-    {
+    } else {
         // FVer < verD2010
         if (b != 0 && b != 2 && b != 4 && b != 8 && b != 16 && b != 24 && b != 32 && b != 33 && b != 97 && b != 128 && b != 132) return -1;
     }
@@ -289,21 +256,18 @@ int __fastcall ReadByteFrom(bool V)
     return b;
 }
 //------------------------------------------------------------------------------
-Byte __fastcall ReadTag()
-{
+Byte __fastcall ReadTag() {
     DefStart = CurPos;
     return ReadByte();
 }
 //------------------------------------------------------------------------------
-DWord __fastcall ReadULong()
-{
+DWord __fastcall ReadULong() {
     DWord Result = *reinterpret_cast<DWord *>(CurPos);
     CurPos += 4;
     return Result;
 }
 //------------------------------------------------------------------------------
-String __fastcall ReadStr()
-{
+String __fastcall ReadStr() {
     // String Res;
     Byte Len = ReadByte();
     String Res = String(reinterpret_cast<char *>(CurPos), Len); CurPos += Len;
@@ -311,30 +275,26 @@ String __fastcall ReadStr()
 }
 //------------------------------------------------------------------------------
 // Return pointer to ShortString (Pascal)
-PName __fastcall ReadName()
-{
+PName __fastcall ReadName() {
     PName Result = reinterpret_cast<PName>(CurPos);
     SkipBlock(ReadByte());
     return Result;
 }
 //------------------------------------------------------------------------------
 // Was observed only in drConstAddInfo records of MSIL
-String __fastcall ReadNDXStr()
-{
+String __fastcall ReadNDXStr() {
     int    L   = ReadUIndex();
     String Res = String(reinterpret_cast<char *>(CurPos), L);
     CurPos += L;
     return Res;
 }
 //------------------------------------------------------------------------------
-typedef struct
-{
+typedef struct {
     Byte B;
     int  L;
 } TR4;
 
-int __fastcall ReadUIndex()
-{
+int __fastcall ReadUIndex() {
     int    Result;
     Byte   B[5];
     Word  *W  = reinterpret_cast<Word *>(B);
@@ -345,25 +305,21 @@ int __fastcall ReadUIndex()
     B[0] = ReadByte();
     if ((B[0] & 1) == 0)
         Result = static_cast<DWord>(B[0] >> 1);
-    else
-    {
+    else {
         B[1] = ReadByte();
         if ((B[0] & 2) == 0)
             Result = static_cast<DWord>(*W >> 2);
-        else
-        {
+        else {
             B[2] = ReadByte();
             B[3] = 0;
             if ((B[0] & 4) == 0)
                 Result = *L >> 3;
-            else
-            {
+            else {
                 B[3] = ReadByte();
                 B[4] = 0;
                 if ((B[0] & 8) == 0)
                     Result = *L >> 4;
-                else
-                {
+                else {
                     B[4] = ReadByte();
                     Result = static_cast<DWord>(R4->L);
                     if (FVer > 3 && ((B[0] & 0xF0) != 0))
@@ -375,14 +331,12 @@ int __fastcall ReadUIndex()
     return Result;
 }
 //------------------------------------------------------------------------------
-typedef struct
-{
+typedef struct {
     Word  W;
     short i;
 } TRL;
 
-int __fastcall ReadIndex()
-{
+int __fastcall ReadIndex() {
     int    Result;
     Byte   B[8];
     char  *SB = reinterpret_cast<char *>(B);
@@ -392,43 +346,30 @@ int __fastcall ReadIndex()
     TRL   *RL = reinterpret_cast<TRL *>(B);
 
     B[0] = ReadByte();
-    if ((B[0] & 1) == 0)
-    {
+    if ((B[0] & 1) == 0) {
         Result = *SB;
         __asm   sar [Result], 1
-    }
-    else
-    {
+    } else {
         B[1] = ReadByte();
-        if ((B[0] & 2) == 0)
-        {
+        if ((B[0] & 2) == 0) {
             Result = *W;
             __asm   sar [Result], 2
-        }
-        else
-        {
+        } else {
             B[2] = ReadByte();
             B[3] = 0;
-            if ((B[0] & 4) == 0)
-            {
-                RL->i = (char)(B[2]);
+            if ((B[0] & 4) == 0) {
+                RL->i = static_cast<char>(B[2]);
                 Result = *L;
                 __asm   sar [Result], 3
-            }
-            else
-            {
+            } else {
                 B[3] = ReadByte();
-                if ((B[0] & 8) == 0)
-                {
+                if ((B[0] & 8) == 0) {
                     Result = *L;
                     __asm   sar [Result], 3
-                }
-                else
-                {
+                } else {
                     B[4] = ReadByte();
                     Result = R4->L;
-                    if (FVer > 3 && ((B[0] & 0xF0) != 0))
-                    {
+                    if (FVer > 3 && ((B[0] & 0xF0) != 0)) {
                         NDXHi = ReadULong();
                         return Result;
                     }
@@ -436,27 +377,26 @@ int __fastcall ReadIndex()
             }
         }
     }
+
     if (Result < 0)
         NDXHi = -1;
     else
         NDXHi = 0;
+
     return Result;
 }
 //------------------------------------------------------------------------------
-void __fastcall ReadIndex64(PInt64Rec Res)
-{
+void __fastcall ReadIndex64(PInt64Rec Res) {
     Res->Lo = ReadIndex();
     Res->Hi = NDXHi;
 }
 //------------------------------------------------------------------------------
-void __fastcall ReadUIndex64(PInt64Rec Res)
-{
+void __fastcall ReadUIndex64(PInt64Rec Res) {
     Res->Lo = ReadUIndex();
     Res->Hi = NDXHi;
 }
 //------------------------------------------------------------------------------
-String __fastcall NDXToStr(int NDXLo)
-{
+String __fastcall NDXToStr(int NDXLo) {
     char buf[256];
 
     if (!NDXHi)
@@ -467,6 +407,7 @@ String __fastcall NDXToStr(int NDXLo)
         sprintf(buf, "-$%lX%08lX", -NDXHi - 1, -NDXLo);
     else
         sprintf(buf, "$%lX%08lX", NDXHi, NDXLo);
+
     return String(buf);
 }
 //------------------------------------------------------------------------------
@@ -475,8 +416,7 @@ const char AlterSep = '\\';
 #else
 const char AlterSep = '/';
 #endif
-String __fastcall ExtractFileNameAnySep(String FN)
-{
+String __fastcall ExtractFileNameAnySep(String FN) {
     String Result = ExtractFileName(FN);
     char* CP = StrRScan(AnsiString(Result).c_str(), AlterSep);
     if (!CP)
@@ -486,14 +426,11 @@ String __fastcall ExtractFileNameAnySep(String FN)
 }
 //------------------------------------------------------------------------------
 // In D10 some codes were changed, we'll try to move them back
-Byte __fastcall FixTag(Byte Tag)
-{
+Byte __fastcall FixTag(Byte Tag) {
     Byte Result = Tag;
 
-    if (FVer >= verD2006 && FVer < verK1)
-    {
-        if (Result >= 0x2D && Result <= 0x36)
-        {
+    if (FVer >= verD2006 && FVer < verK1) {
+        if (Result >= 0x2D && Result <= 0x36) {
             Result--;
             if (Result < 0x2D)
                 Result = 0x36; // This code could be wrong, but the overloaded value of $2D should be moved somewhere
@@ -502,52 +439,45 @@ Byte __fastcall FixTag(Byte Tag)
     return Result;
 }
 //------------------------------------------------------------------------------
-void __fastcall RegisterEmbeddedTypes(PNameDecl *Embedded, int Depth)
-{
+void __fastcall RegisterEmbeddedTypes(PNameDecl *Embedded, int Depth) {
     PDCURec          D;
     PTypeDecl        TD;
     PEmbeddedTypeInf TI;
 
     PDCURec *DP = reinterpret_cast<PDCURec *>(Embedded);
-    while (true)
-    {
+
+    while (true) {
         D = *DP;
         if (D == 0) return;
-        if (D->InheritsFrom(__classid(TTypeDecl))) // The effect was noticed only for types
-        {
+        // The effect was noticed only for types
+        if (D->InheritsFrom(__classid(TTypeDecl))) {
             TD = static_cast<PTypeDecl>(D);
             if (FEmbeddedTypes == 0) FEmbeddedTypes = new TList;
             ChkListSize(FEmbeddedTypes, TD->hDef);
             TI = (PEmbeddedTypeInf)(FEmbeddedTypes->Items[TD->hDef - 1]);
-            if (TI == 0)
-            {
-                TI = new TEmbeddedTypeInf;
-                TI->TD = 0;
+            if (TI == 0) {
+                TI        = new TEmbeddedTypeInf;
+                TI->TD    = 0;
                 TI->Depth = 0;
                 FEmbeddedTypes->Items[TD->hDef - 1] = TI;
-            }
-            else if (TI->TD->hDecl > TD->hDecl)
+            } else if (TI->TD->hDecl > TD->hDecl)
                 TI->TD = 0;
-            if (TI->TD == 0)
-            {
-                TI->TD = TD;
+            if (TI->TD == 0) {
+                TI->TD    = TD;
                 TI->Depth = Depth;
             }
             *DP = D->Next;
-        }
-        else
+        } else
             DP = &(D->Next);
     }
 }
 //------------------------------------------------------------------------------
-typedef struct
-{
+typedef struct {
     TList   *EmbL;
     TList   *EmbeddedTypes;
 } TBindEmbeddedTypeInf, *PBindEmbeddedTypeInf;
 
-void _fastcall BindEmbeddedType(PDCURec UseRec, int hDT, DWord* IP)
-{
+void _fastcall BindEmbeddedType(PDCURec UseRec, int hDT, DWord* IP) {
     PBindEmbeddedTypeInf betf = reinterpret_cast<PBindEmbeddedTypeInf>(IP);
 
     if (hDT <= 0 || hDT > betf->EmbeddedTypes->Count) return;
@@ -563,10 +493,8 @@ void _fastcall BindEmbeddedType(PDCURec UseRec, int hDT, DWord* IP)
     TD->EnumUsedTypes(BindEmbeddedType, IP);
 }
 //------------------------------------------------------------------------------
-void __fastcall EnumUsedTypeList(PDCURec L, TTypeUseAction Action, DWord* IP)
-{
-    while (L != 0)
-    {
+void __fastcall EnumUsedTypeList(PDCURec L, TTypeUseAction Action, DWord *IP) {
+    while (L != 0) {
         L->EnumUsedTypes(Action, IP);
         L = L->Next;
     }
@@ -574,15 +502,14 @@ void __fastcall EnumUsedTypeList(PDCURec L, TTypeUseAction Action, DWord* IP)
 //------------------------------------------------------------------------------
 TBindEmbeddedTypeInf BindEmbeddedTypeInf;
 
-void __fastcall CheckProcedures(PDCURec D)
-{
-    while (D != 0)
-    {
-        if (D->InheritsFrom(__classid(TProcDecl)))
-        {
+void __fastcall CheckProcedures(PDCURec D) {
+    while (D != 0) {
+        if (D->InheritsFrom(__classid(TProcDecl))) {
             BindEmbeddedTypeInf.EmbL->Add(D);
-            EnumUsedTypeList(static_cast<PProcDecl>(D)->Locals, BindEmbeddedType, reinterpret_cast<DWord *>(&BindEmbeddedTypeInf));
-            EnumUsedTypeList(static_cast<PProcDecl>(D)->Embedded, BindEmbeddedType, reinterpret_cast<DWord *>(&BindEmbeddedTypeInf));
+            EnumUsedTypeList(static_cast<PProcDecl>(D)->Locals, BindEmbeddedType,
+                             reinterpret_cast<DWord *>(&BindEmbeddedTypeInf));
+            EnumUsedTypeList(static_cast<PProcDecl>(D)->Embedded, BindEmbeddedType,
+                             reinterpret_cast<DWord *>(&BindEmbeddedTypeInf));
             CheckProcedures(static_cast<PProcDecl>(D)->Embedded);
             BindEmbeddedTypeInf.EmbL->Count = BindEmbeddedTypeInf.EmbL->Count - 1;
         }
@@ -590,86 +517,72 @@ void __fastcall CheckProcedures(PDCURec D)
     }
 }
 
-void __fastcall BindEmbeddedTypes()
-{
-    PEmbeddedTypeInf    TI;
+void __fastcall BindEmbeddedTypes() {
+    PEmbeddedTypeInf TI;
 
     if (FEmbeddedTypes == 0) return;
-    BindEmbeddedTypeInf.EmbL = new TList;
+    BindEmbeddedTypeInf.EmbL          = new TList;
     BindEmbeddedTypeInf.EmbeddedTypes = FEmbeddedTypes;
     CheckProcedures(FDecls);
     delete BindEmbeddedTypeInf.EmbL;
-    for (int i = FEmbeddedTypes->Count - 1; i >= 0; i--)
-    {
-        TI = (PEmbeddedTypeInf)FEmbeddedTypes->Items[i];
+    for (int i = FEmbeddedTypes->Count - 1; i >= 0; i--) {
+        TI = (PEmbeddedTypeInf) FEmbeddedTypes->Items[i];
         if (TI == 0) continue;
         TI->TD->Next = FDecls;
-        FDecls = TI->TD;
+        FDecls       = TI->TD;
         delete TI;
     }
     delete FEmbeddedTypes;
     FEmbeddedTypes = 0;
 }
 //------------------------------------------------------------------------------
-Byte __fastcall ReadCallKind()
-{
+Byte __fastcall ReadCallKind() {
     Byte Result = pcRegister;
-    if (Tag >= arCDecl && Tag <= arSafeCall)
-    {
+    if (Tag >= arCDecl && Tag <= arSafeCall) {
         Result = Tag - arCDecl + 1;
-        Tag = ReadTag();
+        Tag    = ReadTag();
     }
     return Result;
 }
 //------------------------------------------------------------------------------
-int __fastcall ReadClassInterfaces(int** PITbl)
-{
-    int     hIntf, MCnt, N, hMember;
-    int     X1, X2, X3;
-    int     Cnt;
+int __fastcall ReadClassInterfaces(int** PITbl) {
+    int hIntf, MCnt, N, hMember;
+    int X1, X2, X3;
+    int Cnt;
 
     int Result = ReadIndex();
     if (Result <= 0) return Result;
     int *ITbl = NULL;
-    if (PITbl)
-    {
-        ITbl = new int[Result*2];
+    if (PITbl) {
+        ITbl   = new int[Result * 2];
         *PITbl = ITbl;
     }
-    for (int i = 0; i < Result; i++)
-    {
+    for (int i = 0; i < Result; i++) {
         hIntf = ReadUIndex();
         MCnt = ReadUIndex();
-        if (ITbl)
-        {
-            ITbl[2*i] = hIntf;
-            ITbl[2*i+1] = MCnt;
+        if (ITbl) {
+            ITbl[2 * i]     = hIntf;
+            ITbl[2 * i + 1] = MCnt;
         }
-        if (IsMSIL)
-        {
-            for (int j = 0; j < MCnt; j++)
-            {
-                N = ReadUIndex();
+        if (IsMSIL) {
+            for (int j = 0; j < MCnt; j++) {
+                N       = ReadUIndex();
                 hMember = ReadUIndex();
             }
         }
-        if (FVer >= verD2006 && FVer < verK1)
-        {
-            X1 = ReadIndex();   // ReadUIndex?
-            if (FVer >= verD2010 && FVer < verK1)
-            {
+        if (FVer >= verD2006 && FVer < verK1) {
+            X1 = ReadIndex(); // ReadUIndex?
+            if (FVer >= verD2010 && FVer < verK1) {
                 Cnt = ReadUIndex();
-                for (int j = 0; j < Cnt; j++)
-                {
-                    ReadUIndex();   // +4
-                    ReadUIndex();   // +8
-                    ReadByte();     // =1
+                for (int j = 0; j < Cnt; j++) {
+                    ReadUIndex(); // +4
+                    ReadUIndex(); // +8
+                    ReadByte();   // =1
                     ReadName();
                 }
             }
             X2 = ReadUIndex();
-            if (FVer >= verD2010 && FVer < verK1)
-                X3 = ReadUIndex();
+            if (FVer >= verD2010 && FVer < verK1) X3 = ReadUIndex();
         }
     }
     return Result;
@@ -677,23 +590,19 @@ int __fastcall ReadClassInterfaces(int** PITbl)
 //------------------------------------------------------------------------------
 TList *FSrcFiles = 0;
 
-void __fastcall ShowSourceFiles()
-{
+void __fastcall ShowSourceFiles() {
     PSrcFileRec SFR;
 
     ModuleInfo->Name = UnitName;
 #ifdef SHOW
     OutLog2("Unit %s\n", UnitName.c_str());
-    if (FVer > verD2)
-    {
+    if (FVer > verD2) {
         OutLog2("Flags: %lX\n", Flags);
-        if (FVer > verD3)
-            OutLog2("Priority %lX\n", UnitPrior);
+        if (FVer > verD3) OutLog2("Priority %lX\n", UnitPrior);
     }
     OutLog1("Source files:\n");
-    for (int n = 0; n < FSrcFiles->Count; n++)
-    {
-        SFR = (PSrcFileRec)FSrcFiles->Items[n];
+    for (int n = 0; n < FSrcFiles->Count; n++) {
+        SFR    = (PSrcFileRec) FSrcFiles->Items[n];
         Byte T = SFR->Def->Tag;
         switch (T) {
             case drSrc: OutLog1("src"); break;
@@ -706,18 +615,18 @@ void __fastcall ShowSourceFiles()
 #endif
 }
 //------------------------------------------------------------------------------
-void __fastcall ReadSourceFiles()
-{
-    int         F;
+void __fastcall ReadSourceFiles() {
+    int F;
+
     PSrcFileRec SFR, SFRMain = 0;
     FSrcFiles = new TList;
 
-    while (Tag == drSrc || Tag == drRes || Tag == drObj || Tag == drAsm || (FVer >= verD2010 && FVer < verK1 && Tag == drUnitInlineSrc))
-    {
+    while (Tag == drSrc || Tag == drRes || Tag == drObj || Tag == drAsm ||
+           (FVer >= verD2010 && FVer < verK1 && Tag == drUnitInlineSrc)) {
         SFR = new TSrcFileRec;
         SFR->Def = reinterpret_cast<PNameDef>(DefStart);
         ReadName();
-        ReadULong();    //FileTime
+        ReadULong(); // FileTime
         F = ReadUIndex();
         if (!F) SFRMain = SFR;
         SFR->Ndx = F;
@@ -731,8 +640,7 @@ void __fastcall ReadSourceFiles()
     UnitName.SetLength(CP - AnsiString(UnitName).c_str());
 }
 //------------------------------------------------------------------------------
-void __fastcall ReadUses(Byte TagRq)
-{
+void __fastcall ReadUses(Byte TagRq) {
     char        Ch;
     int         hPack, hImp, hUnit;
     int         ndx, ImpBase0, ImpReBase;
@@ -746,8 +654,7 @@ void __fastcall ReadUses(Byte TagRq)
     int hUses   = 0;
     int ImpBase = 0;
 
-    while (Tag == TagRq)
-    {
+    while (Tag == TagRq) {
         UseName = ReadName();
         U = new TUnitImpRec;
         memset(static_cast<void *>(U), 0, sizeof(TUnitImpRec));
@@ -789,14 +696,12 @@ void __fastcall ReadUses(Byte TagRq)
         if (hPack > 0 && FVer < verD2009)
             RefAddrDef(hPack); // Reserve index for unit package number
 
-        while (true)
-        {
+        while (true) {
             Tag = ReadTag();
-            if (Tag == drImpType || Tag == drImpTypeDef)
-            {
+            if (Tag == drImpType || Tag == drImpTypeDef) {
                 if (TagRq != drDLL) // 0x68
                 {
-                    Ch = 'T';
+                    Ch   = 'T';
                     ImpN = ReadName();
                     if (Tag == drImpTypeDef) RTTISz = ReadUIndex();
                     L = ReadULong();
@@ -805,47 +710,39 @@ void __fastcall ReadUses(Byte TagRq)
                     else
                         TR = new TImpDef('T', ImpN, L, NULL, hUnit);
                     FTypes->Add(static_cast<void *>(TR));
-                    TR->hDecl = AddAddrDef(TR);
-                    ndx = FTypes->Count;
+                    TR->hDecl   = AddAddrDef(TR);
+                    ndx         = FTypes->Count;
                     FTypeDefCnt = ndx;
                 }
-            }
-            else if (Tag == drImpVal)
-            {
-                Ch = 'A';
+            } else if (Tag == drImpVal) {
+                Ch   = 'A';
                 ImpN = ReadName();
-                L = ReadULong();
+                L    = ReadULong();
                 if (TagRq != drDLL)
                     AR = new TImpDef('A', ImpN, L, NULL, hUnit);
                 else
                     AR = new TDLLImpRec(ImpN, L, NULL, hUnit);
                 ndx = AddAddrDef(AR);
-                TR = AR;
-            }
-            else if (Tag == drStop2)
-            {
+                TR  = AR;
+            } else if (Tag == drStop2) {
                 L = -1;
-                if (FVer >= verD8 && FVer < verK1)
-                    L = ReadULong();
+                if (FVer >= verD8 && FVer < verK1) L = ReadULong();
                 continue;
-            }
-            else if (Tag == drConstAddInfo)
-            {
+            } else if (Tag == drConstAddInfo) {
                 if (!IsMSIL) break;
                 if (hImp) printf("Warning: ConstAddInfo encountered for %s in subrecord #%d\n", UseName, hImp);
                 ImpReBase = ReadConstAddInfo(NULL);
                 continue;
-            }
-            else
+            } else
                 break;
             hImp++;
         }
 
-        if (Tag != drStop1) printf("Error: Unexpected tag: %lX\n", Tag);   // 0x63
+        if (Tag != drStop1) printf("Error: Unexpected tag: %lX\n", Tag); // 0x63
         hUses++;
         Tag = ReadTag();
-        if (Tag == drProcAddInfo)   // 0x9E
-        {
+        // 0x9E
+        if (Tag == drProcAddInfo) {
             if (FVer < verD7 || FVer >= verK1) break;
             hImp = ReadIndex();
             SetProcAddInfo(hImp);
@@ -854,19 +751,16 @@ void __fastcall ReadUses(Byte TagRq)
     }
 }
 //------------------------------------------------------------------------------
-void __fastcall ShowUses(String PfxS, Byte FRq)
-{
+void __fastcall ShowUses(String PfxS, Byte FRq) {
     PUnitImpRec U;
-    String name;
+    String      name;
 
     int Cnt = 0;
-    for (int i = 0; i < FUnitImp->Count; i++)
-    {
-        U = (PUnitImpRec)FUnitImp->Items[i];
+    for (int i = 0; i < FUnitImp->Count; i++) {
+        U = (PUnitImpRec) FUnitImp->Items[i];
         if (FRq != U->Flags) continue;
         name = String(U->Name->Name, U->Name->Len);
-        if (ModuleInfo->UsesList->IndexOf(name) == -1)
-            ModuleInfo->UsesList->Add(name);
+        if (ModuleInfo->UsesList->IndexOf(name) == -1) ModuleInfo->UsesList->Add(name);
         if (Cnt > 0) {
             OutLog1(",");
         } else {
@@ -879,25 +773,21 @@ void __fastcall ShowUses(String PfxS, Byte FRq)
     OutLog1("\n");
 }
 //------------------------------------------------------------------------------
-void __fastcall SetDeclMem(int hDef, DWord Ofs, DWord Sz)
-{
-    DWord Rest;
-    TDCURec *D = (TDCURec *) FAddrs->Items[hDef - 1];
+void __fastcall SetDeclMem(int hDef, DWord Ofs, DWord Sz) {
+    DWord    Rest;
+    TDCURec *D    = (TDCURec *) FAddrs->Items[hDef - 1];
     DWord    Base = 0;
 
-    while (D)
-    {
-        if (D->InheritsFrom(__classid(TProcDecl)))
-            ((TProcDecl*)D)->AddrBase = Base;
+    while (D) {
+        if (D->InheritsFrom(__classid(TProcDecl))) ((TProcDecl *) D)->AddrBase = Base;
         Rest = D->SetMem(Ofs + Base, Sz - Base);
         if (static_cast<int>(Rest) <= 0) break;
         Base = Sz - Rest;
-        D = D->Next;
+        D    = D->Next;
     }
 }
 //------------------------------------------------------------------------------
-void LoadFixups()
-{
+void LoadFixups() {
     DWord dOfs;
     DWord CurOfs = 0;
     Byte  B1;
@@ -909,13 +799,12 @@ void LoadFixups()
 
     TFixupRec *FP = FFixupTbl;
 
-    for (int i = 0; i < FFixupCnt; i++)
-    {
+    for (int i = 0; i < FFixupCnt; i++) {
         dOfs = ReadUIndex();
         CurOfs += dOfs;
-        B1 = ReadByte();
+        B1       = ReadByte();
         FP->OfsF = (CurOfs & FixOfsMask) | (B1 << 24);
-        FP->Ndx = ReadUIndex();
+        FP->Ndx  = ReadUIndex();
         FP++;
     }
 
@@ -924,68 +813,59 @@ void LoadFixups()
     FP = FFixupTbl;
     int hPrevDecl = 0;
     DWord PrevDeclOfs = 0;
-    for (int i = 0; i < FFixupCnt; i++)
-    {
+    for (int i = 0; i < FFixupCnt; i++) {
         CurOfs = (FP->OfsF & FixOfsMask);
-        B1 = reinterpret_cast<Byte *>(&FP->OfsF)[3];
-        //!!!
+        B1     = reinterpret_cast<Byte *>(&FP->OfsF)[3];
+        // !!!
         // if (B1 != 12 && B1 != 1 && B1 != 2 && B1 != 3 && B1 != 5 && B1 != 13)
         // B1 = B1;
-        if (B1 == fxStart || B1 == fxEnd)
-        {
+        if (B1 == fxStart || B1 == fxEnd) {
             if (hPrevDecl > 0) SetDeclMem(hPrevDecl, PrevDeclOfs, CurOfs - PrevDeclOfs);
-            hPrevDecl = FP->Ndx;
+            hPrevDecl   = FP->Ndx;
             PrevDeclOfs = CurOfs;
-            FDataBlOfs = CurOfs;
+            FDataBlOfs  = CurOfs;
         }
         FP++;
     }
 }
 //------------------------------------------------------------------------------
-void LoadCodeLines()
-{
+void LoadCodeLines() {
     int   dL;
     DWord dOfs;
 
     DWord FCodeLineCnt = ReadUIndex();
     int   CurL         = 0;
     DWord CurOfs       = 0;
-    for (int i = 0; i < FCodeLineCnt; i++)
-    {
-        dL = ReadIndex();
+    for (int i = 0; i < FCodeLineCnt; i++) {
+        dL   = ReadIndex();
         dOfs = ReadUIndex();
         CurOfs += dOfs;
         CurL += dL;
     }
 }
 //------------------------------------------------------------------------------
-void LoadLineRanges()
-{
-    int hFile;
+void LoadLineRanges() {
+    int   hFile;
     DWord Line0, LineNum;
 
     DWord FLineRangeCnt = ReadUIndex();
 
     int Num = 0;
 
-    for (int i = 0; i < FLineRangeCnt; i++)
-    {
-        Line0 = ReadUIndex();
+    for (int i = 0; i < FLineRangeCnt; i++) {
+        Line0   = ReadUIndex();
         LineNum = ReadUIndex();
         Num += LineNum;
         hFile = ReadUIndex();
     }
 }
 //------------------------------------------------------------------------------
-void LoadStrucScope()
-{
+void LoadStrucScope() {
     int Cnt = ReadUIndex();
-    for (int i = 0; i < Cnt*5; i++)
-        ReadUIndex();
+    for (int i = 0; i < Cnt * 5; i++) ReadUIndex();
 }
 //------------------------------------------------------------------------------
-void LoadSymbolInfo()
-{
+void LoadSymbolInfo() {
     int hSym;
     int hMember; // for symbols - type members, else - 0
     int Sz;
@@ -994,36 +874,31 @@ void LoadSymbolInfo()
     int Cnt      = ReadUIndex();
     int NPrimary = ReadUIndex();
 
-    for (int i = 0; i < Cnt; i++)
-    {
-        hSym = ReadUIndex();
+    for (int i = 0; i < Cnt; i++) {
+        hSym    = ReadUIndex();
         hMember = ReadUIndex();
-        Sz = ReadUIndex();
-        hDef = ReadUIndex();
-        for (int j = 0; j < Sz; j++)
-            ReadUIndex();
+        Sz      = ReadUIndex();
+        hDef    = ReadUIndex();
+        for (int j = 0; j < Sz; j++) ReadUIndex();
     }
 }
 //------------------------------------------------------------------------------
-void LoadLocVarTbl()
-{
+void LoadLocVarTbl() {
     FLocVarCnt = ReadUIndex();
-    FLocVarTbl = new TLocVarRec[FLocVarCnt]; memset(FLocVarTbl, 0, FLocVarCnt * sizeof(FLocVarCnt));
+    FLocVarTbl = new TLocVarRec[FLocVarCnt];
+    memset(FLocVarTbl, 0, FLocVarCnt * sizeof(FLocVarCnt));
     PLocVarRec LR = FLocVarTbl;
 
-    for (int i = 0; i < FLocVarCnt; i++)
-    {
-        LR->sym = ReadUIndex();
-        LR->ofs = ReadUIndex();
+    for (int i = 0; i < FLocVarCnt; i++) {
+        LR->sym   = ReadUIndex();
+        LR->ofs   = ReadUIndex();
         LR->frame = ReadIndex();
         LR++;
     }
 }
 //------------------------------------------------------------------------------
-int __fastcall AddAddrDef(TDCURec* ND)
-{
-    if (FhNextAddr > 0)
-    {
+int __fastcall AddAddrDef(TDCURec *ND) {
+    if (FhNextAddr > 0) {
         int Result                = FhNextAddr;
         FAddrs->Items[Result - 1] = static_cast<void *>(ND);
         if (FVer >= verDXE1 && FVer < verK1)
@@ -1036,29 +911,23 @@ int __fastcall AddAddrDef(TDCURec* ND)
     return FAddrs->Count;
 }
 //------------------------------------------------------------------------------
-void __fastcall RefAddrDef(int V)
-{
-    if (V > FAddrs->Count)
-    {
-        if (V != FAddrs->Count + 1)
-            printf("Error: Unexpected forward hDecl=0x%x<>0x%x", V, FAddrs->Count + 1);
+void __fastcall RefAddrDef(int V) {
+    if (V > FAddrs->Count) {
+        if (V != FAddrs->Count + 1) printf("Error: Unexpected forward hDecl=0x%x<>0x%x", V, FAddrs->Count + 1);
         FAddrs->Add(NULL);
     }
 }
 //------------------------------------------------------------------------------
-TDCURec* __fastcall GetAddrDef(int hDef)
-{
+TDCURec *__fastcall GetAddrDef(int hDef) {
     if (hDef <= 0 || hDef > FAddrs->Count) return NULL;
-    return (TDCURec*)FAddrs->Items[hDef-1];
+    return (TDCURec *) FAddrs->Items[hDef - 1];
 }
 //------------------------------------------------------------------------------
-String __fastcall GetAddrStr(int hDef)
-{
+String __fastcall GetAddrStr(int hDef) {
     return GetDCURecStr(GetAddrDef(hDef), hDef);
 }
 //------------------------------------------------------------------------------
-TTypeDef* __fastcall GetLocalTypeDef(int hDef)
-{
+TTypeDef *__fastcall GetLocalTypeDef(int hDef) {
     // The type should be from this unit
     TBaseDef *D = GetTypeDef(hDef);
     if (D->InheritsFrom(__classid(TTypeDef)))
@@ -1067,27 +936,22 @@ TTypeDef* __fastcall GetLocalTypeDef(int hDef)
         return NULL;
 }
 //------------------------------------------------------------------------------
-TTypeDef* __fastcall GetGlobalTypeDef(int hDef)
-{
-    int hUnit;
+TTypeDef *__fastcall GetGlobalTypeDef(int hDef) {
+    int   hUnit;
     PName N;
 
     TBaseDef *D = GetTypeDef(hDef);
 
-    while (true)
-    {
+    while (true) {
         if (!D) return NULL;
         if (D->InheritsFrom(__classid(TTypeDef))) break;
         if (!D->InheritsFrom(__classid(TImpDef))) return NULL;
-        if (D->InheritsFrom(__classid(TImpTypeDefRec)))
-        {
+        if (D->InheritsFrom(__classid(TImpTypeDefRec))) {
             hUnit = static_cast<TImpTypeDefRec *>(D)->hImpUnit;
-            N = static_cast<TImpTypeDefRec *>(D)->ImpName;
-        }
-        else
-        {
-            hUnit = ((TImpDef*)D)->hUnit;
-            N = ((TImpDef*)D)->GetName();
+            N     = static_cast<TImpTypeDefRec *>(D)->ImpName;
+        } else {
+            hUnit = ((TImpDef *) D)->hUnit;
+            N     = ((TImpDef *) D)->GetName();
         }
         // GetUnitImp(hUnit);
         return NULL;
@@ -1095,68 +959,56 @@ TTypeDef* __fastcall GetGlobalTypeDef(int hDef)
     return static_cast<TTypeDef *>(D);
 }
 //------------------------------------------------------------------------------
-int __fastcall GetTypeSize(int hDef)
-{
+int __fastcall GetTypeSize(int hDef) {
     TTypeDef *T = GetGlobalTypeDef(hDef);
     if (!T) return -1;
     return T->Sz;
 }
 //------------------------------------------------------------------------------
-void __fastcall SetProcAddInfo(int V)
-{
-    if (V == -1)
-        FhNextAddr = 0;
-    if (V >= 1 && FVer >= verD7)
-        FhNextAddr = V;
+void __fastcall SetProcAddInfo(int V) {
+    if (V == -1) FhNextAddr = 0;
+    if (V >= 1 && FVer >= verD7) FhNextAddr = V;
 }
 //------------------------------------------------------------------------------
-void __fastcall FreeDCURecList(TDCURec* L)
-{
+void __fastcall FreeDCURecList(TDCURec *L) {
     TDCURec *Tmp;
 
-    while (L)
-    {
+    while (L) {
         Tmp = L;
-        L = L->Next;
+        L   = L->Next;
         delete Tmp;
     }
 }
 //------------------------------------------------------------------------------
-TDCURec* __fastcall GetDCURecListEnd(TDCURec* L)
-{
-    TDCURec* Result = L;
-    while (Result)
-        Result = Result->Next;
+TDCURec *__fastcall GetDCURecListEnd(TDCURec *L) {
+    TDCURec *Result = L;
+    while (Result) Result = Result->Next;
     return Result;
 }
 //------------------------------------------------------------------------------
-void __fastcall SetExportNames(TNameDecl* Decl)
-{
-    FExportNames = new TStringList;
-    FExportNames->Sorted = true;
+void __fastcall SetExportNames(TNameDecl *Decl) {
+    FExportNames             = new TStringList;
+    FExportNames->Sorted     = true;
     FExportNames->Duplicates = System::Types::TDuplicates::dupAccept;
 
-    while (Decl)
-    {
+    while (Decl) {
         if (Decl->InheritsFrom(__classid(TNameFDecl)) && Decl->IsVisible(dlMain))
             FExportNames->AddObject(PName2String(Decl->GetName()), Decl);
-            
+
         Decl = static_cast<TNameDecl *>(Decl->Next);
     }
 }
 //------------------------------------------------------------------------------
-TTypeDef* __fastcall GetTypeDef(int hDef)
-{
+TTypeDef *__fastcall GetTypeDef(int hDef) {
     if (hDef <= 0 || hDef > FTypes->Count) return NULL;
-    return (TTypeDef*)FTypes->Items[hDef - 1];
+    return (TTypeDef *) FTypes->Items[hDef - 1];
 }
 //------------------------------------------------------------------------------
-void __fastcall SetEnumConsts(TNameDecl** Decl)
-{
+void __fastcall SetEnumConsts(TNameDecl** Decl) {
     TNameDecl *D;
-    TTypeDef *TD;
-    TEnumDef *Enum;
-    TList *NT;
+    TTypeDef  *TD;
+    TEnumDef  *Enum;
+    TList     *NT;
 
     TNameDecl **DeclP = Decl;
     TNameDecl **LastConstP = NULL;
@@ -1164,36 +1016,27 @@ void __fastcall SetEnumConsts(TNameDecl** Decl)
 
     int ConstCnt = 0;
 
-    while (*DeclP)
-    {
+    while (*DeclP) {
         D = *DeclP;
-        if (D->InheritsFrom(__classid(TConstDecl)))
-        {
-            if (LastConst && LastConst->hDT == static_cast<TConstDecl *>(D)->hDT)
-            {
+        if (D->InheritsFrom(__classid(TConstDecl))) {
+            if (LastConst && LastConst->hDT == static_cast<TConstDecl *>(D)->hDT) {
                 ConstCnt++;
-            }
-            else
-            {
+            } else {
                 LastConstP = DeclP;
-                LastConst = static_cast<TConstDecl *>(D);
-                ConstCnt = 1;
+                LastConst  = static_cast<TConstDecl *>(D);
+                ConstCnt   = 1;
             }
-        }
-        else
-        {
-            if (D->InheritsFrom(__classid(TTypeDecl)) && LastConst)
-            {
+        } else {
+            if (D->InheritsFrom(__classid(TTypeDecl)) && LastConst) {
                 TD = GetTypeDef(static_cast<TTypeDecl *>(D)->hDef);
-                if (TD->InheritsFrom(__classid(TEnumDef)))
-                {
-                    Enum = static_cast<TEnumDef *>(TD);
-                    NT = new TList;
+                if (TD->InheritsFrom(__classid(TEnumDef))) {
+                    Enum         = static_cast<TEnumDef *>(TD);
+                    NT           = new TList;
                     NT->Capacity = ConstCnt;
-                    *LastConstP = D;
-                    *DeclP = NULL;
-                    while (LastConst)
-                    {
+                    *LastConstP  = D;
+                    *DeclP       = NULL;
+
+                    while (LastConst) {
                         NT->Add(static_cast<void *>(LastConst));
                         LastConst = static_cast<TConstDecl *>(LastConst->Next);
                     }
@@ -1201,18 +1044,17 @@ void __fastcall SetEnumConsts(TNameDecl** Decl)
                 }
             }
             LastConst = NULL;
-            ConstCnt = 0;
+            ConstCnt  = 0;
         }
         DeclP = reinterpret_cast<TNameDecl **>(&D->Next);
         // DeclP = &static_cast<TNameDecl *>(D->Next);
     }
 }
 //------------------------------------------------------------------------------
-void __fastcall FillProcLocVarTbls()
-{
+void __fastcall FillProcLocVarTbls() {
     TDCURec *D;
-    bool wasProc;
-    int f;
+    bool     wasProc;
+    int      f;
 
     if (!FLocVarTbl) return;
     PLocVarRec LVP = FLocVarTbl;
@@ -1220,38 +1062,32 @@ void __fastcall FillProcLocVarTbls()
     TProcDecl *Proc   = NULL;
     int        iStart = 0;
 
-    for (int i = 0; i < FLocVarCnt; i++)
-    {
+    for (int i = 0; i < FLocVarCnt; i++) {
         wasProc = isProc;
-        f = LVP->frame;
-        D = NULL;
-        isProc = false;
-        if (!wasProc && LVP->sym)
-        {
-            D = GetAddrDef(LVP->sym);
+        f       = LVP->frame;
+        D       = NULL;
+        isProc  = false;
+        if (!wasProc && LVP->sym) {
+            D      = GetAddrDef(LVP->sym);
             isProc = (D->InheritsFrom(__classid(TProcDecl)));
-            if (isProc)
-            {
-                if (Proc)
-                {
+            if (isProc) {
+                if (Proc) {
                     Proc->FProcLocVarTbl = &FLocVarTbl[iStart];
                     Proc->FProcLocVarCnt = i - iStart;
                 }
-                Proc = static_cast<TProcDecl *>(D);
+                Proc   = static_cast<TProcDecl *>(D);
                 iStart = i;
             }
         }
         LVP++;
     }
-    if (Proc)
-    {
+    if (Proc) {
         Proc->FProcLocVarTbl = &FLocVarTbl[iStart];
         Proc->FProcLocVarCnt = FLocVarCnt - iStart;
     }
 }
 //------------------------------------------------------------------------------
-int __fastcall ReadConstAddInfo(TNameDecl* LastProcDecl)
-{
+int __fastcall ReadConstAddInfo(TNameDecl* LastProcDecl) {
     bool    brk = false;
     Byte    Tag, caiStop, b, *cPos;
     int     hDef, hDef1, hDef2, hDef3, hDef4, hDef5, hDT, F, IP;
@@ -1263,8 +1099,7 @@ int __fastcall ReadConstAddInfo(TNameDecl* LastProcDecl)
     String  S;
 
     int Result = -1;
-    if (FVer <= verD7 || FVer >= verK1)
-    {
+    if (FVer <= verD7 || FVer >= verK1) {
         ReadByte();
         ReadUIndex();
         ReadByte();
@@ -1273,321 +1108,272 @@ int __fastcall ReadConstAddInfo(TNameDecl* LastProcDecl)
     }
 
     caiStop = 0xD;
-    if (FVer >= verD2005)
-    {
+    if (FVer >= verD2005) {
         caiStop = 0xF;
         if (FVer >= verD2009) caiStop = 0xFF;
     }
 
-    while (true)
-    {
+    while (true) {
         Tag = ReadByte();
-        switch (Tag)
-        {
-        case 1:
-            Result = ReadUIndex();
-            RefAddrDef(Result);
-            F = ReadUIndex();
-            if (IsMSIL)
-            {
-                Len = ReadUIndex();
-                for (int i = 1; i <= Len; i++)
-                {
-                    hDef = ReadUIndex();
-                    RefAddrDef(hDef);
-                    V = ReadUIndex();
-                    S = ReadNDXStr();
-                    if (S != "")
-                    {
-                        Len1 = ReadUIndex();
-                        for (int j = 1; j <= Len1; j++)
-                        {
-                            hDef1 = ReadUIndex();
-                            RefAddrDef(hDef1); // It seems that it's required to reserve addr index
-                        }
-                    }
-                }
-            }
-            if (FVer >= verD2005 && FVer < verK1)
-            {
-                InlineMask = 0x80000;
-                if (FVer >= verD2009)
-                {
-                    if (F & 0x800000) IP2 = ReadUIndex();
-                    if (F & 0x1) S = ReadNDXStr(); // Deprecated
-                    InlineMask = 0x40000;
-                }
-                else if (FVer >= verD2006)
-                {
-                    if (F & 0x1000000) IP = ReadUIndex();
-                }                                         
-
-                if (F & InlineMask)
-                {
-                   // Very complex structure - corresponds to the new (Ver>=8) inline directive.
-                   // Fortunately, we can completely ignore all this info, because it is duplicated
-                   // as a regular procedure info even for inlines
-                    if (FVer >= verD2006)
-                    {
-                        ReadUIndex();
-                        ReadUIndex();
-                    }
+        switch (Tag) {
+            case 1:
+                Result = ReadUIndex();
+                RefAddrDef(Result);
+                F = ReadUIndex();
+                if (IsMSIL) {
                     Len = ReadUIndex();
-                    SkipBlock(Len);
-                    if (FVer >= verDXE2) ReadUIndex();
-                    for (int i = 1; i <= 5; i++) ReadUIndex();
-                    V = ReadUIndex();
-                    RefAddrDef(V);
-                    Len = ReadUIndex();
-                    if (FVer >= verD2009)
-                    {
-                        ReadUIndex();
-                        ReadUIndex();
-                        Len1 = ReadUIndex();
-                        SkipBlock(Len1*sizeof(int));
-                    }
-                    for (int i = 1; i <= Len; i++)
-                    {
+                    for (int i = 1; i <= Len; i++) {
+                        hDef = ReadUIndex();
+                        RefAddrDef(hDef);
                         V = ReadUIndex();
-                        if (FVer >= verD2009)
-                        {
-                            RefAddrDef(V); // It seems that it's required to reserve addr index (1)
-                            // Same as (2); it looks like the field was relocated
-                            ReadUIndex();
-                            ReadUIndex();
-                        }
-                        V = ReadUIndex();
-                        if (FVer < verD2009) RefAddrDef(V); // It seems that it's required to reserve addr index (2)
-                        Z = ReadUIndex();
-                        if (FVer >= verD2009 && Z)
-                            ReadUIndex();
-                        if (FVer >= verD2010) ReadUIndex();
-                    }
-                    Len = ReadUIndex();
-                    for (int i = 1; i <= Len; i++)
-                    {
-                        V = ReadUIndex();
-                        if (FVer >= verD2009)
-                        {
-                            switch (V)
-                            {
-                            case 1:
-                                V = ReadUIndex();
-                                if (FVer >= verDXE1) RefAddrDef(V); // Perhaps it's required for lower versions too
-                                if (FVer >= verDXE1)
-                                    V = 2;
-                                else
-                                    V = 1;
-                                break;
-                            case 2:
-                                V = 1;
-                                break;
-                            case 3:
-                                V = 3;
-                                break;
-                            case 4:
-                                V = 2;
-                                break;
-                            case 5:
-                                V = 4;
-                                break;
-                            case 6:
-                                V = 1;
-                                break;
-                            default:
-                                printf("Error: Unexpected TConstAddInfo.1 LF value: %d\n", V);
-                                break;
+                        S = ReadNDXStr();
+                        if (S != "") {
+                            Len1 = ReadUIndex();
+                            for (int j = 1; j <= Len1; j++) {
+                                hDef1 = ReadUIndex();
+                                RefAddrDef(hDef1); // It seems that it's required to reserve addr index
                             }
-                            for (int j = 1; j <= V; j++) ReadUIndex();
-                        }
-                        else
-                            V = ReadUIndex();
-                    }
-                    Len = ReadUIndex(); // Number of units defs from which are used in this def
-                    for (int i = 1; i <= Len; i++)
-                    {
-                        hUnit = ReadUIndex();
-                        RefAddrDef(hUnit);
-                        Len1 = ReadUIndex();
-                        for (int j = 1; j <= Len1; j++)
-                        {
-                            V = ReadUIndex();
-                            if (hUnit) continue; // Import from another unit - don't care
-                            RefAddrDef(V);
                         }
                     }
-                    if (FVer >= verD2006)
-                    {
+                }
+                if (FVer >= verD2005 && FVer < verK1) {
+                    InlineMask = 0x80000;
+                    if (FVer >= verD2009) {
+                        if (F & 0x800000) IP2 = ReadUIndex();
+                        if (F & 0x1) S = ReadNDXStr(); // Deprecated
+                        InlineMask = 0x40000;
+                    } else if (FVer >= verD2006) {
+                        if (F & 0x1000000) IP = ReadUIndex();
+                    }
+
+                    if (F & InlineMask) {
+                        // Very complex structure - corresponds to the new (Ver>=8) inline directive.
+                        // Fortunately, we can completely ignore all this info, because it is duplicated
+                        // as a regular procedure info even for inlines
+                        if (FVer >= verD2006) {
+                            ReadUIndex();
+                            ReadUIndex();
+                        }
                         Len = ReadUIndex();
-                        for (int i = 1; i <= Len; i++) ReadUIndex();
-                        if (FVer >= verD2009)
-                        {
+                        SkipBlock(Len);
+                        if (FVer >= verDXE2) ReadUIndex();
+                        for (int i = 1; i <= 5; i++) ReadUIndex();
+                        V = ReadUIndex();
+                        RefAddrDef(V);
+                        Len = ReadUIndex();
+                        if (FVer >= verD2009) {
                             ReadUIndex();
+                            ReadUIndex();
+                            Len1 = ReadUIndex();
+                            SkipBlock(Len1 * sizeof(int));
+                        }
+                        for (int i = 1; i <= Len; i++) {
                             V = ReadUIndex();
-                            RefAddrDef(V);
-                            ReadUIndex();
+                            if (FVer >= verD2009) {
+                                RefAddrDef(V); // It seems that it's required to reserve addr index (1)
+                                // Same as (2); it looks like the field was relocated
+                                ReadUIndex();
+                                ReadUIndex();
+                            }
+                            V = ReadUIndex();
+                            if (FVer < verD2009) RefAddrDef(V); // It seems that it's required to reserve addr index (2)
+                            Z = ReadUIndex();
+                            if (FVer >= verD2009 && Z) ReadUIndex();
+                            if (FVer >= verD2010) ReadUIndex();
+                        }
+                        Len = ReadUIndex();
+                        for (int i = 1; i <= Len; i++) {
+                            V = ReadUIndex();
+                            if (FVer >= verD2009) {
+                                switch (V) {
+                                    case 1:
+                                        V = ReadUIndex();
+                                        if (FVer >= verDXE1)
+                                            RefAddrDef(V); // Perhaps it's required for lower versions too
+                                        if (FVer >= verDXE1)
+                                            V = 2;
+                                        else
+                                            V = 1;
+                                        break;
+                                    case 2: V = 1; break;
+                                    case 3: V = 3; break;
+                                    case 4: V = 2; break;
+                                    case 5: V = 4; break;
+                                    case 6: V = 1; break;
+                                    default: printf("Error: Unexpected TConstAddInfo.1 LF value: %d\n", V); break;
+                                }
+                                for (int j = 1; j <= V; j++) ReadUIndex();
+                            } else
+                                V = ReadUIndex();
+                        }
+                        Len = ReadUIndex(); // Number of units defs from which are used in this def
+                        for (int i = 1; i <= Len; i++) {
+                            hUnit = ReadUIndex();
+                            RefAddrDef(hUnit);
+                            Len1 = ReadUIndex();
+                            for (int j = 1; j <= Len1; j++) {
+                                V = ReadUIndex();
+                                if (hUnit) continue; // Import from another unit - don't care
+                                RefAddrDef(V);
+                            }
+                        }
+                        if (FVer >= verD2006) {
+                            Len = ReadUIndex();
+                            for (int i = 1; i <= Len; i++) ReadUIndex();
+                            if (FVer >= verD2009) {
+                                ReadUIndex();
+                                V = ReadUIndex();
+                                RefAddrDef(V);
+                                ReadUIndex();
+                            }
                         }
                     }
+                    if (FVer >= verD2009) {
+                        if (F & 0x80000) ReadUIndex();
+                    } else {
+                        if (F & 0x100000) ReadUIndex();
+                    }
                 }
-                if (FVer >= verD2009)
-                {
-                    if (F & 0x80000) ReadUIndex();
-                }
-                else
-                {
-                    if (F & 0x100000) ReadUIndex();
-                }
-            }
-            break;
-        case 0x4:
-            if (FVer >= verD2006 && FVer < verK1)
-            {
-                V = ReadUIndex();
-                V = ReadUIndex();
-            }
-            break;
-        case 0x6:
-            Result = ReadUIndex();
-            hDT = ReadUIndex();
-            V = ReadUIndex();
-            hDef1 = ReadUIndex();
-            break;
-        case 0x7:
-            Result = ReadUIndex();
-            hDef1 = ReadUIndex();
-            hDef2 = ReadUIndex();
-            V = ReadUIndex();
-            break;
-        case 0x9:
-            Result = ReadUIndex();
-            hDT = ReadUIndex();
-            break;
-        case 0xA:
-            Result = ReadUIndex();
-            V = ReadUIndex();
-            F = ReadUIndex();
-            hDT = 0;
-            if (F & 0x1) hDT = ReadUIndex();
-            hDef1 = 0;
-            if (F & 0x2) hDef1 = ReadUIndex();
-            V2 = 0;
-            if (F & 0x4) V2 = ReadUIndex();
-            V3 = 0;
-            if (F & 0x8) V3 = ReadUIndex();
-            V4 = 0;
-            if (F & 0x10) V4 = ReadUIndex();
-            hDef5 = 0;
-            if (F & 0x20) hDef5 = ReadUIndex();
-            if (F & 0x40)
-            {
-                Len = ReadUIndex();
-                for (int i = 1; i <= Len; i++)
-                {
-                    S = ReadNDXStr();
+                break;
+            case 0x4:
+                if (FVer >= verD2006 && FVer < verK1) {
                     V = ReadUIndex();
-                    V1 = ReadUIndex();
-                    hDT = ReadUIndex();
+                    V = ReadUIndex();
                 }
-            }
-            if (F & 0x80)
-            {
-                V = ReadUIndex();
+                break;
+            case 0x6:
+                Result = ReadUIndex();
+                hDT    = ReadUIndex();
+                V      = ReadUIndex();
+                hDef1  = ReadUIndex();
+                break;
+            case 0x7:
+                Result = ReadUIndex();
+                hDef1  = ReadUIndex();
+                hDef2  = ReadUIndex();
+                V      = ReadUIndex();
+                break;
+            case 0x9:
+                Result = ReadUIndex();
+                hDT    = ReadUIndex();
+                break;
+            case 0xA:
+                Result = ReadUIndex();
+                V      = ReadUIndex();
+                F      = ReadUIndex();
+                hDT    = 0;
+                if (F & 0x1) hDT = ReadUIndex();
+                hDef1 = 0;
+                if (F & 0x2) hDef1 = ReadUIndex();
+                V2 = 0;
+                if (F & 0x4) V2 = ReadUIndex();
+                V3 = 0;
+                if (F & 0x8) V3 = ReadUIndex();
+                V4 = 0;
+                if (F & 0x10) V4 = ReadUIndex();
+                hDef5 = 0;
+                if (F & 0x20) hDef5 = ReadUIndex();
+                if (F & 0x40) {
+                    Len = ReadUIndex();
+                    for (int i = 1; i <= Len; i++) {
+                        S   = ReadNDXStr();
+                        V   = ReadUIndex();
+                        V1  = ReadUIndex();
+                        hDT = ReadUIndex();
+                    }
+                }
+                if (F & 0x80) {
+                    V  = ReadUIndex();
+                    V1 = ReadUIndex();
+                    V2 = ReadUIndex();
+                }
+                if (F & 0x100) S = ReadNDXStr();
+                if (F & 0x200) S = ReadNDXStr();
+                hDef11 = 0;
+                if (F & 0x400) {
+                    hDef11 = ReadUIndex();
+                    if (IsMSIL) RefAddrDef(hDef11);
+                }
+                hDef12 = 0;
+                if (F & 0x800) {
+                    hDef12 = ReadUIndex();
+                    if (IsMSIL) RefAddrDef(hDef12);
+                }
+                hDef13 = 0;
+                if (F & 0x1000) {
+                    hDef13 = ReadUIndex();
+                    if (IsMSIL) RefAddrDef(hDef13);
+                }
+                hDef14 = 0;
+                if (F & 0x2000) {
+                    hDef14 = ReadUIndex();
+                    if (IsMSIL) RefAddrDef(hDef14);
+                }
+                hDef15 = 0;
+                if (F & 0x4000) {
+                    hDef15 = ReadUIndex(); // MSIL 9 only?
+                    if (IsMSIL) RefAddrDef(hDef15);
+                }
+                break;
+            case 0xC:
+                Result = ReadUIndex();
+                V1     = ReadUIndex();
+                V2     = ReadUIndex();
+                break;
+            case 0xD:
+                if (FVer < verD2005 || FVer >= verK1) return Result;
+                // imported unit module information (FileName and version)?
+                Result = ReadUIndex();
+                S      = ReadNDXStr();
+                break;
+            case 0x10:
+                if (FVer < verD2009 || FVer >= verK1) return Result;
                 V1 = ReadUIndex();
+                RefAddrDef(V1); //???
                 V2 = ReadUIndex();
-            }
-            if (F & 0x100) S = ReadNDXStr();
-            if (F & 0x200) S = ReadNDXStr();
-            hDef11 = 0;
-            if (F & 0x400)
-            {
-                hDef11 = ReadUIndex();
-                if (IsMSIL) RefAddrDef(hDef11);
-            }
-            hDef12 = 0;
-            if (F & 0x800)
-            {
-                hDef12 = ReadUIndex();
-                if (IsMSIL) RefAddrDef(hDef12);
-            }
-            hDef13 = 0;
-            if (F & 0x1000)
-            {
-                hDef13 = ReadUIndex();
-                if (IsMSIL) RefAddrDef(hDef13);
-            }
-            hDef14 = 0;
-            if (F & 0x2000)
-            {
-                hDef14 = ReadUIndex();
-                if (IsMSIL) RefAddrDef(hDef14);
-            }
-            hDef15 = 0;
-            if (F & 0x4000)
-            {
-                hDef15 = ReadUIndex(); // MSIL 9 only?
-                if (IsMSIL) RefAddrDef(hDef15);
-            }
-            break;
-        case 0xC:
-            Result = ReadUIndex();
-            V1 = ReadUIndex();
-            V2 = ReadUIndex();
-            break;
-        case 0xD:
-            if (FVer < verD2005 || FVer >= verK1) return Result;
-            // imported unit module information (FileName and version)?
-            Result = ReadUIndex();
-            S = ReadNDXStr();
-            break;
-        case 0x10:
-            if (FVer < verD2009 || FVer >= verK1) return Result;
-            V1 = ReadUIndex();
-            RefAddrDef(V1); //???
-            V2 = ReadUIndex();
-            RefAddrDef(V2); //???
-            V3 = ReadUIndex();
-            break;
-        case 0x12:
-            if (FVer < verD2009 || FVer >= verK1) return Result;
-            V1 = ReadUIndex();
-            RefAddrDef(V1); //???
-            V2 = ReadUIndex();
-            RefAddrDef(V2); //???
-            break;
-        case 0x13:
-            if (FVer < verD2009 || FVer >= verK1) return Result;
-            V1 = ReadUIndex();
-            RefAddrDef(V1); // It seems that it's required to reserve addr index
-            V2 = ReadUIndex();
-            V3 = ReadUIndex();
-            S  = ReadNDXStr(); // $EXTERNALSYM
-            S  = ReadNDXStr(); // ??
-            S  = ReadNDXStr(); // $OBJTYPENAME
-            break;
-        case 0x14:
-            if (FVer < verD2009 || FVer >= verK1) return Result;
-            V1 = ReadUIndex();
-            RefAddrDef(V1); // ???
-            V2 = ReadUIndex();
-            Len = ReadUIndex();
-            for (int i = 1; i <= Len; i++)
-            {
+                RefAddrDef(V2); //???
+                V3 = ReadUIndex();
+                break;
+            case 0x12:
+                if (FVer < verD2009 || FVer >= verK1) return Result;
                 V1 = ReadUIndex();
+                RefAddrDef(V1); //???
+                V2 = ReadUIndex();
+                RefAddrDef(V2); //???
+                break;
+            case 0x13:
+                if (FVer < verD2009 || FVer >= verK1) return Result;
+                V1 = ReadUIndex();
+                RefAddrDef(V1); // It seems that it's required to reserve addr index
                 V2 = ReadUIndex();
                 V3 = ReadUIndex();
-                S = ReadNDXStr();
-            }
-            break;
-        case 0x15:
-            if (FVer < verD2009 || FVer >= verK1) return Result;
-            V1 = ReadUIndex();
-            RefAddrDef(V1);
-            V2 = ReadUIndex();   // 1
-            V3 = ReadUIndex();
-            break;
-        default:
-            if (Tag == caiStop) return Result;
-            break;
+                S  = ReadNDXStr(); // $EXTERNALSYM
+                S  = ReadNDXStr(); // ??
+                S  = ReadNDXStr(); // $OBJTYPENAME
+                break;
+            case 0x14:
+                if (FVer < verD2009 || FVer >= verK1) return Result;
+                V1 = ReadUIndex();
+                RefAddrDef(V1); // ???
+                V2  = ReadUIndex();
+                Len = ReadUIndex();
+                for (int i = 1; i <= Len; i++) {
+                    V1 = ReadUIndex();
+                    V2 = ReadUIndex();
+                    V3 = ReadUIndex();
+                    S  = ReadNDXStr();
+                }
+                break;
+            case 0x15:
+                if (FVer < verD2009 || FVer >= verK1) return Result;
+                V1 = ReadUIndex();
+                RefAddrDef(V1);
+                V2 = ReadUIndex(); // 1
+                V3 = ReadUIndex();
+                break;
+            default:
+                if (Tag == caiStop) return Result;
+                break;
         }
     }
     return Result;
@@ -1595,11 +1381,10 @@ int __fastcall ReadConstAddInfo(TNameDecl* LastProcDecl)
 //------------------------------------------------------------------------------
 int CurDeclNo = 0;
 
-void __fastcall ReadDeclList(Byte LK, TNameDecl** Result)
-{
+void __fastcall ReadDeclList(Byte LK, TNameDecl** Result) {
     int  TTT;
     Byte B;
-    int  i, V, X;
+    int  V, X;
     Byte Tag1;
     bool brk       = false;
     bool WasEmbEnd = false; // For MSIL only
@@ -1613,379 +1398,374 @@ void __fastcall ReadDeclList(Byte LK, TNameDecl** Result)
     TNameDecl *LastProcDecl = NULL;
     FhNextAddr              = 0;
 
-    while (true)
-    {
+    while (true) {
         Tag1 = FixTag(Tag);
         Decl = NULL;
         switch (Tag1)
         {
-        case drType:
-            Decl = new TTypeDecl;
-            break;
-        case drTypeP:
-            Decl = new TTypePDecl;
-            break;
-        case drConst:
-            Decl = new TConstDecl;
-            break;
-        case drResStr:
-            Decl = new TResStrDef;
-            break;
-        case drSysProc:
-            if (FVer >= verD8 && FVer < verK1)
-                Decl = new TSysProc8Decl;
-            else
-                Decl = new TSysProcDecl;
-         break;
-        case drProc:
-            Decl = new TProcDecl(Embedded, false);
-            LastProcDecl = Decl;
-            Embedded = 0;
-            break;
-        case drEmbeddedProcStart:
-            if ((IsMSIL || (FVer >= verD2009 && FVer < verK1)) && WasEmbEnd)
-                WasEmbEnd = false; // Just ignore and continue
-            else
-            {
-                FEmbedDepth++;
-                if (Embedded)
-                {
-                    if (!IsMSIL) printf("Warning: Duplicate embedded list\n");
-                    Tag = ReadTag();
-                    TNameDecl* le = static_cast<TNameDecl *>(GetDCURecListEnd(Embedded));
-                    ReadDeclList(dlEmbedded, &le);
-                }
+            case drType:
+                Decl = new TTypeDecl;
+                break;
+            case drTypeP:
+                Decl = new TTypePDecl;
+                break;
+            case drConst:
+                Decl = new TConstDecl;
+                break;
+            case drResStr:
+                Decl = new TResStrDef;
+                break;
+            case drSysProc:
+                if (FVer >= verD8 && FVer < verK1)
+                    Decl = new TSysProc8Decl;
+                else
+                    Decl = new TSysProcDecl;
+             break;
+            case drProc:
+                Decl = new TProcDecl(Embedded, false);
+                LastProcDecl = Decl;
+                Embedded = 0;
+                break;
+            case drEmbeddedProcStart:
+                if ((IsMSIL || (FVer >= verD2009 && FVer < verK1)) && WasEmbEnd)
+                    WasEmbEnd = false; // Just ignore and continue
                 else
                 {
-                    Tag = ReadTag();
-                    ReadDeclList(dlEmbedded, &Embedded);
+                    FEmbedDepth++;
+                    if (Embedded)
+                    {
+                        if (!IsMSIL) printf("Warning: Duplicate embedded list\n");
+                        Tag = ReadTag();
+                        TNameDecl* le = static_cast<TNameDecl *>(GetDCURecListEnd(Embedded));
+                        ReadDeclList(dlEmbedded, &le);
+                    }
+                    else
+                    {
+                        Tag = ReadTag();
+                        ReadDeclList(dlEmbedded, &Embedded);
+                    }
+                    FEmbedDepth--;
+                    if (Tag != drEmbeddedProcEnd) printf("Warning: Embedded Stop Tag\n");
+                    // try to fix the local types relocation problem of XE
+                    if (FVer >= verDXE1 && FVer < verK1) RegisterEmbeddedTypes(&Embedded, FEmbedDepth + 1);
                 }
-                FEmbedDepth--;
-                if (Tag != drEmbeddedProcEnd) printf("Warning: Embedded Stop Tag\n");
-                // try to fix the local types relocation problem of XE
-                if (FVer >= verDXE1 && FVer < verK1) RegisterEmbeddedTypes(&Embedded, FEmbedDepth + 1);
-            }
-            break;
-        case drVar:
-            if (LK == dlArgs || LK == dlArgsT)
+                break;
+            case drVar:
+                if (LK == dlArgs || LK == dlArgsT)
+                    Decl = new TLocalDecl(LK);
+                else
+                    Decl = new TVarDecl;
+              break;
+            case drThreadVar:
+                Decl = new TThreadVarDecl;
+                break;
+            case drExport:
+                Decl = new TExportDecl;
+                break;
+            case drVarC:
+                Decl = new TVarCDecl(false);
+                break;
+            case arVal:
+            case arVar:
+            case arResult:
+            case arFld:
                 Decl = new TLocalDecl(LK);
-            else
-                Decl = new TVarDecl;
-          break;
-        case drThreadVar:
-            Decl = new TThreadVarDecl;
-            break;
-        case drExport:
-            Decl = new TExportDecl;
-            break;
-        case drVarC:
-            Decl = new TVarCDecl(false);
-            break;
-        case arVal:
-        case arVar:
-        case arResult:
-        case arFld:
-            Decl = new TLocalDecl(LK);
-            break;
-        case arAbsLocVar:
-            if (LK == dlMain || LK == dlMainImpl)
-                Decl = new TAbsVarDecl;
-            else
-                Decl = new TLocalDecl(LK);
-            break;
-        case arLabel:
-            Decl = new TLabelDecl;
-            break;
-        case arMethod:
-        case arConstr:
-        case arDestr:
-            Decl = new TMethodDecl(LK);
-            break;
-        case arClassVar:
-            if (!(FVer >= verD2006 && FVer < verK1))
-                brk = true;
-            else
-                Decl = new TClassVarDecl(LK);
-            break;
-        case arProperty:
-            if (LK == dlDispInterface)
-                Decl = new TDispPropDecl(LK);
-            else
-                Decl = new TPropDecl;
-            break;
-        case arCDecl:
-        case arPascal:
-        case arStdCall:
-        case arSafeCall:
-            break;
-        case arSetDeft:
-            Decl = new TSetDeftInfo;
-            break;
-        case drStop2:
-            if (FVer >= verD8 && FVer < verK1)
-                ReadULong();
-            break;
-        case drStrConstRec:
-            if (!(FVer >= verD8 && FVer < verK1))
-                brk = true;
-            else
-                Decl = new TStrConstDecl;
-            break;
-        case drSpecVar:
-            if (!(FVer >= verD2006 && FVer < verK1))
-                brk = true;
-            else
-                Decl = new TSpecVar;
-            break;
-        case drRangeDef:
-        case drChRangeDef:
-        case drBoolRangeDef:
-        case drWCharRangeDef:
-        case drWideRangeDef:
-            new TRangeDef;
-            break;
-        case drEnumDef:
-            new TEnumDef;
-            break;
-        case drFloatDef:
-            new TFloatDef;
-            break;
-        case drPtrDef:
-            new TPtrDef;
-            break;
-        case drTextDef:
-            new TTextDef;
-            break;
-        case drFileDef:
-            new TFileDef;
-            break;
-        case drSetDef:
-            new TSetDef;
-            break;
-        case drShortStrDef:
-            new TShortStrDef;
-            break;
-        case drStringDef:
-        case drWideStrDef:
-            new TStringDef;
-            break;
-        case drArrayDef:
-            new TArrayDef(false);
-            break;
-        case drVariantDef:
-            new TVariantDef;
-            break;
-        case drObjVMTDef:
-            new TObjVMTDef;
-            break;
-        case drRecDef:
-            new TRecDef;
-            break;
-        case drProcTypeDef:
-            new TProcTypeDef;
-            break;
-        case drObjDef:
-            new TObjDef;
-            break;
-        case drClassDef:
-            new TClassDef;
-            break;
-        case drMetaClassDef:
-            if (!(FVer >= verD8 && FVer < verK1))
-                brk = true;
-            else
-                new TMetaClassDef;
-            break;
-        case drInterfaceDef:
-            new TInterfaceDef;
-            break;
-        case drVoid:
-            new TVoidDef;
-            break;
-        case drCBlock:
-            if (LK != dlMain)
-                brk = true;
-            else
-            {
-                if (FDataBlPtr) printf("Warning: 2nd Data block\n");
-                FDataBlSize = ReadUIndex();
-                FDataBlPtr = ReadMem(FDataBlSize);
-            }
-            break;
-        case drFixUp:
-            LoadFixups();
-            break;
-        case drEmbeddedProcEnd:
-            if (!(LK == dlArgsT && FVer > verD3 || LK == dlArgs && FVer > verD3))
-                brk = true;
-            else
-                if (IsMSIL || (FVer >= verD2009 && FVer < verK1)) WasEmbEnd = true;
-            break;
-        case drCodeLines:
-            LoadCodeLines();
-            break;
-        case drLinNum:
-            LoadLineRanges();
-            break;
-        case drStrucScope:
-            LoadStrucScope();
-            break;
-        case drLocVarTbl:
-            LoadLocVarTbl();
-            break;
-        case drSymbolRef:
-            LoadSymbolInfo();
-            break;
-        case drUnitAddInfo:
-            if (!(FVer >= verD7 && FVer < verK1))
-                brk = true;
-            else
-                Decl = new TUnitAddInfo;
-            break;
-        case drConstAddInfo:
-            if (!(FVer >= verD7 && FVer < verK1 || FVer >= verK3))
-                brk = true;
-            else
-                ReadConstAddInfo(LastProcDecl);
-            break;
-        case drProcAddInfo:
-            if (!(FVer >= verD7 && FVer < verK1))
-                brk = true;
-            else
-            {
-                V = ReadIndex();
-                SetProcAddInfo(V);
-            }
-            break;
-        case drORec:
-            if (!(FVer >= verD8 && FVer < verK1))
-                brk = true;
-            else
-            {
-                if (FVer >= verD2009)
-                    Decl = new TORecDecl;
+                break;
+            case arAbsLocVar:
+                if (LK == dlMain || LK == dlMainImpl)
+                    Decl = new TAbsVarDecl;
+                else
+                    Decl = new TLocalDecl(LK);
+                break;
+            case arLabel:
+                Decl = new TLabelDecl;
+                break;
+            case arMethod:
+            case arConstr:
+            case arDestr:
+                Decl = new TMethodDecl(LK);
+                break;
+            case arClassVar:
+                if (!(FVer >= verD2006 && FVer < verK1))
+                    brk = true;
+                else
+                    Decl = new TClassVarDecl(LK);
+                break;
+            case arProperty:
+                if (LK == dlDispInterface)
+                    Decl = new TDispPropDecl(LK);
+                else
+                    Decl = new TPropDecl;
+                break;
+            case arCDecl:
+            case arPascal:
+            case arStdCall:
+            case arSafeCall:
+                break;
+            case arSetDeft:
+                Decl = new TSetDeftInfo;
+                break;
+            case drStop2:
+                if (FVer >= verD8 && FVer < verK1)
+                    ReadULong();
+                break;
+            case drStrConstRec:
+                if (!(FVer >= verD8 && FVer < verK1))
+                    brk = true;
+                else
+                    Decl = new TStrConstDecl;
+                break;
+            case drSpecVar:
+                if (!(FVer >= verD2006 && FVer < verK1))
+                    brk = true;
+                else
+                    Decl = new TSpecVar;
+                break;
+            case drRangeDef:
+            case drChRangeDef:
+            case drBoolRangeDef:
+            case drWCharRangeDef:
+            case drWideRangeDef:
+                new TRangeDef;
+                break;
+            case drEnumDef:
+                new TEnumDef;
+                break;
+            case drFloatDef:
+                new TFloatDef;
+                break;
+            case drPtrDef:
+                new TPtrDef;
+                break;
+            case drTextDef:
+                new TTextDef;
+                break;
+            case drFileDef:
+                new TFileDef;
+                break;
+            case drSetDef:
+                new TSetDef;
+                break;
+            case drShortStrDef:
+                new TShortStrDef;
+                break;
+            case drStringDef:
+            case drWideStrDef:
+                new TStringDef;
+                break;
+            case drArrayDef:
+                new TArrayDef(false);
+                break;
+            case drVariantDef:
+                new TVariantDef;
+                break;
+            case drObjVMTDef:
+                new TObjVMTDef;
+                break;
+            case drRecDef:
+                new TRecDef;
+                break;
+            case drProcTypeDef:
+                new TProcTypeDef;
+                break;
+            case drObjDef:
+                new TObjDef;
+                break;
+            case drClassDef:
+                new TClassDef;
+                break;
+            case drMetaClassDef:
+                if (!(FVer >= verD8 && FVer < verK1))
+                    brk = true;
+                else
+                    new TMetaClassDef;
+                break;
+            case drInterfaceDef:
+                new TInterfaceDef;
+                break;
+            case drVoid:
+                new TVoidDef;
+                break;
+            case drCBlock:
+                if (LK != dlMain)
+                    brk = true;
+                else
+                {
+                    if (FDataBlPtr) printf("Warning: 2nd Data block\n");
+                    FDataBlSize = ReadUIndex();
+                    FDataBlPtr = ReadMem(FDataBlSize);
+                }
+                break;
+            case drFixUp:
+                LoadFixups();
+                break;
+            case drEmbeddedProcEnd:
+                if (!(LK == dlArgsT && FVer > verD3 || LK == dlArgs && FVer > verD3))
+                    brk = true;
+                else
+                    if (IsMSIL || (FVer >= verD2009 && FVer < verK1)) WasEmbEnd = true;
+                break;
+            case drCodeLines:
+                LoadCodeLines();
+                break;
+            case drLinNum:
+                LoadLineRanges();
+                break;
+            case drStrucScope:
+                LoadStrucScope();
+                break;
+            case drLocVarTbl:
+                LoadLocVarTbl();
+                break;
+            case drSymbolRef:
+                LoadSymbolInfo();
+                break;
+            case drUnitAddInfo:
+                if (!(FVer >= verD7 && FVer < verK1))
+                    brk = true;
+                else
+                    Decl = new TUnitAddInfo;
+                break;
+            case drConstAddInfo:
+                if (!(FVer >= verD7 && FVer < verK1 || FVer >= verK3))
+                    brk = true;
+                else
+                    ReadConstAddInfo(LastProcDecl);
+                break;
+            case drProcAddInfo:
+                if (!(FVer >= verD7 && FVer < verK1))
+                    brk = true;
+                else
+                {
+                    V = ReadIndex();
+                    SetProcAddInfo(V);
+                }
+                break;
+            case drORec:
+                if (!(FVer >= verD8 && FVer < verK1))
+                    brk = true;
+                else
+                {
+                    if (FVer >= verD2009)
+                        Decl = new TORecDecl;
+                    else
+                        ReadUIndex();
+                }
+                break;
+            case drInfo98:
+                if (!(FVer >= verD8 && FVer < verK1))
+                    brk = true;
+                else
+                {
+                    ReadUIndex();
+                    ReadUIndex();
+                }
+                break;
+            case drCLine: // Lines of C text, just ignore them by now
+                if (!(FVer >= verD2006 && FVer < verK1))
+                    brk = true;
+                else
+                {
+                    if (FVer >= verDXE1 && FVer < verK1) X = ReadByte();
+                    V = ReadUIndex(); // Length of the line
+                    SkipBlock(V);     // Line chars
+                }
+                break;
+            case drA1Info: // Some record of 6 indices, ignore it completely
+                if (!(FVer >= verD2006 && FVer < verK1))
+                    brk = true;
+                else
+                {
+                    ReadUIndex();
+                    ReadUIndex();
+                    ReadUIndex();
+                    ReadUIndex();
+                    V = ReadUIndex();
+                    for (int i = 1; i <= V; i++) ReadUIndex();
+                }
+                break;
+            case drA2Info:
+                if (!(FVer >= verD2006 && FVer < verK1))
+                    brk = true;
+                break;
+            case arCopyDecl:
+                if (!(FVer >= verD2006 && FVer < verK1))
+                    brk = true;
+                else
+                    Decl = new TCopyDecl;
+                break;
+            case drA5Info:
+                if (!(FVer >= verD2009 && FVer < verK1))
+                    brk = true;
+                // No data for this tag
+                break;
+            case drA6Info:
+                if (!(FVer >= verD2009 && FVer < verK1))
+                    brk = true;
+                else
+                    new TA6Def;
+                break;
+            case drA7Info:
+                if (!(FVer >= verD2009 && FVer < verK1))
+                    brk = true;
+                else
+                    new TA7Def;
+                break;
+            case drA8Info:
+                if (!(FVer >= verD2009 && FVer < verK1))
+                    brk = true;
                 else
                     ReadUIndex();
-            }
-            break;
-        case drInfo98:
-            if (!(FVer >= verD8 && FVer < verK1))
+                break;
+            case drDynArrayDef:
+                if (!(FVer >= verD2009 && FVer < verK1))
+                    brk = true;
+                else
+                    new TDynArrayDef;
+                break;
+            case drTemplateArgDef:
+                if (!(FVer >= verD2009 && FVer < verK1))
+                    brk = true;
+                else
+                    new TTemplateArgDef;
+                break;
+            case drTemplateCall:
+                if (!(FVer >= verD2009 && FVer < verK1))
+                    brk = true;
+                else
+                    new TTemplateCall;
+                break;
+            case drUnicodeStringDef:
+                if (!(FVer >= verD2009 && FVer < verK1))
+                    brk = true;
+                else
+                    new TStringDef;
+                break;
+            case drDelayedImpInfo:
+                if (!(FVer >= verD2009 && FVer < verK1))
+                    brk = true;
+                else
+                    Decl = new TDelayedImpRec;
+                break;
+            default:
                 brk = true;
-            else
-            {
-                ReadUIndex();
-                ReadUIndex();
-            }
-            break;
-        case drCLine: // Lines of C text, just ignore them by now
-            if (!(FVer >= verD2006 && FVer < verK1))
-                brk = true;
-            else
-            {
-                if (FVer >= verDXE1 && FVer < verK1) X = ReadByte();
-                V = ReadUIndex(); // Length of the line
-                SkipBlock(V);     // Line chars
-            }
-            break;
-        case drA1Info: // Some record of 6 indices, ignore it completely
-            if (!(FVer >= verD2006 && FVer < verK1))
-                brk = true;
-            else
-            {
-                ReadUIndex();
-                ReadUIndex();
-                ReadUIndex();
-                ReadUIndex();
-                V = ReadUIndex();
-                for (i = 1; i <= V; i++) ReadUIndex();
-            }
-            break;
-        case drA2Info:
-            if (!(FVer >= verD2006 && FVer < verK1))
-                brk = true;
-            break;
-        case arCopyDecl:
-            if (!(FVer >= verD2006 && FVer < verK1))
-                brk = true;
-            else
-                Decl = new TCopyDecl;
-            break;
-        case drA5Info:
-            if (!(FVer >= verD2009 && FVer < verK1))
-                brk = true;
-            // No data for this tag
-            break;
-        case drA6Info:
-            if (!(FVer >= verD2009 && FVer < verK1))
-                brk = true;
-            else
-                new TA6Def;
-            break;
-        case drA7Info:
-            if (!(FVer >= verD2009 && FVer < verK1))
-                brk = true;
-            else
-                new TA7Def;
-            break;
-        case drA8Info:
-            if (!(FVer >= verD2009 && FVer < verK1))
-                brk = true;
-            else
-                ReadUIndex();
-            break;
-        case drDynArrayDef:
-            if (!(FVer >= verD2009 && FVer < verK1))
-                brk = true;
-            else
-                new TDynArrayDef;
-            break;
-        case drTemplateArgDef:
-            if (!(FVer >= verD2009 && FVer < verK1))
-                brk = true;
-            else
-                new TTemplateArgDef;
-            break;
-        case drTemplateCall:
-            if (!(FVer >= verD2009 && FVer < verK1))
-                brk = true;
-            else
-                new TTemplateCall;
-            break;
-        case drUnicodeStringDef:
-            if (!(FVer >= verD2009 && FVer < verK1))
-                brk = true;
-            else
-                new TStringDef;
-            break;
-        case drDelayedImpInfo:
-            if (!(FVer >= verD2009 && FVer < verK1))
-                brk = true;
-            else
-                Decl = new TDelayedImpRec;
-            break;
-        default:
-            brk = true;
-            break;
+                break;
         }
         if (brk) break;
-        if (Decl)
-        {
+        if (Decl) {
             CurDeclNo++;
             *DeclEnd = Decl;
-            DeclEnd = reinterpret_cast<TNameDecl **>(&Decl->Next);
+            DeclEnd  = reinterpret_cast<TNameDecl **>(&Decl->Next);
         }
         Tag = ReadTag();
     }
-    if (Embedded)
-    {
-        if ((IsMSIL && LK == dlEmbedded) || (FVer >= verD2010 && FVer <= verK1 && (LK == dlArgs || LK == dlArgsT)) || (LK == dlEmbedded && !*Result))
-        {
+    if (Embedded) {
+        if ((IsMSIL && LK == dlEmbedded) || (FVer >= verD2010 && FVer <= verK1 && (LK == dlArgs || LK == dlArgsT)) ||
+            (LK == dlEmbedded && !*Result)) {
             // A lot of files contain additional drEmbeddedProcStart - drEmbeddedProcEnd
             // brackets for aux record
             *DeclEnd = Embedded;
-        }
-        else
-        {
+        } else {
             FreeDCURecList(Embedded);
             printf("Error: Unused embedded list\n");
         }
@@ -2019,48 +1799,43 @@ String SecNames[] = {
 
 void __fastcall ShowDeclList(Byte LK, TNameDecl* Decl, String& OutS)
 {
-    bool        Visible;
-    Byte        SK;
-    TTypeDef    *TD;
-    String      SecN, S;
+    bool      Visible;
+    Byte      SK;
+    TTypeDef *TD;
+    String    SecN, S;
 
     OutS = "";
     int DeclCnt = 0;
 
-    while (Decl)
-    {
+    while (Decl) {
         Visible = Decl->IsVisible(LK);
-        if (Visible)
-        {
+        if (Visible) {
             SK = Decl->GetSecKind();
-            if (DeclCnt > 0)
-            {
+            if (DeclCnt > 0) {
                 OutS += ";";
-                OutLog1(";\n");    // !!! prototype separator
+                OutLog1(";\n"); // !!! prototype separator
             }
+
             if (SK >= 9 && SK <= 12)
                 ActiveScope = SK;
             else
                 ActiveScope = 0;
-            if (SK == 2)    // const
-            {
+
+            // const
+            if (SK == 2) {
                 ActiveInfo = 2;
-            }
-            else if (SK == 3)   // type
-            {
+            } else if (SK == 3) {
+                // type
                 ActiveInfo = 3;
-            }
-            else if (SK == 4)   // var
-            {
+            } else if (SK == 4) {
+                // var
                 ActiveInfo = 4;
-            }
-            else if (SK == 5)   // threadvar
-            {
-                ThreadVar = true;
+            } else if (SK == 5) {
+                // threadvar
+                ThreadVar  = true;
                 ActiveInfo = 5;
-            }
-            else if (SK == 6)   // resourcestring
-            {
+            } else if (SK == 6) {
+                // resourcestring
                 ActiveInfo = 6;
             }
             
@@ -2071,31 +1846,27 @@ void __fastcall ShowDeclList(Byte LK, TNameDecl* Decl, String& OutS)
                 Decl->ShowDef(false, S);
             else if (LK == dlMainImpl)
                 Decl->ShowDef(true, S);
-            else if (LK == dlA6)
-            {
+            else if (LK == dlA6) {
                 TD = 0;
-                if (Decl->InheritsFrom(__classid(TTypeDecl)))
-                {
-                    TD = GetTypeDef(((TTypeDecl*)Decl)->hDef);
+                if (Decl->InheritsFrom(__classid(TTypeDecl))) {
+                    TD = GetTypeDef(((TTypeDecl *) Decl)->hDef);
                     if (TD && TD->InheritsFrom(__classid(TTemplateArgDef)))
                         Decl->ShowName(S);
                     else
                         TD = 0;
                 }
                 if (!TD) Decl->Show(S); // Just in case
-            }
-            else
-            {
-                if (LK == dlClass)  // Class
-                {
-                    TList *SFieldsList = FieldsList;
+            } else {
+                // Class
+                if (LK == dlClass) {
+                    TList *SFieldsList     = FieldsList;
                     TList *SPropertiesList = PropertiesList;
-                    TList *SMethodsList = MethodsList;
-                    TList *SArgsList = ArgsList;
-                    FieldsList = 0;
-                    PropertiesList = 0;
-                    MethodsList = 0;
-                    ArgsList = 0;
+                    TList *SMethodsList    = MethodsList;
+                    TList *SArgsList       = ArgsList;
+                    FieldsList             = 0;
+                    PropertiesList         = 0;
+                    MethodsList            = 0;
+                    ArgsList               = 0;
 
                     if (Decl->ClassNameIs("TLocalDecl"))
                         FieldsList = SFieldsList;
@@ -2106,44 +1877,40 @@ void __fastcall ShowDeclList(Byte LK, TNameDecl* Decl, String& OutS)
 
                     Decl->Show(S);
 
-                    FieldsList = SFieldsList;;
+                    FieldsList = SFieldsList;
+
                     PropertiesList = SPropertiesList;
-                    MethodsList = SMethodsList;
-                    ArgsList = SArgsList;
-                }
-                else if (LK == dlArgsT) // Interface
-                {
-                    TList *SFieldsList = FieldsList;
+                    MethodsList    = SMethodsList;
+                    ArgsList       = SArgsList;
+                } else if (LK == dlArgsT) {
+                    // Interface
+                    TList *SFieldsList  = FieldsList;
                     TList *SMethodsList = MethodsList;
-                    TList *SArgsList = ArgsList;
-                    TList *SLocalsList = LocalsList;
-                    FieldsList = 0;
+                    TList *SArgsList    = ArgsList;
+                    TList *SLocalsList  = LocalsList;
+
+                    FieldsList  = 0;
                     MethodsList = 0;
-                    ArgsList = 0;
-                    LocalsList = 0;
+                    ArgsList    = 0;
+                    LocalsList  = 0;
 
                     Decl->Show(S);
 
-                    FieldsList = SFieldsList;;
+                    FieldsList = SFieldsList;
                     MethodsList = SMethodsList;
-                    ArgsList = SArgsList;
-                    LocalsList = SLocalsList;
-                }
-                else if (LK == dlFields)
-                {
+                    ArgsList    = SArgsList;
+                    LocalsList  = SLocalsList;
+                } else if (LK == dlFields) {
                     Decl->Show(S);
-                }
-                else if (LK == dlEmbedded)
-                {
+                } else if (LK == dlEmbedded) {
                     TList *SConstList = ConstList;
-                    TList *STypeList = TypeList;
-                    ConstList = 0;
-                    TypeList = 0;
+                    TList *STypeList  = TypeList;
+                    ConstList         = 0;
+                    TypeList          = 0;
                     Decl->Show(S);
                     ConstList = SConstList;
-                    TypeList = STypeList;
-                }
-                else
+                    TypeList  = STypeList;
+                } else
                     Decl->Show(S);
             }
             DeclCnt++;
@@ -2153,11 +1920,9 @@ void __fastcall ShowDeclList(Byte LK, TNameDecl* Decl, String& OutS)
     }
 }
 //------------------------------------------------------------------------------
-String __fastcall ShowRefOfsQualifier(int hDef, int Ofs)
-{
+String __fastcall ShowRefOfsQualifier(int hDef, int Ofs) {
     TTypeDef *TD = GetGlobalTypeDef(hDef);
-    if (!TD)
-    {
+    if (!TD) {
         if (Ofs > 0) return Format("^+%d", ARRAYOFCONST((Ofs)));
         if (Ofs < 0) return Format('^%d', ARRAYOFCONST((Ofs)));
         return "";
@@ -2165,25 +1930,21 @@ String __fastcall ShowRefOfsQualifier(int hDef, int Ofs)
     return TD->GetRefOfsQualifier(Ofs);
 }
 //------------------------------------------------------------------------------
-String __fastcall ShowTypeDef(int hDef, PName N)
-{
-    String Result;
+String __fastcall ShowTypeDef(int hDef, PName N) {
+    String Result = "";
 
-    Result = "";
     TBaseDef *D = GetTypeDef(hDef);
 
     if (D)
         D->ShowNamed(N, Result);
-    else
-    {
+    else {
         Result = "?";
         OutLog1("?");
     }
     return Result;
 }
 //------------------------------------------------------------------------------
-String __fastcall ShowTypeName(int hDef)
-{
+String __fastcall ShowTypeName(int hDef) {
     String S = "";
 
     if (hDef <= 0 || hDef > FTypes->Count) return S;
@@ -2207,8 +1968,7 @@ void __fastcall ShowDump(Byte *DP,                        // File 0 address, sho
                          DWord Ofs0Displ,                 // initial display offset
                          DWord Ofs0,                      // offset in DCU data block - for fixups
                          DWord WMin,                      // Minimal dump width (in bytes)
-                         int FixCnt, TFixupRec *FixTbl)
-{
+                         int FixCnt, TFixupRec *FixTbl) {
     DWord LSz, dOfs, ROfs;
     Byte K, B;
 
@@ -2227,8 +1987,7 @@ void __fastcall ShowDump(Byte *DP,                        // File 0 address, sho
         *pDumpSize = Size;
 
     OutLog3("{Ofs:%lX Sz:%lX}\n", ROfs, Size);
-    for (int n = 0; n < Size; n++)
-    {
+    for (int n = 0; n < Size; n++) {
         if (n) OutLog1(" ");
         OutLog2("%02X", *(LP + n));
     }
@@ -2236,8 +1995,7 @@ void __fastcall ShowDump(Byte *DP,                        // File 0 address, sho
     OutLog1("\n");
 
     DWord W = 16;
-    if (Size < W)
-    {
+    if (Size < W) {
         W = Size;
         if (W < WMin) W = WMin;
     }
@@ -2248,131 +2006,93 @@ void __fastcall ShowDump(Byte *DP,                        // File 0 address, sho
     String Name;
     PFIXUPINFO finfo;
 
-    do
-    {
+    do {
         LSz = W;
         if (LSz > Size) LSz = Size;
-        while (FixCnt > 0)
-        {
+        while (FixCnt > 0) {
             dOfs = (FP->OfsF & FixOfsMask) - Ofs0;
-            K = ((Byte*)&FP->OfsF)[3];
+            K    = reinterpret_cast<Byte *>(&FP->OfsF)[3];
             if (dOfs >= LSz && (dOfs != LSz || K != fxEnd)) break;
-            if (FVer == verD2010 || FVer == verDXE1 || FVer == verDXE2)
-            {
-                if (K == 4 || K == 5 || K == 6 || K == 8 || K == 18)
-                {
+            if (FVer == verD2010 || FVer == verDXE1 || FVer == verDXE2) {
+                if (K == 4 || K == 5 || K == 6 || K == 8 || K == 18) {
                     finfo = new FIXUPINFO;
                     finfo->Ofs = LP - DP + dOfs;
                     OutLog2("%lX: ", LP - DPFile0 + dOfs);
-                    if (K == 4)
-                    {
+                    if (K == 4) {
                         finfo->Type = 'A';
                         OutLog1("A");
-                    }
-                    else if (K == 5)
-                    {
+                    } else if (K == 5) {
                         finfo->Type = 'J';
                         OutLog1("J");
-                    }
-                    else if (K == 6)
-                    {
+                    } else if (K == 6) {
                         finfo->Type = 'D';
                         OutLog1("D");
-                    }
-                    else if (K == 8)
-                    {
+                    } else if (K == 8) {
                         finfo->Type = 'S';
                         OutLog1("S");
-                    }
-                    else if (K == 18)   //???
-                    {
+                    } else if (K == 18) {
+                        // ???
                         finfo->Type = 'B';
                         OutLog1("B");
-                    }
-                    else
-                    {
+                    } else {
                         finfo->Type = 'U';
                         OutLog1("U");
                     }
                     Name = GetAddrStr(FP->Ndx);
                     finfo->Name = Name;
-                    if (FixupsList) FixupsList->Add((void*)finfo);
+                    if (FixupsList) FixupsList->Add(static_cast<void *>(finfo));
                     OutLog2(" %s\n", Name.c_str());
                 }
-            }
-            else if (FVer == verD7 || FVer == verD2006 || FVer == verD2009)
-            {
-                if (K == 1 || K == 2 || K == 3 || K == 5)
-                {
+            } else if (FVer == verD7 || FVer == verD2006 || FVer == verD2009) {
+                if (K == 1 || K == 2 || K == 3 || K == 5) {
                     finfo = new FIXUPINFO;
                     finfo->Ofs = LP - DP + dOfs;
                     OutLog2("%lX: ", LP - DPFile0 + dOfs);
-                    if (K == 1)
-                    {
+                    if (K == 1) {
                         finfo->Type = 'A';
                         OutLog1("A");
-                    }
-                    else if (K == 2)
-                    {
+                    } else if (K == 2) {
                         finfo->Type = 'J';
                         OutLog1("J");
-                    }
-                    else if (K == 3)
-                    {
+                    } else if (K == 3) {
                         finfo->Type = 'D';
                         OutLog1("D");
-                    }
-                    else if (K == 5)
-                    {
+                    } else if (K == 5) {
                         finfo->Type = 'S';
                         OutLog1("S");
-                    }
-                    else
-                    {
+                    } else {
                         finfo->Type = 'U';
                         OutLog1("U");
                     }
                     Name = GetAddrStr(FP->Ndx);
                     finfo->Name = Name;
-                    if (FixupsList) FixupsList->Add((void*)finfo);
+                    if (FixupsList) FixupsList->Add(static_cast<void *>(finfo));
                     OutLog2(" %s\n", Name.c_str());
                 }
-            }
-            else
-            {
-                if (K == 1 || K == 2 || (K == 3 && FVer != verD2))
-                {
+            } else {
+                if (K == 1 || K == 2 || (K == 3 && FVer != verD2)) {
                     finfo = new FIXUPINFO;
                     finfo->Ofs = LP - DP + dOfs;
                     OutLog2("%lX: ", LP - DPFile0 + dOfs);
-                    if (K == 1)
-                    {
+                    if (K == 1) {
                         finfo->Type = 'A';
                         OutLog1("A");
-                    }
-                    else if (K == 2)
-                    {
+                    } else if (K == 2) {
                         finfo->Type = 'J';
                         OutLog1("J");
-                    }
-                    else if (K == 3)
-                    {
+                    } else if (K == 3) {
                         finfo->Type = 'D';
                         OutLog1("D");
-                    }
-                    else if (K == 5)
-                    {
+                    } else if (K == 5) {
                         finfo->Type = 'S';
                         OutLog1("S");
-                    }
-                    else
-                    {
+                    } else {
                         finfo->Type = 'U';
                         OutLog1("U");
                     }
                     Name = GetAddrStr(FP->Ndx);
                     finfo->Name = Name;
-                    if (FixupsList) FixupsList->Add((void*)finfo);
+                    if (FixupsList) FixupsList->Add(static_cast<void *>(finfo));
                     OutLog2(" %s\n", Name.c_str());
                 }
             }
@@ -2386,12 +2106,10 @@ void __fastcall ShowDump(Byte *DP,                        // File 0 address, sho
     } while (Size > 0);
 }
 //------------------------------------------------------------------------------
-Byte* __fastcall GetBlockMem(DWord BlOfs, DWord BlSz, DWord* ResSz)
-{
+Byte *__fastcall GetBlockMem(DWord BlOfs, DWord BlSz, DWord *ResSz) {
     *ResSz = BlSz;
     if (!FDataBlPtr || static_cast<int>(BlOfs) < 0 || !BlSz) return NULL;
-    if (BlSz + BlOfs > FDataBlSize)
-    {
+    if (BlSz + BlOfs > FDataBlSize) {
         BlSz = FDataBlSize - BlOfs;
         if (static_cast<int>(BlSz) <= 0) return NULL;
     }
@@ -2399,8 +2117,7 @@ Byte* __fastcall GetBlockMem(DWord BlOfs, DWord BlSz, DWord* ResSz)
     return FDataBlPtr + BlOfs;
 }
 //------------------------------------------------------------------------------
-int __fastcall GetStartFixup(DWord Ofs)
-{
+int __fastcall GetStartFixup(DWord Ofs) {
     int i;
     int d;
 
@@ -2408,9 +2125,8 @@ int __fastcall GetStartFixup(DWord Ofs)
     if (!Ofs) return 0;
     int iMin = 0;
     int iMax = FFixupCnt - 1;
-    while (iMin <= iMax)
-    {
-        i = (iMin + iMax)/2;
+    while (iMin <= iMax) {
+        i = (iMin + iMax) / 2;
         TFixupRec fRec = FFixupTbl[i];
         d = (fRec.OfsF & FixOfsMask) - Ofs;
         if (d < 0)
@@ -2421,100 +2137,77 @@ int __fastcall GetStartFixup(DWord Ofs)
     return iMin;
 }
 //------------------------------------------------------------------------------
-void __fastcall ShowDataBl(DWord Ofs0, DWord BlOfs, DWord BlSz)
-{
+void __fastcall ShowDataBl(DWord Ofs0, DWord BlOfs, DWord BlSz) {
     Byte *DP = GetBlockMem(BlOfs + Ofs0, BlSz - Ofs0, &BlSz);
     if (!DP) return;
     int Fix0 = GetStartFixup(BlOfs + Ofs0);
     ShowDump(DP, FMemPtr, FMemSize, 0, BlSz, Ofs0, BlOfs + Ofs0, 0, FFixupCnt - Fix0, &FFixupTbl[Fix0]);
 }
 //------------------------------------------------------------------------------
-void __fastcall DasmCodeBlSeq(DWord Ofs0, DWord BlOfs, DWord BlSz)
-{
+void __fastcall DasmCodeBlSeq(DWord Ofs0, DWord BlOfs, DWord BlSz) {
     Byte *DP = GetBlockMem(BlOfs, BlSz, &BlSz);
-    if (!DP)
-    {
+    if (!DP) {
         printf("Warning: nodump\n");
         return;
     }
-    int Fix0 = GetStartFixup(BlOfs);
+    int   Fix0  = GetStartFixup(BlOfs);
     char *FOfs0 = reinterpret_cast<char *>(FMemPtr);
-    ShowDump(DP, reinterpret_cast<Byte *>(FOfs0), FMemSize, BlSz, BlSz, Ofs0, BlOfs, 0, FFixupCnt-Fix0, &FFixupTbl[Fix0]);
+    ShowDump(DP, reinterpret_cast<Byte *>(FOfs0), FMemSize, BlSz, BlSz, Ofs0, BlOfs, 0, FFixupCnt - Fix0, &FFixupTbl[Fix0]);
 }
 //------------------------------------------------------------------------------
-void __fastcall ShowCodeBl(DWord Ofs0, DWord BlOfs, DWord BlSz)
-{
-    DWord Sz;
+void __fastcall ShowCodeBl(DWord Ofs0, DWord BlOfs, DWord BlSz) {
     DWord CodeSz = BlSz;
     DasmCodeBlSeq(Ofs0, BlOfs, CodeSz);
 
-    if (CodeSz < BlSz)
-    {
+    if (CodeSz < BlSz) {
         OutLog1("rest:\n");
         ShowDataBl(Ofs0 + CodeSz, BlOfs + CodeSz, Ofs0 + BlSz);
     }
 }
 //------------------------------------------------------------------------------
-bool __fastcall MemToUInt(Byte *DP, DWord Sz, DWord* Res)
-{
-    switch (Sz)
-    {
-    case 1:
-        *Res = *((Byte*)DP);
-        break;
-    case 2:
-        *Res = *((Word*)DP);
-        break;
-    case 4:
-        *Res = *((DWord*)DP);
-        break;
-    default:
-        Res = 0;
-        return false;
+bool __fastcall MemToUInt(Byte *DP, DWord Sz, DWord *Res) {
+    switch (Sz) {
+        case 1: *Res = *((Byte *) DP); break;
+        case 2: *Res = *reinterpret_cast<Word *>(DP); break;
+        case 4: *Res = *reinterpret_cast<DWord *>(DP); break;
+        default: Res = 0; return false;
     }
     return true;
 }
 //------------------------------------------------------------------------------
-String __fastcall CharStr(char Ch)
-{
+String __fastcall CharStr(char Ch) {
     char buf[256];
     if (Ch < ' ')
-        sprintf(buf, "#%d", (Byte)Ch);
+        sprintf(buf, "#%d", (Byte) Ch);
     else
         sprintf(buf, "'%c'", Ch);
     return String(buf);
 }
 //------------------------------------------------------------------------------
-String __fastcall StrConstStr(char* CP, int L)
-{
+String __fastcall StrConstStr(char *CP, int L) {
     bool WasCode;
     char Ch;
 
     String Result;
-    Result.SetLength(3*L + 2);
-    int LRes = 0;
+    Result.SetLength(3 * L + 2);
+    int  LRes = 0;
     bool Code = true;
-    while (L > 0)
-    {
+    while (L > 0) {
         Ch = *CP;
-        CP++; L--;
+        CP++;
+        L--;
         WasCode = Code;
-        Code = (Ch < ' ');
-        if (WasCode != Code)
-        {
+        Code    = (Ch < ' ');
+        if (WasCode != Code) {
             LRes++;
             Result[LRes] = '\'';
         }
-        if (Code)
-        {
+        if (Code) {
             String S = CharStr(Ch);
             Move(&S[1], &Result[LRes + 1], S.Length());
             LRes += S.Length();
-        }
-        else
-        {
-            if (Ch == '\'')
-            {
+        } else {
+            if (Ch == '\'') {
                 LRes++;
                 Result[LRes] = '\'';
             }
@@ -2522,8 +2215,7 @@ String __fastcall StrConstStr(char* CP, int L)
             Result[LRes] = Ch;
         }
     }
-    if (!Code)
-    {
+    if (!Code) {
         LRes++;
         Result[LRes] = '\'';
     }
@@ -2534,9 +2226,8 @@ String __fastcall StrConstStr(char* CP, int L)
     return Result;
 }
 //------------------------------------------------------------------------------
-int __fastcall ShowStrConst(Byte* DP, DWord DS, String& OutS)
-{
-    int L;
+int __fastcall ShowStrConst(Byte *DP, DWord DS, String &OutS) {
+    int    L;
     String Value;
     OutS = "";
 
@@ -2547,8 +2238,8 @@ int __fastcall ShowStrConst(Byte* DP, DWord DS, String& OutS)
     if (DS < L + 9) return -1;
     VP += sizeof(int);
     if (*(VP + L)) return -1;
-    Value = StrConstStr(reinterpret_cast<char*>(VP), L);
-    OutS = Value;
+    Value = StrConstStr(reinterpret_cast<char *>(VP), L);
+    OutS  = Value;
     OutLog2("%s", Value.c_str());
     return L + 9;
 }
@@ -2559,85 +2250,82 @@ int __fastcall ShowStrConst(Byte* DP, DWord DS, String& OutS)
 //  -10:2 - string item size
 //  -8:4 - reference count
 //  -4:4 - Length in terms of the string item size
-int __fastcall ShowUnicodeStrConst(Byte* DP, DWord DS, String& OutS) // Ver >=verD12
+int __fastcall ShowUnicodeStrConst(Byte *DP, DWord DS, String &OutS) // Ver >=verD12
 {
     int Result = -1;
 
     OutS = "";
     if (DS < 13) return Result;
-    Byte *VP = DP + sizeof(Word);
+    Byte *VP   = DP + sizeof(Word);
     int   ElSz = *reinterpret_cast<Word *>(VP);
     if (ElSz == sizeof(AnsiChar)) // Try to show it as an AnsiString (!!!the code page is ignored by now)
     {
-        Result = ShowStrConst(DP + 2*sizeof(Word), DS - 2*sizeof(Word), OutS);
-        if (Result > 0) Result += 2*sizeof(Word);
+        Result = ShowStrConst(DP + 2 * sizeof(Word), DS - 2 * sizeof(Word), OutS);
+        if (Result > 0) Result += 2 * sizeof(Word);
         return Result;
     }
     if (ElSz != sizeof(WideChar)) return Result;
     VP = DP + sizeof(int);
     if (*reinterpret_cast<int *>(VP) != -1) return Result;
     VP += sizeof(int);
-    Result = ShowUnicodeResStrConst(VP, DS - 2*sizeof(int), OutS);
+    Result = ShowUnicodeResStrConst(VP, DS - 2 * sizeof(int), OutS);
     if (Result < 0) return Result;
-    Result += 2*sizeof(int);
+    Result += 2 * sizeof(int);
     return Result;
 }
 //------------------------------------------------------------------------------
-int __fastcall ShowUnicodeResStrConst(Byte* DP, DWord DS, String& OutS) //Ver >=verD12
+int __fastcall ShowUnicodeResStrConst(Byte *DP, DWord DS, String &OutS) // Ver >=verD12
 {
-    int         L, Result = -1;
-    WideString  WS;
-    String      S;
+    int Result = -1;
 
-    OutS = "";
-    L = *reinterpret_cast<int *>(DP);
-    if (DS - 6 < L*sizeof(WideChar) || L < 0) return Result;
+    OutS  = "";
+    int L = *reinterpret_cast<int *>(DP);
+    if (DS - 6 < L * sizeof(WideChar) || L < 0) return Result;
     DP += sizeof(int);
     if (*reinterpret_cast<PWideChar>(DP + L * sizeof(WideChar)) != 0) return Result;
-    WS = WideString(reinterpret_cast<PWideChar>(DP), L);
-    S = WS;
-    Result = L*sizeof(WideChar) + 6;
-    OutS = StrConstStr(AnsiString(S).c_str(), L);
+
+    WideString wide = WideString(reinterpret_cast<PWideChar>(DP), L);
+    String     str  = wide;
+
+    Result = L * sizeof(WideChar) + 6;
+    OutS   = StrConstStr(AnsiString(str).c_str(), L);
+
     OutLog2("%s", OutS.c_str());
 }
 //------------------------------------------------------------------------------
-int __fastcall ShowTypeValue(TTypeDef* T, Byte* DP, DWord DS, int ConstKind, String& OutS)
-{
+int __fastcall ShowTypeValue(TTypeDef *T, Byte *DP, DWord DS, int ConstKind, String &OutS) {
     int Result;
+
     TFixupMemState MS;
 
     OutS = "";
     if (!T) return -1;
-    if (ConstKind > 0)
-    {
+    if (ConstKind > 0) {
         SaveFixupMemState(&MS);
         SetCodeRange(DP, DP, DS);
     }
-    if (ConstKind > 0 && T->InheritsFrom(__classid(TStringDef)))
-    {
-        if (FVer >= verD2009 && FVer < verK1)
-        {
+    if (ConstKind > 0 && T->InheritsFrom(__classid(TStringDef))) {
+        if (FVer >= verD2009 && FVer < verK1) {
             if (ConstKind == 2)
                 Result = ShowUnicodeResStrConst(DP, DS, OutS);
             else
                 Result = ShowUnicodeStrConst(DP, DS, OutS);
-        }
-        else
+        } else
             Result = ShowStrConst(DP, DS, OutS);
-    }
-    else
+    } else
         Result = T->ShowValue(DP, DS, OutS);
-    if (ConstKind > 0)
-        RestoreFixupMemState(&MS);
+    if (ConstKind > 0) RestoreFixupMemState(&MS);
     return Result;
 }
 //------------------------------------------------------------------------------
-int __fastcall ShowGlobalTypeValue(int hDef, Byte* DP, DWord DS, bool AndRest, int ConstKind, String& OutS)
-{
+int __fastcall ShowGlobalTypeValue(int hDef, Byte *DP, DWord DS, bool AndRest, int ConstKind, String &OutS) {
     OutS = "";
     if (!DP) return -1;
-    TTypeDef *T      = GetGlobalTypeDef(hDef);
+
+    TTypeDef *T = GetGlobalTypeDef(hDef);
+
     int Result = ShowTypeValue(T, DP, DS, ConstKind, OutS);
+
     if (!AndRest) return Result;
     int SzShown = Result;
     if (SzShown < 0) SzShown = 0;
@@ -2645,8 +2333,7 @@ int __fastcall ShowGlobalTypeValue(int hDef, Byte* DP, DWord DS, bool AndRest, i
 
     if (DP >= FDataBlPtr && DP < FDataBlPtr + FDataBlSize)
         ShowDataBl(SzShown, DP - FDataBlPtr, DS);
-    else
-    {
+    else {
         Byte *FOfs0;
         FOfs0 = FMemPtr;
         ShowDump(DP, FOfs0, FMemSize, 0, DS, SzShown, SzShown, 0, 0, NULL);
@@ -2654,27 +2341,23 @@ int __fastcall ShowGlobalTypeValue(int hDef, Byte* DP, DWord DS, bool AndRest, i
     return Result;
 }
 //------------------------------------------------------------------------------
-TDCURec* __fastcall GetGlobalAddrDef(int hDef)
-{
+TDCURec *__fastcall GetGlobalAddrDef(int hDef) {
     TDCURec *D = GetAddrDef(hDef);
     if (!D) return NULL;
     if (D->InheritsFrom(__classid(TImpDef))) return NULL;
     return D;
 }
 //------------------------------------------------------------------------------
-bool __fastcall ShowGlobalConstValue(int hDef, String& OutS)
-{
+bool __fastcall ShowGlobalConstValue(int hDef, String &OutS) {
     TDCURec *D = GetGlobalAddrDef(hDef);
     if (!D || !D->InheritsFrom(__classid(TConstDecl))) return false;
-    ((TConstDecl*)D)->ShowValue(OutS);
+    static_cast<TConstDecl *>(D)->ShowValue(OutS);
     return true;
 }
 //------------------------------------------------------------------------------
-String __fastcall ShowOfsQualifier(int hDef, int Ofs)
-{
+String __fastcall ShowOfsQualifier(int hDef, int Ofs) {
     TTypeDef *TD = GetGlobalTypeDef(hDef);
-    if (!TD)
-    {
+    if (!TD) {
         if (Ofs > 0)
             return Format("+%d", ARRAYOFCONST((Ofs)));
         else if (Ofs < 0)
@@ -2684,11 +2367,10 @@ String __fastcall ShowOfsQualifier(int hDef, int Ofs)
     return TD->GetOfsQualifier(Ofs);
 }
 //------------------------------------------------------------------------------
-bool __fastcall ScanOneDCU(String Filename)
-{
+bool __fastcall ScanOneDCU(String Filename) {
     Byte   B;
     String S, SName;
-    DWord  L, L1, L2, Flags1;
+    DWord  L, L1, L2;
 
     FILE *fIn = fopen(AnsiString(Filename).c_str(), "rb");
     if (!fIn) return false;
@@ -2876,8 +2558,7 @@ bool __fastcall ScanOneDCU(String Filename)
 
     // Read File Header
     FileSizeH = ReadULong();
-    if (FileSizeH != FMemSize)
-    {
+    if (FileSizeH != FMemSize) {
         printf("Error: Wrong size: %lX != %lX\n", FileSizeH, FMemSize);
         delete[] FMemPtr;
         return false;
@@ -2885,53 +2566,39 @@ bool __fastcall ScanOneDCU(String Filename)
 
     // Read FileTime
     FT = ReadULong();
-    if (FVer == verD2)
-    {
+    if (FVer == verD2) {
         B = ReadByte();
         Tag = ReadTag();
-    }
-    else
-    {
+    } else {
         Stamp = ReadULong();
         B = ReadByte();
-        if (FVer >= verD7 && FVer < verK1)
-        {
+        if (FVer >= verD7 && FVer < verK1) {
             B = ReadByte(); // It has another header byte (or index)
             AddAddrDef(NULL);
         }
-        if (FVer >= verD2005 && FVer < verK1)
-        {
+        if (FVer >= verD2005 && FVer < verK1) {
             SName = ReadStr();
         }
-        if (FVer >= verD2009 && FVer < verK1)
-        {
+        if (FVer >= verD2009 && FVer < verK1) {
             L1 = ReadUIndex();
             L2 = ReadUIndex();
         }
         Tag = ReadTag();
-        if (FVer >= verK1)
-        {
-            if (Tag == drUnit4)
-            {
-                do
-                {
-                    L = ReadULong();
+        if (FVer >= verK1) {
+            if (Tag == drUnit4) {
+                do {
+                    L   = ReadULong();
                     Tag = ReadTag();
                 } while (Tag != drUnit4);
-            }
-            else if (Tag != drUnitFlags)
-            {
+            } else if (Tag != drUnitFlags) {
                 SkipBlock(3);
                 Tag = ReadTag();
             }
         }
-        if (Tag == drUnitFlags)
-        {
+        if (Tag == drUnitFlags) {
             Flags = ReadUIndex();
-            if (FVer > verD2005 && FVer < verK1)
-                Flags1 = ReadUIndex();
-            if (FVer > verD3)
-                UnitPrior = ReadUIndex();
+            if (FVer > verD2005 && FVer < verK1) DWord Flags1 = ReadUIndex();
+            if (FVer > verD3) UnitPrior = ReadUIndex();
             Tag = ReadTag();
         }
     }
@@ -2965,8 +2632,7 @@ bool __fastcall ScanOneDCU(String Filename)
 //------------------------------------------------------------------------------
 // Сортировка по именам
 // Sort by name
-int __fastcall CompareModulesByName(void *Item1, void *Item2)
-{
+int __fastcall CompareModulesByName(void *Item1, void *Item2) {
     PMODULEINFO info1 = static_cast<PMODULEINFO>(Item1);
     PMODULEINFO info2 = static_cast<PMODULEINFO>(Item2);
     return CompareText(info1->Name, info2->Name);
@@ -2974,8 +2640,7 @@ int __fastcall CompareModulesByName(void *Item1, void *Item2)
 //------------------------------------------------------------------------------
 // Сортировка по ModuleID
 // Sort by ModuleID
-int __fastcall CompareModulesByID(void *Item1, void *Item2)
-{
+int __fastcall CompareModulesByID(void *Item1, void *Item2) {
     PMODULEINFO info1 = static_cast<PMODULEINFO>(Item1);
     PMODULEINFO info2 = static_cast<PMODULEINFO>(Item2);
     if (info1->ModuleID > info2->ModuleID) return 1;
@@ -2983,19 +2648,17 @@ int __fastcall CompareModulesByID(void *Item1, void *Item2)
     return 0;
 }
 //------------------------------------------------------------------------------
-int __fastcall CompareConstsByName(void *Item1, void *Item2)
-{
+int __fastcall CompareConstsByName(void *Item1, void *Item2) {
     PCONSTINFO info1 = static_cast<PCONSTINFO>(Item1);
     PCONSTINFO info2 = static_cast<PCONSTINFO>(Item2);
-    int res = CompareText(info1->Name, info2->Name);
+    int        res   = CompareText(info1->Name, info2->Name);
     if (res) return res;
     if (info1->ModuleID > info2->ModuleID) return 1;
     if (info1->ModuleID < info2->ModuleID) return -1;
     return 0;
 }
 //------------------------------------------------------------------------------
-int __fastcall CompareConstsByID(void *Item1, void *Item2)
-{
+int __fastcall CompareConstsByID(void *Item1, void *Item2) {
     PCONSTINFO info1 = static_cast<PCONSTINFO>(Item1);
     PCONSTINFO info2 = static_cast<PCONSTINFO>(Item2);
     if (info1->ModuleID > info2->ModuleID) return 1;
@@ -3023,61 +2686,55 @@ int __fastcall CompareTypesByID(void *Item1, void *Item2)
     return CompareText(info1->Name, info2->Name);
 }
 //------------------------------------------------------------------------------
-int __fastcall CompareVarsByName(void *Item1, void *Item2)
-{
-    PVARINFO info1 = (PVARINFO)Item1;
-    PVARINFO info2 = (PVARINFO)Item2;
-    int res = CompareText(info1->Name, info2->Name);
+int __fastcall CompareVarsByName(void *Item1, void *Item2) {
+    PVARINFO info1 = static_cast<PVARINFO>(Item1);
+    PVARINFO info2 = static_cast<PVARINFO>(Item2);
+    int      res   = CompareText(info1->Name, info2->Name);
     if (res) return res;
     if (info1->ModuleID > info2->ModuleID) return 1;
     if (info1->ModuleID < info2->ModuleID) return -1;
     return 0;
 }
 //------------------------------------------------------------------------------
-int __fastcall CompareVarsByID(void *Item1, void *Item2)
-{
-    PVARINFO info1 = (PVARINFO)Item1;
-    PVARINFO info2 = (PVARINFO)Item2;
+int __fastcall CompareVarsByID(void *Item1, void *Item2) {
+    PVARINFO info1 = static_cast<PVARINFO>(Item1);
+    PVARINFO info2 = static_cast<PVARINFO>(Item2);
     if (info1->ModuleID > info2->ModuleID) return 1;
     if (info1->ModuleID < info2->ModuleID) return -1;
     return CompareText(info1->Name, info2->Name);
 }
 //------------------------------------------------------------------------------
-int __fastcall CompareResStrsByName(void *Item1, void *Item2)
-{
-    PRESSTRINFO info1 = (PRESSTRINFO)Item1;
-    PRESSTRINFO info2 = (PRESSTRINFO)Item2;
-    int res = CompareText(info1->Name, info2->Name);
+int __fastcall CompareResStrsByName(void *Item1, void *Item2) {
+    PRESSTRINFO info1 = static_cast<PRESSTRINFO>(Item1);
+    PRESSTRINFO info2 = static_cast<PRESSTRINFO>(Item2);
+    int         res   = CompareText(info1->Name, info2->Name);
     if (res) return res;
     if (info1->ModuleID > info2->ModuleID) return 1;
     if (info1->ModuleID < info2->ModuleID) return -1;
     return 0;
 }
 //------------------------------------------------------------------------------
-int __fastcall CompareResStrsByID(void *Item1, void *Item2)
-{
-    PRESSTRINFO info1 = (PRESSTRINFO)Item1;
-    PRESSTRINFO info2 = (PRESSTRINFO)Item2;
+int __fastcall CompareResStrsByID(void *Item1, void *Item2) {
+    PRESSTRINFO info1 = static_cast<PRESSTRINFO>(Item1);
+    PRESSTRINFO info2 = static_cast<PRESSTRINFO>(Item2);
     if (info1->ModuleID > info2->ModuleID) return 1;
     if (info1->ModuleID < info2->ModuleID) return -1;
     return CompareText(info1->Name, info2->Name);
 }
 //------------------------------------------------------------------------------
-int __fastcall CompareProcsByName(void *Item1, void *Item2)
-{
-    PPROCDECLINFO info1 = (PPROCDECLINFO)Item1;
-    PPROCDECLINFO info2 = (PPROCDECLINFO)Item2;
-    int res = CompareText(info1->Name, info2->Name);
+int __fastcall CompareProcsByName(void *Item1, void *Item2) {
+    PPROCDECLINFO info1 = static_cast<PPROCDECLINFO>(Item1);
+    PPROCDECLINFO info2 = static_cast<PPROCDECLINFO>(Item2);
+    int           res   = CompareText(info1->Name, info2->Name);
     if (res) return res;
     if (info1->ModuleID > info2->ModuleID) return 1;
     if (info1->ModuleID < info2->ModuleID) return -1;
     return 0;
 }
 //------------------------------------------------------------------------------
-int __fastcall CompareProcsByID(void *Item1, void *Item2)
-{
-    PPROCDECLINFO info1 = (PPROCDECLINFO)Item1;
-    PPROCDECLINFO info2 = (PPROCDECLINFO)Item2;
+int __fastcall CompareProcsByID(void *Item1, void *Item2) {
+    PPROCDECLINFO info1 = static_cast<PPROCDECLINFO>(Item1);
+    PPROCDECLINFO info2 = static_cast<PPROCDECLINFO>(Item2);
     if (info1->ModuleID > info2->ModuleID) return 1;
     if (info1->ModuleID < info2->ModuleID) return -1;
     if (info1->ID > info2->ID) return 1;
@@ -3087,26 +2744,22 @@ int __fastcall CompareProcsByID(void *Item1, void *Item2)
 //------------------------------------------------------------------------------
 // Записываем длину имени (Word) + имя + нулевой байт, возвращаем общее кол-во байт
 // We write the length of the name (Word) + name + zero byte, return the total number of bytes
-int __fastcall WriteString(FILE* fDst, const String& str)
-{
+int __fastcall WriteString(FILE* fDst, const String& str) {
     int Bytes = 0;
     Byte ZeroB = 0;
 
     Word NameLength = static_cast<Word>(str.Length());
     if (fDst) fwrite(&NameLength, sizeof(NameLength), 1, fDst);
-    if (NameLength)
-    {
+    if (NameLength) {
         if (fDst) fwrite(str.c_str(), 1, NameLength, fDst);
     }
     if (fDst) fwrite(&ZeroB, 1, 1, fDst);
     return sizeof(NameLength) + NameLength + 1;
 }
 //------------------------------------------------------------------------------
-int __fastcall WriteDump(FILE* fSrc, FILE *fDst, long SrcOffset, DWord Bytes)
-{
+int __fastcall WriteDump(FILE *fSrc, FILE *fDst, long SrcOffset, DWord Bytes) {
     fseek(fSrc, SrcOffset, SEEK_SET);
-    for (int m = 0; m < Bytes; m++)
-    {
+    for (int m = 0; m < Bytes; m++) {
         Byte b;
         fread(&b, 1, 1, fSrc);
         fwrite(&b, 1, 1, fDst);
@@ -3114,45 +2767,42 @@ int __fastcall WriteDump(FILE* fSrc, FILE *fDst, long SrcOffset, DWord Bytes)
     return Bytes;
 }
 //------------------------------------------------------------------------------
-int __fastcall WriteRelocs(FILE *fDst, TList *FixupList, DWord Bytes, String Name)
-{
+int __fastcall WriteRelocs(FILE *fDst, TList *FixupList, DWord Bytes, String Name) {
     Byte  Byte00 = 0;
     DWord ByteFF = 0xFFFFFFFF;
     int   ByteNo = 0;
 
-    for (int n = 0; n < FixupList->Count; n++)
-    {
-        PFIXUPINFO finfo = (PFIXUPINFO)FixupList->Items[n];
+    for (int n = 0; n < FixupList->Count; n++) {
+        PFIXUPINFO finfo = (PFIXUPINFO) FixupList->Items[n];
         // Если информация о фиксапе занимает больше места, чем нужно, не записываем ее
         // If the fixup information takes up more space than necessary, do not write it down.
         if (finfo->Ofs + 4 > Bytes) continue;
         if (finfo->Ofs < ByteNo) continue;
         // Свободное от релоков место заполняем 0
         // We fill the space free from relocations with 0
-        for (ByteNo; ByteNo < finfo->Ofs; ByteNo++)
-            fwrite(&Byte00, 1, 1, fDst);
+        for (ByteNo; ByteNo < finfo->Ofs; ByteNo++) fwrite(&Byte00, 1, 1, fDst);
         // Сам релок заполняем 4-мя байтами 0xFF
         // We fill the relock itself with 4 bytes 0xFF
-        fwrite(&ByteFF, 1, 4, fDst); ByteNo += 4;
+        fwrite(&ByteFF, 1, 4, fDst);
+        ByteNo += 4;
     }
     // Оставшиеся байты заполняем 0
     // Fill the remaining bytes with 0
-    for (ByteNo; ByteNo < Bytes; ByteNo++)
-        fwrite(&Byte00, 1, 1, fDst);
+    for (ByteNo; ByteNo < Bytes; ByteNo++) fwrite(&Byte00, 1, 1, fDst);
 
     return Bytes;
 }
 //------------------------------------------------------------------------------
-int __fastcall WriteFixups(FILE *fDst, TList *FixupList)
-{
+int __fastcall WriteFixups(FILE *fDst, TList *FixupList) {
     int Bytes = 0;
-    for (int m = 0; m < FixupList->Count; m++)
-    {
-        PFIXUPINFO finfo = (PFIXUPINFO)FixupList->Items[m];
+    for (int m = 0; m < FixupList->Count; m++) {
+        PFIXUPINFO finfo = (PFIXUPINFO) FixupList->Items[m];
         // write Type
-        if (fDst) fwrite(&finfo->Type, sizeof(finfo->Type), 1, fDst); Bytes += sizeof(finfo->Type);
+        if (fDst) fwrite(&finfo->Type, sizeof(finfo->Type), 1, fDst);
+        Bytes += sizeof(finfo->Type);
         // write Offset
-        if (fDst) fwrite(&finfo->Ofs, sizeof(finfo->Ofs), 1, fDst); Bytes += sizeof(finfo->Ofs);
+        if (fDst) fwrite(&finfo->Ofs, sizeof(finfo->Ofs), 1, fDst);
+        Bytes += sizeof(finfo->Ofs);
         // write Name
         Bytes += WriteString(fDst, finfo->Name);
     }
@@ -3160,36 +2810,34 @@ int __fastcall WriteFixups(FILE *fDst, TList *FixupList)
 }
 //------------------------------------------------------------------------------
 #pragma argsused
-int _tmain(int argc, _TCHAR* argv[])
 // int main(int argc, char* argv[])
-{
-    int         num = 0;
-    FILE*       fList = 0;
-    TSearchRec  sr;
-    int         iAttributes = faReadOnly | faArchive;
-    char        dcuFilename[256];
+
+int _tmain(int argc, _TCHAR *argv[]) {
+    int   num         = 0;
+    FILE *fList       = 0;
+    int   iAttributes = faReadOnly | faArchive;
+    char  dcuFilename[256];
+
+    TSearchRec sr;
 
     printf("Knowledge Base Builder for IDR by crypto and Alexei Hmelnov\n");
 
-    if (argc != 2 && argc != 3)
-    {
+    if (argc != 2 && argc != 3) {
         printf("Usage:\n BuildKB.exe KBName <DCUList>\n");
         return -1;
     }
 
     fOut = fopen(argv[1], "wb+");
-    if (!fOut)
-    {
+    if (!fOut) {
         printf("Error: Cannot open KB file %s\n", argv[1]);
         return -1;
     }
+
     fLog = fopen("BuildKB.Log", "wt+");
 
-    if (argc == 3)
-    {
+    if (argc == 3) {
         fList = fopen(argv[2], "rt");
-        if (!fList)
-        {
+        if (!fList) {
             printf("Error: Cannot open DCU list file %s\n", argv[2]);
             fclose(fOut);
             return -1;
@@ -3197,40 +2845,36 @@ int _tmain(int argc, _TCHAR* argv[])
     }
 
     ModuleList = new TList;
-    ConstList = new TList;
-    TypeList = new TList;
-    VarList = new TList;
+    ConstList  = new TList;
+    TypeList   = new TList;
+    VarList    = new TList;
     ResStrList = new TList;
-    ProcList = new TList;
+    ProcList   = new TList;
 
-    FUnitImp = new TList;
-    FTypes = new TList;
-    FAddrs = new TList;
+    FUnitImp       = new TList;
+    FTypes         = new TList;
+    FAddrs         = new TList;
     FTypeShowStack = new TList;
 
-    if (argc == 2)
-    {
-        if (FindFirst("*.dcu", iAttributes, sr) == 0)
-        {
-            do
-            {
+    if (argc == 2) {
+        if (FindFirst("*.dcu", iAttributes, sr) == 0) {
+            do {
                 printf("Unit %s\n", AnsiString(sr.Name).c_str());
-                ScanOneDCU(sr.Name); num++;
+                ScanOneDCU(sr.Name);
+                num++;
                 printf("Done\n");
             } while (FindNext(sr) == 0);
 
             FindClose(sr);
         }
-    }
-    else
-    {
-        while (1)
-        {
+    } else {
+        while (true) {
             if (!fgets(dcuFilename, 256, fList)) break;
-            char* q = strrchr(dcuFilename, '\n');
+            char *q = strrchr(dcuFilename, '\n');
             if (q) *q = 0;
             printf("Unit %s\n", dcuFilename);
-            ScanOneDCU(String(dcuFilename)); num++;
+            ScanOneDCU(String(dcuFilename));
+            num++;
             printf("Done\n");
         }
         fclose(fList);
@@ -3245,36 +2889,44 @@ int _tmain(int argc, _TCHAR* argv[])
 
     DWord CurrOffset = 0;
     FILE *fIn;
-    int charnum;
-    long filelen;
-//---------------------------------------------------------------------
-// KB header
+    long  fileLen;
+
+    //---------------------------------------------------------------------
+    // KB header
 #ifdef NEW_VERSION
-    char *KBSignature = "IDR Knowledge Base File";
+    const char *KBSignature = "IDR Knowledge Base File";
     DWord Version = 2.0;
 #else
-    char *KBSignature = "IDD Knowledge Base File";
+    const char *KBSignature = "IDD Knowledge Base File";
     DWord Version = 1.0;
 #endif
-    fwrite(KBSignature, 1, strlen(KBSignature) + 1, fOut); CurrOffset += strlen(KBSignature) + 1;
-    fwrite(&IsMSIL, sizeof(IsMSIL), 1, fOut); CurrOffset += sizeof(IsMSIL);
-    fwrite(&FVer, sizeof(FVer), 1, fOut); CurrOffset += sizeof(FVer);
+    fwrite(KBSignature, 1, strlen(KBSignature) + 1, fOut);
+    CurrOffset += strlen(KBSignature) + 1;
+    fwrite(&IsMSIL, sizeof(IsMSIL), 1, fOut);
+    CurrOffset += sizeof(IsMSIL);
+    fwrite(&FVer, sizeof(FVer), 1, fOut);
+    CurrOffset += sizeof(FVer);
     DWord CRC = 0xFFFFFFFF;
-    fwrite(&CRC, sizeof(CRC), 1, fOut); CurrOffset += sizeof(CRC);
+    fwrite(&CRC, sizeof(CRC), 1, fOut);
+    CurrOffset += sizeof(CRC);
     char Description[256];
-    fwrite(Description, 1, 256, fOut); CurrOffset += 256;
-    fwrite(&Version, sizeof(Version), 1, fOut); CurrOffset += sizeof(Version);
+    fwrite(Description, 1, 256, fOut);
+    CurrOffset += 256;
+    fwrite(&Version, sizeof(Version), 1, fOut);
+    CurrOffset += sizeof(Version);
     TDateTime CreateDT, LastModifyDT;
-    fwrite(&CreateDT, sizeof(CreateDT), 1, fOut); CurrOffset += sizeof(CreateDT);
-    fwrite(&LastModifyDT, sizeof(LastModifyDT), 1, fOut); CurrOffset += sizeof(LastModifyDT);
-//-----------------------------------------------------------------------
-// MODULES
+    fwrite(&CreateDT, sizeof(CreateDT), 1, fOut);
+    CurrOffset += sizeof(CreateDT);
+    fwrite(&LastModifyDT, sizeof(LastModifyDT), 1, fOut);
+    CurrOffset += sizeof(LastModifyDT);
+
+    //-----------------------------------------------------------------------
+    // MODULES
     int ModuleCount = ModuleList->Count;
     int MaxModuleDataSize = 0;
-    for (int n = 0; n < ModuleCount; n++)
-    {
-        ModuleInfo = (PMODULEINFO)ModuleList->Items[n];
-        ModuleInfo->ID = n;
+    for (int n = 0; n < ModuleCount; n++) {
+        ModuleInfo         = (PMODULEINFO) ModuleList->Items[n];
+        ModuleInfo->ID     = n;
         ModuleInfo->Offset = CurrOffset;
 
         DWord DataSize = 0;
@@ -3290,32 +2942,27 @@ int _tmain(int argc, _TCHAR* argv[])
         fwrite(&UsesNum, sizeof(UsesNum), 1, fOut);
         DataSize += sizeof(UsesNum);
         // Uses
-        for (int m = 0; m < UsesNum; m++)
-        {
+        for (int m = 0; m < UsesNum; m++) {
             bool found = false;
-            for (int mm = 0; mm < ModuleCount; mm++)
-            {
-                PMODULEINFO modInfo = (PMODULEINFO)ModuleList->Items[mm];
-                if (!AnsiString(modInfo->Name).AnsiCompareIC(ModuleInfo->UsesList->Strings[m]))
-                {
+            for (int mm = 0; mm < ModuleCount; mm++) {
+                PMODULEINFO modInfo = (PMODULEINFO) ModuleList->Items[mm];
+                if (!AnsiString(modInfo->Name).AnsiCompareIC(ModuleInfo->UsesList->Strings[m])) {
                     fwrite(&modInfo->ModuleID, sizeof(Word), 1, fOut);
                     found = true;
                     break;
                 }
             }
-            if (!found)
-            {
+            if (!found) {
                 Word mID = 0xFFFF;
                 fwrite(&mID, sizeof(Word), 1, fOut);
                 // Вспомогательная печать для определения замкнутого множества юнитов
                 // Auxiliary printing for defining a closed set of units
-                //if (!ModuleInfo->UsesList->Strings[m].Pos("."))
+                // if (!ModuleInfo->UsesList->Strings[m].Pos("."))
                 //    printf("-%s\n", ModuleInfo->UsesList->Strings[m]);
             }
             DataSize += sizeof(Word);
         }
-        for (int m = 0; m < UsesNum; m++)
-        {
+        for (int m = 0; m < UsesNum; m++) {
             DataSize += WriteString(fOut, String(ModuleInfo->UsesList->Strings[m]));
         }
 
@@ -3324,91 +2971,86 @@ int _tmain(int argc, _TCHAR* argv[])
         CurrOffset += DataSize;
     }
     fflush(fOut);
-    filelen = ftell(fOut);
-    if (filelen != CurrOffset) printf("Error: MODULES\n");
-//---------------------------------------------------------------------CONSTANTS
+    fileLen = ftell(fOut);
+    if (fileLen != CurrOffset) printf("Error: MODULES\n");
+
+    //---------------------------------------------------------------------
+    // CONSTANTS
     ConstList->Sort(CompareConstsByName);
-    int ConstCount = 0;
-    int MaxConstDataSize = 0;
-    Word PrevModId = 0xFFFF;
-    String PrevName = "";
-    for (int n = 0; n < ConstList->Count; n++)
-    {
-        PCONSTINFO constInfo = (PCONSTINFO)ConstList->Items[n];
-        constInfo->Skip = false;
-        if (constInfo->Name == PrevName && constInfo->ModuleID == PrevModId)
-        {
+    int    ConstCount       = 0;
+    int    MaxConstDataSize = 0;
+    Word   PrevModId        = 0xFFFF;
+    String PrevName         = "";
+    for (int n = 0; n < ConstList->Count; n++) {
+        PCONSTINFO constInfo = (PCONSTINFO) ConstList->Items[n];
+        constInfo->Skip      = false;
+        if (constInfo->Name == PrevName && constInfo->ModuleID == PrevModId) {
             constInfo->Skip = true;
             continue;
         }
 
-        constInfo->ID = ConstCount;
+        constInfo->ID     = ConstCount;
         constInfo->Offset = CurrOffset;
-        PrevModId = constInfo->ModuleID;
-        PrevName = constInfo->Name;
+        PrevModId         = constInfo->ModuleID;
+        PrevName          = constInfo->Name;
 
         DWord DataSize = 0;
-        //ModuleID
+        // ModuleID
         fwrite(&constInfo->ModuleID, sizeof(constInfo->ModuleID), 1, fOut);
         DataSize += sizeof(constInfo->ModuleID);
-        //Name
+        // Name
         DataSize += WriteString(fOut, constInfo->Name);
-        //Type
+        // Type
         fwrite(&constInfo->Type, sizeof(constInfo->Type), 1, fOut);
         DataSize += sizeof(constInfo->Type);
-        //TypeDef
+        // TypeDef
         DataSize += WriteString(fOut, constInfo->TypeDef);
-        //Value
+        // Value
         DataSize += WriteString(fOut, constInfo->Value);
-        //Не будем дампить константы с внутренними именами
+        // Не будем дампить константы с внутренними именами
+        // We will not dump constants with internal names
         if (constInfo->Name.Pos("_NV_") == 1) constInfo->RTTISz = 0;
-        //DumpTotal
+        // DumpTotal
         DWord DumpTotal = 0;
-        if (constInfo->RTTISz)
-        {
+        if (constInfo->RTTISz) {
             fIn = 0;
-            for (int m = 0; m < ModuleList->Count; m++)
-            {
-                ModuleInfo = (PMODULEINFO)ModuleList->Items[m];
-                if (ModuleInfo->ModuleID == constInfo->ModuleID)
-                {
+            for (int m = 0; m < ModuleList->Count; m++) {
+                ModuleInfo = (PMODULEINFO) ModuleList->Items[m];
+                if (ModuleInfo->ModuleID == constInfo->ModuleID) {
                     fIn = fopen(AnsiString(ModuleInfo->Filename).c_str(), "rb");
                     break;
                 }
             }
-            if (fIn)
-            {
-                //Dump
+            if (fIn) {
+                // Dump
                 DumpTotal += constInfo->RTTISz;
-                //Relocs
+                // Relocs
                 DumpTotal += constInfo->RTTISz;
-                //Fixups
+                // Fixups
                 DumpTotal += WriteFixups(0, constInfo->Fixups);
             }
         }
-        DumpTotal += sizeof(constInfo->RTTISz); //DumpSz
+        DumpTotal += sizeof(constInfo->RTTISz); // DumpSz
         DWord FixupNum = constInfo->Fixups->Count;
-        DumpTotal += sizeof(FixupNum);          //FixupNum
+        DumpTotal += sizeof(FixupNum); // FixupNum
 
         fwrite(&DumpTotal, sizeof(DumpTotal), 1, fOut);
         DataSize += sizeof(DumpTotal);
-        //DumpSz
+        // DumpSz
         fwrite(&constInfo->RTTISz, sizeof(constInfo->RTTISz), 1, fOut);
         DataSize += sizeof(constInfo->RTTISz);
-        //FixupNum
+        // FixupNum
         fwrite(&FixupNum, sizeof(FixupNum), 1, fOut);
         DataSize += sizeof(FixupNum);
 
-        if (constInfo->RTTISz)
-        {
-            if (fIn)
-            {
-                //Dump
+        if (constInfo->RTTISz) {
+            if (fIn) {
+                // Dump
                 DataSize += WriteDump(fIn, fOut, constInfo->RTTIOfs, constInfo->RTTISz);
                 fclose(fIn);
-                //Relocs
+                // Relocs
                 DataSize += WriteRelocs(fOut, constInfo->Fixups, constInfo->RTTISz, constInfo->Name);
-                //Fixups
+                // Fixups
                 DataSize += WriteFixups(fOut, constInfo->Fixups);
             }
         }
@@ -3418,18 +3060,19 @@ int _tmain(int argc, _TCHAR* argv[])
         ConstCount++;
     }
     fflush(fOut);
-    filelen = ftell(fOut);
-    if (filelen != CurrOffset) printf("Error: CONSTANTS\n");
-//-------------------------------------------------------------------------TYPES
-    int TypeCount = TypeList->Count;
+    fileLen = ftell(fOut);
+    if (fileLen != CurrOffset) printf("Error: CONSTANTS\n");
+
+    //-------------------------------------------------------------------------
+    // TYPES
+    int TypeCount       = TypeList->Count;
     int MaxTypeDataSize = 0;
-    for (int n = 0; n < TypeCount; n++)
-    {
+    for (int n = 0; n < TypeCount; n++) {
         // TypeOffsets[n].DataOffset = CurrOffset;
-        PTYPEINFO typeInfo = (PTYPEINFO)TypeList->Items[n];
-        typeInfo->ID = n;
-        typeInfo->Offset = CurrOffset;
-        DWord DataSize = 0;
+        PTYPEINFO typeInfo = (PTYPEINFO) TypeList->Items[n];
+        typeInfo->ID       = n;
+        typeInfo->Offset   = CurrOffset;
+        DWord DataSize     = 0;
 #ifdef NEW_VERSION
         // Size
         fwrite(&typeInfo->Size, sizeof(typeInfo->Size), 1, fOut);
@@ -3453,20 +3096,16 @@ int _tmain(int argc, _TCHAR* argv[])
         if (typeInfo->Name.Pos("_NT_") == 1) typeInfo->RTTISz = 0;
         // DumpTotal
         DWord DumpTotal = 0;
-        if (typeInfo->RTTISz)
-        {
+        if (typeInfo->RTTISz) {
             fIn = 0;
-            for (int m = 0; m < ModuleList->Count; m++)
-            {
-                ModuleInfo = (PMODULEINFO)ModuleList->Items[m];
-                if (ModuleInfo->ModuleID == typeInfo->ModuleID)
-                {
+            for (int m = 0; m < ModuleList->Count; m++) {
+                ModuleInfo = (PMODULEINFO) ModuleList->Items[m];
+                if (ModuleInfo->ModuleID == typeInfo->ModuleID) {
                     fIn = fopen(AnsiString(ModuleInfo->Filename).c_str(), "rb");
                     break;
                 }
             }
-            if (fIn)
-            {
+            if (fIn) {
                 // Dump
                 DumpTotal += typeInfo->RTTISz;
                 // Relocs
@@ -3475,10 +3114,10 @@ int _tmain(int argc, _TCHAR* argv[])
                 DumpTotal += WriteFixups(0, typeInfo->Fixups);
             }
         }
-        DumpTotal += sizeof(typeInfo->RTTISz);  //DumpSz
+        DumpTotal += sizeof(typeInfo->RTTISz); // DumpSz
         DWord FixupNum = typeInfo->Fixups->Count;
-        DumpTotal += sizeof(FixupNum);          //FixupNum
-        
+        DumpTotal += sizeof(FixupNum); // FixupNum
+
         fwrite(&DumpTotal, sizeof(DumpTotal), 1, fOut);
         DataSize += sizeof(DumpTotal);
         // DumpSz
@@ -3488,10 +3127,8 @@ int _tmain(int argc, _TCHAR* argv[])
         fwrite(&FixupNum, sizeof(FixupNum), 1, fOut);
         DataSize += sizeof(FixupNum);
 
-        if (typeInfo->RTTISz)
-        {
-            if (fIn)
-            {
+        if (typeInfo->RTTISz) {
+            if (fIn) {
                 // Dump
                 DataSize += WriteDump(fIn, fOut, typeInfo->RTTIOfs, typeInfo->RTTISz);
                 fclose(fIn);
@@ -3502,18 +3139,17 @@ int _tmain(int argc, _TCHAR* argv[])
             }
         }
         // FieldsTotal
-        Word FieldsNum = typeInfo->Fields->Count;
+        Word  FieldsNum   = typeInfo->Fields->Count;
         DWord FieldsTotal = 0;
-        for (int m = 0; m < FieldsNum; m++)
-        {
-            PLOCALDECLINFO linfo = (PLOCALDECLINFO)typeInfo->Fields->Items[m];
+        for (int m = 0; m < FieldsNum; m++) {
+            PLOCALDECLINFO linfo = (PLOCALDECLINFO) typeInfo->Fields->Items[m];
             FieldsTotal += sizeof(linfo->Scope);
             FieldsTotal += sizeof(linfo->Ndx);
             FieldsTotal += sizeof(linfo->Case);
             FieldsTotal += WriteString(0, linfo->Name);
             FieldsTotal += WriteString(0, linfo->TypeDef);
         }
-        FieldsTotal += sizeof(FieldsNum);   //FieldsNum
+        FieldsTotal += sizeof(FieldsNum); // FieldsNum
 
         fwrite(&FieldsTotal, sizeof(FieldsTotal), 1, fOut);
         DataSize += sizeof(FieldsTotal);
@@ -3521,9 +3157,8 @@ int _tmain(int argc, _TCHAR* argv[])
         fwrite(&FieldsNum, sizeof(FieldsNum), 1, fOut);
         DataSize += sizeof(FieldsNum);
         // Fields
-        for (int m = 0; m < FieldsNum; m++)
-        {
-            PLOCALDECLINFO linfo = (PLOCALDECLINFO)typeInfo->Fields->Items[m];
+        for (int m = 0; m < FieldsNum; m++) {
+            PLOCALDECLINFO linfo = (PLOCALDECLINFO) typeInfo->Fields->Items[m];
             fwrite(&linfo->Scope, sizeof(linfo->Scope), 1, fOut);
             DataSize += sizeof(linfo->Scope);
             fwrite(&linfo->Ndx, sizeof(linfo->Ndx), 1, fOut);
@@ -3534,13 +3169,11 @@ int _tmain(int argc, _TCHAR* argv[])
             DataSize += WriteString(fOut, linfo->TypeDef);
         }
         // PropsTotal
-        Word PropsNum = typeInfo->Properties->Count;
+        Word  PropsNum   = typeInfo->Properties->Count;
         DWord PropsTotal = 0;
-        for (int m = 0; m < PropsNum; m++)
-        {
-            if (typeInfo->Kind == drClassDef || typeInfo->Kind == drInterfaceDef)
-            {
-                PPROPERTYINFO pinfo = (PPROPERTYINFO)typeInfo->Properties->Items[m];
+        for (int m = 0; m < PropsNum; m++) {
+            if (typeInfo->Kind == drClassDef || typeInfo->Kind == drInterfaceDef) {
+                PPROPERTYINFO pinfo = (PPROPERTYINFO) typeInfo->Properties->Items[m];
                 PropsTotal += sizeof(pinfo->Scope);
                 PropsTotal += sizeof(pinfo->Index);
                 PropsTotal += sizeof(pinfo->DispId);
@@ -3559,11 +3192,9 @@ int _tmain(int argc, _TCHAR* argv[])
         fwrite(&PropsNum, sizeof(PropsNum), 1, fOut);
         DataSize += sizeof(PropsNum);
         // Props
-        for (int m = 0; m < PropsNum; m++)
-        {
-            if (typeInfo->Kind == drClassDef || typeInfo->Kind == drInterfaceDef)
-            {
-                PPROPERTYINFO pinfo = (PPROPERTYINFO)typeInfo->Properties->Items[m];
+        for (int m = 0; m < PropsNum; m++) {
+            if (typeInfo->Kind == drClassDef || typeInfo->Kind == drInterfaceDef) {
+                PPROPERTYINFO pinfo = (PPROPERTYINFO) typeInfo->Properties->Items[m];
                 fwrite(&pinfo->Scope, sizeof(pinfo->Scope), 1, fOut);
                 DataSize += sizeof(pinfo->Scope);
                 fwrite(&pinfo->Index, sizeof(pinfo->Index), 1, fOut);
@@ -3578,11 +3209,10 @@ int _tmain(int argc, _TCHAR* argv[])
             }
         }
         // MethodsTotal
-        Word MethodsNum = typeInfo->Methods->Count;
+        Word  MethodsNum   = typeInfo->Methods->Count;
         DWord MethodsTotal = 0;
-        for (int m = 0; m < MethodsNum; m++)
-        {
-            PMETHODDECLINFO minfo = (PMETHODDECLINFO)typeInfo->Methods->Items[m];
+        for (int m = 0; m < MethodsNum; m++) {
+            PMETHODDECLINFO minfo = (PMETHODDECLINFO) typeInfo->Methods->Items[m];
             MethodsTotal += sizeof(minfo->Scope);
             MethodsTotal += sizeof(minfo->MethodKind);
             MethodsTotal += WriteString(0, minfo->Prototype);
@@ -3595,9 +3225,8 @@ int _tmain(int argc, _TCHAR* argv[])
         fwrite(&MethodsNum, sizeof(MethodsNum), 1, fOut);
         DataSize += sizeof(MethodsNum);
         // Methods
-        for (int m = 0; m < MethodsNum; m++)
-        {
-            PMETHODDECLINFO minfo = (PMETHODDECLINFO)typeInfo->Methods->Items[m];
+        for (int m = 0; m < MethodsNum; m++) {
+            PMETHODDECLINFO minfo = (PMETHODDECLINFO) typeInfo->Methods->Items[m];
             fwrite(&minfo->Scope, sizeof(minfo->Scope), 1, fOut);
             DataSize += sizeof(minfo->Scope);
             fwrite(&minfo->MethodKind, sizeof(minfo->MethodKind), 1, fOut);
@@ -3609,29 +3238,30 @@ int _tmain(int argc, _TCHAR* argv[])
         CurrOffset += DataSize;
     }
     fflush(fOut);
-    filelen = ftell(fOut);
-    if (filelen != CurrOffset) printf("Error: TYPES\n");
-//--------------------------------------------------------------------------VARS
-    int VarCount = VarList->Count;
+    fileLen = ftell(fOut);
+    if (fileLen != CurrOffset) printf("Error: TYPES\n");
+
+    //--------------------------------------------------------------------------
+    // VARS
+    int VarCount       = VarList->Count;
     int MaxVarDataSize = 0;
-    for (int n = 0; n < VarCount; n++)
-    {
-        PVARINFO vInfo = (PVARINFO)VarList->Items[n];
-        vInfo->ID = n;
-        vInfo->Offset = CurrOffset;
+    for (int n = 0; n < VarCount; n++) {
+        PVARINFO vInfo = (PVARINFO) VarList->Items[n];
+        vInfo->ID      = n;
+        vInfo->Offset  = CurrOffset;
 
         DWord DataSize = 0;
-        //ModuleID
+        // ModuleID
         fwrite(&vInfo->ModuleID, sizeof(vInfo->ModuleID), 1, fOut);
         DataSize += sizeof(vInfo->ModuleID);
-        //Name
+        // Name
         DataSize += WriteString(fOut, vInfo->Name);
-        //Type
+        // Type
         fwrite(&vInfo->Type, sizeof(vInfo->Type), 1, fOut);
         DataSize += sizeof(vInfo->Type);
-        //TypeDef
+        // TypeDef
         DataSize += WriteString(fOut, vInfo->TypeDef);
-        //AbsName
+        // AbsName
         DataSize += WriteString(fOut, vInfo->AbsName);
 
         vInfo->Size = DataSize;
@@ -3639,47 +3269,44 @@ int _tmain(int argc, _TCHAR* argv[])
         CurrOffset += DataSize;
     }
     fflush(fOut);
-    filelen = ftell(fOut);
-    if (filelen != CurrOffset) printf("Error: VARS\n");
-//--------------------------------------------------------------RESOURCE STRINGS
-    int ResStrCount = ResStrList->Count;
-    int MaxResStrDataSize = 0;
+    fileLen = ftell(fOut);
+    if (fileLen != CurrOffset) printf("Error: VARS\n");
+
+    //--------------------------------------------------------------
+    // RESOURCE STRINGS
+    int  ResStrCount       = ResStrList->Count;
+    int  MaxResStrDataSize = 0;
     Byte ResStrBuf[1024];
-    for (int n = 0; n < ResStrCount; n++)
-    {
-        PRESSTRINFO rsInfo = (PRESSTRINFO)ResStrList->Items[n];
-        rsInfo->ID = n;
-        rsInfo->Offset = CurrOffset;
+    for (int n = 0; n < ResStrCount; n++) {
+        PRESSTRINFO rsInfo = (PRESSTRINFO) ResStrList->Items[n];
+        rsInfo->ID         = n;
+        rsInfo->Offset     = CurrOffset;
 
         DWord DataSize = 0;
-        //ModuleID
+        // ModuleID
         fwrite(&rsInfo->ModuleID, sizeof(rsInfo->ModuleID), 1, fOut);
         DataSize += sizeof(rsInfo->ModuleID);
-        //Name
+        // Name
         DataSize += WriteString(fOut, rsInfo->Name);
-        //TypeDef
+        // TypeDef
         DataSize += WriteString(fOut, rsInfo->TypeDef);
-        //Context
-        if (rsInfo->DumpSz)
-        {
+        // Context
+        if (rsInfo->DumpSz) {
             fIn = 0;
-            for (int m = 0; m < ModuleList->Count; m++)
-            {
-                ModuleInfo = (PMODULEINFO)ModuleList->Items[m];
-                if (ModuleInfo->ModuleID == rsInfo->ModuleID)
-                {
+            for (int m = 0; m < ModuleList->Count; m++) {
+                ModuleInfo = (PMODULEINFO) ModuleList->Items[m];
+                if (ModuleInfo->ModuleID == rsInfo->ModuleID) {
                     fIn = fopen(AnsiString(ModuleInfo->Filename).c_str(), "rb");
                     break;
                 }
             }
-            if (fIn)
-            {
-                //Context
+            if (fIn) {
+                // Context
                 fseek(fIn, rsInfo->DumpOfs, SEEK_SET);
                 fread(ResStrBuf, 1, rsInfo->DumpSz, fIn);
                 fclose(fIn);
-                Word ResStrLen = *((Word*)(ResStrBuf + 4));
-                rsInfo->Context = String((char*)(ResStrBuf + 8), ResStrLen);
+                Word ResStrLen  = *reinterpret_cast<Word *>(ResStrBuf + 4);
+                rsInfo->Context = String(reinterpret_cast<char *>(ResStrBuf + 8), ResStrLen);
                 DataSize += WriteString(fOut, rsInfo->Context);
             }
         }
@@ -3688,112 +3315,105 @@ int _tmain(int argc, _TCHAR* argv[])
         CurrOffset += DataSize;
     }
     fflush(fOut);
-    filelen = ftell(fOut);
-    if (filelen != CurrOffset) printf("Error: RESOURCE STRINGS\n");
-//--------------------------------------------------------------------PROCEDURES
-    int ProcCount = ProcList->Count;
+    fileLen = ftell(fOut);
+    if (fileLen != CurrOffset) printf("Error: RESOURCE STRINGS\n");
+
+    //--------------------------------------------------------------------
+    // PROCEDURES
+    int ProcCount       = ProcList->Count;
     int MaxProcDataSize = 0;
-    for (int n = 0; n < ProcCount; n++)
-    {
-        DWord DataSize = 0;
-        PPROCDECLINFO pInfo = (PPROCDECLINFO)ProcList->Items[n];
-        pInfo->ID = n;
-        pInfo->Offset = CurrOffset;
-        //ModuleID
+    for (int n = 0; n < ProcCount; n++) {
+        DWord         DataSize = 0;
+        PPROCDECLINFO pInfo    = (PPROCDECLINFO) ProcList->Items[n];
+        pInfo->ID              = n;
+        pInfo->Offset          = CurrOffset;
+        // ModuleID
         fwrite(&pInfo->ModuleID, sizeof(pInfo->ModuleID), 1, fOut);
         DataSize += sizeof(pInfo->ModuleID);
-        //Name
+        // Name
         DataSize += WriteString(fOut, pInfo->Name);
-        //Embedded
+        // Embedded
         fwrite(&pInfo->Embedded, sizeof(pInfo->Embedded), 1, fOut);
         DataSize += sizeof(pInfo->Embedded);
-        //DumpType
+        // DumpType
         fwrite(&pInfo->DumpType, sizeof(pInfo->DumpType), 1, fOut);
         DataSize += sizeof(pInfo->DumpType);
-        //MethodKind
+        // MethodKind
         fwrite(&pInfo->MethodKind, sizeof(pInfo->MethodKind), 1, fOut);
         DataSize += sizeof(pInfo->MethodKind);
-        //CallKind
+        // CallKind
         fwrite(&pInfo->CallKind, sizeof(pInfo->CallKind), 1, fOut);
         DataSize += sizeof(pInfo->CallKind);
-        //VProc
+        // VProc
         fwrite(&pInfo->VProc, sizeof(pInfo->VProc), 1, fOut);
         DataSize += sizeof(pInfo->VProc);
-        //TypeDef
+        // TypeDef
         DataSize += WriteString(fOut, pInfo->TypeDef);
-        //DumpTotal
+        // DumpTotal
         DWord DumpTotal = 0;
-        if (pInfo->DumpSz)
-        {
+        if (pInfo->DumpSz) {
             fIn = 0;
-            for (int m = 0; m < ModuleList->Count; m++)
-            {
-                ModuleInfo = (PMODULEINFO)ModuleList->Items[m];
-                if (ModuleInfo->ModuleID == pInfo->ModuleID)
-                {
+            for (int m = 0; m < ModuleList->Count; m++) {
+                ModuleInfo = (PMODULEINFO) ModuleList->Items[m];
+                if (ModuleInfo->ModuleID == pInfo->ModuleID) {
                     fIn = fopen(AnsiString(ModuleInfo->Filename).c_str(), "rb");
                     break;
                 }
             }
-            if (fIn)
-            {
-                //Dump
+            if (fIn) {
+                // Dump
                 DumpTotal += pInfo->DumpSz;
-                //Relocs
+                // Relocs
                 DumpTotal += pInfo->DumpSz;
-                //Fixups
+                // Fixups
                 DumpTotal += WriteFixups(0, pInfo->Fixups);
             }
         }
-        DumpTotal += sizeof(pInfo->DumpSz); //DumpSz
+        DumpTotal += sizeof(pInfo->DumpSz); // DumpSz
         DWord FixupNum = pInfo->Fixups->Count;
-        DumpTotal += sizeof(FixupNum);      //FixupNum
-        
+        DumpTotal += sizeof(FixupNum); // FixupNum
+
         fwrite(&DumpTotal, sizeof(DumpTotal), 1, fOut);
         DataSize += sizeof(DumpTotal);
-        //DumpSz
+        // DumpSz
         fwrite(&pInfo->DumpSz, sizeof(pInfo->DumpSz), 1, fOut);
         DataSize += sizeof(pInfo->DumpSz);
-        //FixupNum
+        // FixupNum
         fwrite(&FixupNum, sizeof(FixupNum), 1, fOut);
         DataSize += sizeof(FixupNum);
-        
-        if (pInfo->DumpSz)
-        {
-            if (fIn)
-            {
-                //Dump
+
+        if (pInfo->DumpSz) {
+            if (fIn) {
+                // Dump
                 DataSize += WriteDump(fIn, fOut, pInfo->DumpOfs, pInfo->DumpSz);
                 fclose(fIn);
-                //Relocs
+                // Relocs
                 DataSize += WriteRelocs(fOut, pInfo->Fixups, pInfo->DumpSz, pInfo->Name);
-                //Fixups
+                // Fixups
                 DataSize += WriteFixups(fOut, pInfo->Fixups);
             }
         }
-        //ArgsTotal
-        Word ArgsNum = pInfo->Args->Count;
+        // ArgsTotal
+        Word  ArgsNum   = pInfo->Args->Count;
         DWord ArgsTotal = 0;
-        for (int m = 0; m < ArgsNum; m++)
-        {
-            PLOCALDECLINFO lInfo = (PLOCALDECLINFO)pInfo->Args->Items[m];
+        for (int m = 0; m < ArgsNum; m++) {
+            PLOCALDECLINFO lInfo = (PLOCALDECLINFO) pInfo->Args->Items[m];
             ArgsTotal += sizeof(lInfo->Tag);
             ArgsTotal += sizeof(lInfo->LocFlags);
             ArgsTotal += sizeof(lInfo->Ndx);
             ArgsTotal += WriteString(0, lInfo->Name);
             ArgsTotal += WriteString(0, lInfo->TypeDef);
         }
-        ArgsTotal += sizeof(ArgsNum);   //ArgsNum
-        
+        ArgsTotal += sizeof(ArgsNum); // ArgsNum
+
         fwrite(&ArgsTotal, sizeof(ArgsTotal), 1, fOut);
         DataSize += sizeof(ArgsTotal);
-        //ArgsNum
+        // ArgsNum
         fwrite(&ArgsNum, sizeof(ArgsNum), 1, fOut);
         DataSize += sizeof(ArgsNum);
-        //Args
-        for (int m = 0; m < ArgsNum; m++)
-        {
-            PLOCALDECLINFO lInfo = (PLOCALDECLINFO)pInfo->Args->Items[m];
+        // Args
+        for (int m = 0; m < ArgsNum; m++) {
+            PLOCALDECLINFO lInfo = (PLOCALDECLINFO) pInfo->Args->Items[m];
 
             fwrite(&lInfo->Tag, sizeof(lInfo->Tag), 1, fOut);
             DataSize += sizeof(lInfo->Tag);
@@ -3804,12 +3424,11 @@ int _tmain(int argc, _TCHAR* argv[])
             DataSize += WriteString(fOut, lInfo->Name);
             DataSize += WriteString(fOut, lInfo->TypeDef);
         }
-        //LocalsTotal
-        Word LocalsNum = pInfo->Locals->Count;
+        // LocalsTotal
+        Word  LocalsNum   = pInfo->Locals->Count;
         DWord LocalsTotal = 0;
-        for (int m = 0; m < LocalsNum; m++)
-        {
-            PLOCALDECLINFO lInfo = (PLOCALDECLINFO)pInfo->Locals->Items[m];
+        for (int m = 0; m < LocalsNum; m++) {
+            PLOCALDECLINFO lInfo = (PLOCALDECLINFO) pInfo->Locals->Items[m];
             LocalsTotal += sizeof(lInfo->Tag);
             LocalsTotal += sizeof(lInfo->LocFlags);
             LocalsTotal += sizeof(lInfo->Ndx);
@@ -3817,17 +3436,16 @@ int _tmain(int argc, _TCHAR* argv[])
             LocalsTotal += WriteString(0, lInfo->TypeDef);
             LocalsTotal += WriteString(0, lInfo->AbsName);
         }
-        LocalsTotal += sizeof(LocalsNum);   //LocalsNum
-        
+        LocalsTotal += sizeof(LocalsNum); // LocalsNum
+
         fwrite(&LocalsTotal, sizeof(LocalsTotal), 1, fOut);
         DataSize += sizeof(LocalsTotal);
-        //LocalsNum
+        // LocalsNum
         fwrite(&LocalsNum, sizeof(LocalsNum), 1, fOut);
         DataSize += sizeof(LocalsNum);
-        //Locals
-        for (int m = 0; m < LocalsNum; m++)
-        {
-            PLOCALDECLINFO lInfo = (PLOCALDECLINFO)pInfo->Locals->Items[m];
+        // Locals
+        for (int m = 0; m < LocalsNum; m++) {
+            PLOCALDECLINFO lInfo = (PLOCALDECLINFO) pInfo->Locals->Items[m];
 
             fwrite(&lInfo->Tag, sizeof(lInfo->Tag), 1, fOut);
             DataSize += sizeof(lInfo->Tag);
@@ -3843,57 +3461,56 @@ int _tmain(int argc, _TCHAR* argv[])
         if (DataSize > MaxProcDataSize) MaxProcDataSize = DataSize;
         CurrOffset += DataSize;
         fflush(fOut);
-        filelen = ftell(fOut);
-        if (filelen != CurrOffset) printf("Error: PROCEDURES\n");
+        fileLen = ftell(fOut);
+        if (fileLen != CurrOffset) printf("Error: PROCEDURES\n");
     }
     fflush(fOut);
-    filelen = ftell(fOut);
-    if (filelen != CurrOffset) printf("Error: PROCEDURES\n");
-//----------------------------------------------------------------Module Section
+    fileLen = ftell(fOut);
+    if (fileLen != CurrOffset) printf("Error: PROCEDURES\n");
+
+    //----------------------------------------------------------------
+    // Module Section
     fwrite(&ModuleCount, sizeof(ModuleCount), 1, fOut);
     fwrite(&MaxModuleDataSize, sizeof(MaxModuleDataSize), 1, fOut);
 
     POFFSETSINFO ModuleOffsets = new OFFSETSINFO[ModuleCount];
-    for (int n = 0; n < ModuleCount; n++)
-    {
-        ModuleInfo = (PMODULEINFO)ModuleList->Items[n];
+    for (int n = 0; n < ModuleCount; n++) {
+        ModuleInfo              = (PMODULEINFO) ModuleList->Items[n];
         ModuleOffsets[n].Offset = ModuleInfo->Offset;
-        ModuleOffsets[n].Size = ModuleInfo->Size;
+        ModuleOffsets[n].Size   = ModuleInfo->Size;
     }
     ModuleList->Sort(CompareModulesByID);
-    for (int n = 0; n < ModuleCount; n++)
-    {
-        ModuleInfo = (PMODULEINFO)ModuleList->Items[n];
+    for (int n = 0; n < ModuleCount; n++) {
+        ModuleInfo             = (PMODULEINFO) ModuleList->Items[n];
         ModuleOffsets[n].ModId = ModuleInfo->ID;
     }
     ModuleList->Sort(CompareModulesByName);
-    for (int n = 0; n < ModuleCount; n++)
-    {
-        ModuleInfo = (PMODULEINFO)ModuleList->Items[n];
+    for (int n = 0; n < ModuleCount; n++) {
+        ModuleInfo             = (PMODULEINFO) ModuleList->Items[n];
         ModuleOffsets[n].NamId = ModuleInfo->ID;
     }
     fwrite(ModuleOffsets, sizeof(OFFSETSINFO), ModuleCount, fOut);
     delete[] ModuleOffsets;
-//-----------------------------------------------------------------Const Section
+
+    //-----------------------------------------------------------------
+    // Const Section
     fwrite(&ConstCount, sizeof(ConstCount), 1, fOut);
     fwrite(&MaxConstDataSize, sizeof(MaxConstDataSize), 1, fOut);
 
     POFFSETSINFO ConstOffsets = new OFFSETSINFO[ConstCount];
-    int cn = 0;
-    for (int n = 0; n < ConstList->Count; n++)
-    {
-        PCONSTINFO constInfo = (PCONSTINFO)ConstList->Items[n];
+    int          cn           = 0;
+    for (int n = 0; n < ConstList->Count; n++) {
+        PCONSTINFO constInfo = (PCONSTINFO) ConstList->Items[n];
         if (constInfo->Skip) continue;
 
         ConstOffsets[cn].Offset = constInfo->Offset;
-        ConstOffsets[cn].Size = constInfo->Size;
+        ConstOffsets[cn].Size   = constInfo->Size;
         cn++;
     }
     ConstList->Sort(CompareConstsByID);
     cn = 0;
-    for (int n = 0; n < ConstList->Count; n++)
-    {
-        PCONSTINFO constInfo = (PCONSTINFO)ConstList->Items[n];
+    for (int n = 0; n < ConstList->Count; n++) {
+        PCONSTINFO constInfo = (PCONSTINFO) ConstList->Items[n];
         if (constInfo->Skip) continue;
 
         ConstOffsets[cn].ModId = constInfo->ID;
@@ -3901,9 +3518,8 @@ int _tmain(int argc, _TCHAR* argv[])
     }
     ConstList->Sort(CompareConstsByName);
     cn = 0;
-    for (int n = 0; n < ConstList->Count; n++)
-    {
-        PCONSTINFO constInfo = (PCONSTINFO)ConstList->Items[n];
+    for (int n = 0; n < ConstList->Count; n++) {
+        PCONSTINFO constInfo = (PCONSTINFO) ConstList->Items[n];
         if (constInfo->Skip) continue;
 
         ConstOffsets[cn].NamId = constInfo->ID;
@@ -3911,107 +3527,105 @@ int _tmain(int argc, _TCHAR* argv[])
     }
     fwrite(ConstOffsets, sizeof(OFFSETSINFO), ConstCount, fOut);
     delete[] ConstOffsets;
-//------------------------------------------------------------------Type Section
+
+    //------------------------------------------------------------------
+    // Type Section
     fwrite(&TypeCount, sizeof(TypeCount), 1, fOut);
     fwrite(&MaxTypeDataSize, sizeof(MaxTypeDataSize), 1, fOut);
 
     POFFSETSINFO TypeOffsets = new OFFSETSINFO[TypeCount];
-    for (int n = 0; n < TypeCount; n++)
-    {
-        PTYPEINFO typeInfo = (PTYPEINFO)TypeList->Items[n];
+    for (int n = 0; n < TypeCount; n++) {
+        PTYPEINFO typeInfo    = (PTYPEINFO) TypeList->Items[n];
         TypeOffsets[n].Offset = typeInfo->Offset;
-        TypeOffsets[n].Size = typeInfo->Size;
+        TypeOffsets[n].Size   = typeInfo->Size;
     }
     TypeList->Sort(CompareTypesByID);
-    for (int n = 0; n < TypeCount; n++)
-    {
-        PTYPEINFO typeInfo = (PTYPEINFO)TypeList->Items[n];
+    for (int n = 0; n < TypeCount; n++) {
+        PTYPEINFO typeInfo   = (PTYPEINFO) TypeList->Items[n];
         TypeOffsets[n].ModId = typeInfo->ID;
     }
     TypeList->Sort(CompareTypesByName);
-    for (int n = 0; n < TypeCount; n++)
-    {
-        PTYPEINFO typeInfo = (PTYPEINFO)TypeList->Items[n];
+    for (int n = 0; n < TypeCount; n++) {
+        PTYPEINFO typeInfo   = (PTYPEINFO) TypeList->Items[n];
         TypeOffsets[n].NamId = typeInfo->ID;
     }
     fwrite(TypeOffsets, sizeof(OFFSETSINFO), TypeCount, fOut);
     delete[] TypeOffsets;
-//-------------------------------------------------------------------Var Section
+
+    //-------------------------------------------------------------------
+    // Var Section
     fwrite(&VarCount, sizeof(VarCount), 1, fOut);
     fwrite(&MaxVarDataSize, sizeof(MaxVarDataSize), 1, fOut);
 
     POFFSETSINFO VarOffsets = new OFFSETSINFO[VarCount];
-    for (int n = 0; n < VarCount; n++)
-    {
-        PVARINFO vInfo = (PVARINFO)VarList->Items[n];
+    for (int n = 0; n < VarCount; n++) {
+        PVARINFO vInfo       = (PVARINFO) VarList->Items[n];
         VarOffsets[n].Offset = vInfo->Offset;
-        VarOffsets[n].Size = vInfo->Size;
+        VarOffsets[n].Size   = vInfo->Size;
     }
     VarList->Sort(CompareVarsByID);
-    for (int n = 0; n < VarCount; n++)
-    {
-        PVARINFO vInfo = (PVARINFO)VarList->Items[n];
+    for (int n = 0; n < VarCount; n++) {
+        PVARINFO vInfo      = (PVARINFO) VarList->Items[n];
         VarOffsets[n].ModId = vInfo->ID;
     }
     VarList->Sort(CompareVarsByName);
-    for (int n = 0; n < VarCount; n++)
-    {
-        PVARINFO vInfo = (PVARINFO)VarList->Items[n];
+    for (int n = 0; n < VarCount; n++) {
+        PVARINFO vInfo      = (PVARINFO) VarList->Items[n];
         VarOffsets[n].NamId = vInfo->ID;
     }
     fwrite(VarOffsets, sizeof(OFFSETSINFO), VarCount, fOut);
     delete[] VarOffsets;
-//----------------------------------------------------------------ResStr Section
+
+    //----------------------------------------------------------------
+    // ResStr Section
     fwrite(&ResStrCount, sizeof(ResStrCount), 1, fOut);
     fwrite(&MaxResStrDataSize, sizeof(MaxResStrDataSize), 1, fOut);
 
     POFFSETSINFO ResStrOffsets = new OFFSETSINFO[ResStrCount];
-    for (int n = 0; n < ResStrCount; n++)
-    {
-        PRESSTRINFO rsInfo = (PRESSTRINFO)ResStrList->Items[n];
+    for (int n = 0; n < ResStrCount; n++) {
+        PRESSTRINFO rsInfo      = (PRESSTRINFO) ResStrList->Items[n];
         ResStrOffsets[n].Offset = rsInfo->Offset;
-        ResStrOffsets[n].Size = rsInfo->Size;
+        ResStrOffsets[n].Size   = rsInfo->Size;
     }
     ResStrList->Sort(CompareResStrsByID);
-    for (int n = 0; n < ResStrCount; n++)
-    {
-        PRESSTRINFO rsInfo = (PRESSTRINFO)ResStrList->Items[n];
+    for (int n = 0; n < ResStrCount; n++) {
+        PRESSTRINFO rsInfo     = (PRESSTRINFO) ResStrList->Items[n];
         ResStrOffsets[n].ModId = rsInfo->ID;
     }
     ResStrList->Sort(CompareResStrsByName);
-    for (int n = 0; n < ResStrCount; n++)
-    {
-        PRESSTRINFO rsInfo = (PRESSTRINFO)ResStrList->Items[n];
+    for (int n = 0; n < ResStrCount; n++) {
+        PRESSTRINFO rsInfo     = (PRESSTRINFO) ResStrList->Items[n];
         ResStrOffsets[n].NamId = rsInfo->ID;
     }
     fwrite(ResStrOffsets, sizeof(OFFSETSINFO), ResStrCount, fOut);
     delete[] ResStrOffsets;
-//------------------------------------------------------------------Proc Section
+
+    //------------------------------------------------------------------
+    // Proc Section
     fwrite(&ProcCount, sizeof(ProcCount), 1, fOut);
     fwrite(&MaxProcDataSize, sizeof(MaxProcDataSize), 1, fOut);
 
     POFFSETSINFO ProcOffsets = new OFFSETSINFO[ProcCount];
-    for (int n = 0; n < ProcCount; n++)
-    {
-        PPROCDECLINFO pInfo = (PPROCDECLINFO)ProcList->Items[n];
+    for (int n = 0; n < ProcCount; n++) {
+        PPROCDECLINFO pInfo   = (PPROCDECLINFO) ProcList->Items[n];
         ProcOffsets[n].Offset = pInfo->Offset;
-        ProcOffsets[n].Size = pInfo->Size;
+        ProcOffsets[n].Size   = pInfo->Size;
     }
     ProcList->Sort(CompareProcsByID);
-    for (int n = 0; n < ProcCount; n++)
-    {
-        PPROCDECLINFO pInfo = (PPROCDECLINFO)ProcList->Items[n];
+    for (int n = 0; n < ProcCount; n++) {
+        PPROCDECLINFO pInfo  = (PPROCDECLINFO) ProcList->Items[n];
         ProcOffsets[n].ModId = pInfo->ID;
     }
     ProcList->Sort(CompareProcsByName);
-    for (int n = 0; n < ProcCount; n++)
-    {
-        PPROCDECLINFO pInfo = (PPROCDECLINFO)ProcList->Items[n];
+    for (int n = 0; n < ProcCount; n++) {
+        PPROCDECLINFO pInfo  = (PPROCDECLINFO) ProcList->Items[n];
         ProcOffsets[n].NamId = pInfo->ID;
     }
     fwrite(ProcOffsets, sizeof(OFFSETSINFO), ProcCount, fOut);
     delete[] ProcOffsets;
-//----------------------------------------------------------------Sections begin
+
+    //----------------------------------------------------------------
+    // Sections begin
     fwrite(&CurrOffset, sizeof(CurrOffset), 1, fOut);
     fclose(fOut);
     if (fLog) fclose(fLog);
