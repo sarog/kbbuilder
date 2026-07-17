@@ -40,6 +40,7 @@
 // Internal unit types
 #define drStop              0
 #define drStop_a            0x61    //'a' - Last Tag in all files
+#define drAssemblyData      0x62    //'b' - The data structure was found in .<PackageName> units of D8 packages
 #define drStop1             0x63    //'c'
 #define drUnit              0x64    //'d'
 #define drUnit1             0x65    //'e' - in implementation
