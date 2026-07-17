@@ -1429,18 +1429,14 @@ void __fastcall ReadDeclList(Byte LK, TNameDecl** Result) {
             case drEmbeddedProcStart:
                 if ((IsMSIL || (FVer >= verD2009 && FVer < verK1)) && WasEmbEnd)
                     WasEmbEnd = false; // Just ignore and continue
-                else
-                {
+                else {
                     FEmbedDepth++;
-                    if (Embedded)
-                    {
+                    if (Embedded) {
                         if (!IsMSIL) printf("Warning: Duplicate embedded list\n");
-                        Tag = ReadTag();
-                        TNameDecl* le = static_cast<TNameDecl *>(GetDCURecListEnd(Embedded));
+                        Tag           = ReadTag();
+                        TNameDecl *le = static_cast<TNameDecl *>(GetDCURecListEnd(Embedded));
                         ReadDeclList(dlEmbedded, &le);
-                    }
-                    else
-                    {
+                    } else {
                         Tag = ReadTag();
                         ReadDeclList(dlEmbedded, &Embedded);
                     }
@@ -1589,11 +1585,10 @@ void __fastcall ReadDeclList(Byte LK, TNameDecl** Result) {
             case drCBlock:
                 if (LK != dlMain)
                     brk = true;
-                else
-                {
+                else {
                     if (FDataBlPtr) printf("Warning: 2nd Data block\n");
                     FDataBlSize = ReadUIndex();
-                    FDataBlPtr = ReadMem(FDataBlSize);
+                    FDataBlPtr  = ReadMem(FDataBlSize);
                 }
                 break;
             case drFixUp:
@@ -1635,8 +1630,7 @@ void __fastcall ReadDeclList(Byte LK, TNameDecl** Result) {
             case drProcAddInfo:
                 if (!(FVer >= verD7 && FVer < verK1))
                     brk = true;
-                else
-                {
+                else {
                     V = ReadIndex();
                     SetProcAddInfo(V);
                 }
@@ -1644,8 +1638,7 @@ void __fastcall ReadDeclList(Byte LK, TNameDecl** Result) {
             case drORec:
                 if (!(FVer >= verD8 && FVer < verK1))
                     brk = true;
-                else
-                {
+                else {
                     if (FVer >= verD2009)
                         Decl = new TORecDecl;
                     else
@@ -1655,8 +1648,7 @@ void __fastcall ReadDeclList(Byte LK, TNameDecl** Result) {
             case drInfo98:
                 if (!(FVer >= verD8 && FVer < verK1))
                     brk = true;
-                else
-                {
+                else {
                     ReadUIndex();
                     ReadUIndex();
                 }
@@ -1674,8 +1666,7 @@ void __fastcall ReadDeclList(Byte LK, TNameDecl** Result) {
             case drA1Info: // Some record of 6 indices, ignore it completely
                 if (!(FVer >= verD2006 && FVer < verK1))
                     brk = true;
-                else
-                {
+                else {
                     ReadUIndex();
                     ReadUIndex();
                     ReadUIndex();
