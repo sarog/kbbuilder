@@ -30,7 +30,7 @@
 #define verD12   29  // 12 Athens
 #define verK1    100 // Kylix 1.0
 #define verK2    101 // Kylix 2.0
-#define verK3    103 // Kylix 2.0
+#define verK3    102 // Kylix 3.0
 
 // TDCUPlatform
 #define dcuplWin32  0
@@ -89,6 +89,7 @@
 #define drInterfaceDef      0x54    //'T'
 #define drWideStrDef        0x55    //'U'
 #define drWideRangeDef      0x56    //'V'
+
 // Various tables
 #define drCodeLines         0x90
 #define drLinNum            0x91
@@ -96,17 +97,22 @@
 #define drSymbolRef         0x93
 #define drLocVarTbl         0x94
 #define drUnitFlags         0x96
+
 // ver70 or higher tags (all of unknown purpose)
 #define drUnitAddInfo       0x34    //'4'
 #define drInfo98            0x98
 #define drConstAddInfo      0x9C
 #define drProcAddInfo       0x9E
+#define drAssemblyInfo      0x9D    // Ver 2005,2006 .Net
+
 // ver80 or higher tags (all of unknown purpose)
 #define drORec              0x6F    //'o' - goes before drCBlock in MSIL
 #define drStrConstRec       0x35    //'5'
 #define drMetaClassDef      0x57    //'W'
-// Kylix specific flags
+
+// Kylix-specific flags
 #define drUnit4             0x0F    //5-bytes record was observed in QOpenBanner.dcu only
+
 // ver10 and higher tags
 #define drSpecVar           0x37    //'7'
 #define arClassVarReal      0x2D    //real value
@@ -115,6 +121,7 @@
 #define drA1Info            0xA1
 #define drA2Info            0xA2
 #define arCopyDecl          0xA3
+
 // ver12 and higher tags
 #define drDynArrayDef       0x58    //'X'
 #define drTemplateArgDef    0x59    //'Y'
@@ -125,6 +132,7 @@
 #define drA7Info            0xA7
 #define drA8Info            0xA8
 #define drDelayedImpInfo    0xB0
+
 // ver13 and higher tags
 #define drUnitInlineSrc     0x76    //'v'
 #define arAnonymousBlock    0x01
@@ -134,6 +142,30 @@
 #define arResult            0x23    //'#'
 #define arAbsLocVar         0x24    //'$'
 #define arLabel             0x2B    //'+'
+
+// XE2 and higher tags
+// mode64 only till XE5, all modes since XE6
+#define drSegInfo           0xB1
+#define drAddrToSegInfo     0xB2
+
+// XE3 and higher tags
+#define arFinalFlag         0xC2
+
+// XE4 and higher tags
+#define drA9Info            0xA9
+
+// XE7 and higher tags
+#define drNextOverload      0xB6
+
+// Delphi 10 (Seattle...Sydney) and higher tags
+#define drDependencyInfo    0xB5
+
+// Delphi 11 Alexandria and higher tags
+#define drInDcpWin64Info    0xB7
+
+// Delphi 12 Athens and higher tags
+#define drDLL1              0xB3
+
 // Fields
 #define arFld               0x2C    //','
 #define arMethod            0x2D    //'-'
@@ -159,14 +191,15 @@
 #define fxStart70   6
 #define fxEnd70     7
 
-#define fxStartMSIL 11
-#define fxEndMSIL   12
+#define fxVirtMethodMSIL 10 // 0x0A
+#define fxStartMSIL      11 // 0x0B
+#define fxEndMSIL        12 // 0x0C
 
 #define fxStart100  12
 #define fxEnd100    13
 
 #define fxMaxXE     15
-#define fxMax       23 // Max over all Delphi versions;
+#define fxMax       23 // 0x17 Max over all Delphi versions
 
 // XE2 64-bit mode
 #define fxAddr64    19
@@ -176,6 +209,7 @@
 #define fxEnd2010   1
 
 #define FixOfsMask  0xFFFFFF
+#define FixOfsShift  24
 
 // TDeclListKind
 #define dlMain          0
