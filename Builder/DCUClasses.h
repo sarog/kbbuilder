@@ -1,7 +1,7 @@
 ﻿#ifndef DCUCLASSES_H
 #define DCUCLASSES_H
 //------------------------------------------------------------------------------
-// Delphi Versions
+// Delphi Versions (referencing dcu32int/DCU32.pas)
 #define verD2    2
 #define verD3    3
 #define verD4    4
@@ -9,13 +9,25 @@
 #define verD6    6
 #define verD7    7
 #define verD8    8
-#define verD2005 9   // 2005    D9->D2005
+#define verD2005 9   // 2005         D9->D2005
 #define verD2006 10  // 2006, 2007  D10->D2006
 #define verD2009 12  // 2009
-#define verD2010 13  // 2010
-#define verDXE1  14  // 2011
-#define verDXE2  15  // 2012
-#define verDXE3  16  // 2013
+#define verD2010 14  // 2010
+#define verDXE1  15  // XE
+#define verDXE2  16  // XE2
+#define verDXE3  17  // XE3
+#define verDXE4  18  // XE4
+#define verDXE5  19  // XE5
+#define verDXE6  20  // XE6
+#define verDXE7  21  // XE7 & AppMethod
+#define verDXE8  22  // XE8
+#define verD10   23  // 10 Seattle
+#define verD10_1 24  // 10.1 Berlin
+#define verD10_2 25  // 10.2 Tokyo
+#define verD10_3 26  // 10.3 Rio
+#define verD10_4 27  // 10.4 Sydney
+#define verD11   28  // 11 Alexandria
+#define verD12   29  // 12 Athens
 #define verK1    100 // Kylix 1.0
 #define verK2    101 // Kylix 2.0
 #define verK3    103 // Kylix 2.0
