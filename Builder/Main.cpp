@@ -669,12 +669,16 @@ void __fastcall ReadUses(Byte TagRq) {
                 Ch       = 'D';
                 U->Flags = ufDLL;
                 break;
+            case drDLL1: // 0xB3
+                Ch       = 'E';
+                U->Flags = ufDLL1;
+                break;
         }
         hUnit = FUnitImp->Count;
         FUnitImp->Add(static_cast<void *>(U));
         hPack = 0;
 
-        if (TagRq != drDLL && FVer >= verD8 && FVer < verK1)
+        if (TagRq != drDLL && TagRq != drDLL1 && FVer >= verD8 && FVer < verK1)
             hPack = ReadUIndex();
             
         if (FVer >= verD2006 && FVer < verK1)
@@ -682,7 +686,7 @@ void __fastcall ReadUses(Byte TagRq) {
         else
             L = ReadULong();
 
-        if ((FVer == verD7 && FVer < verK1) || (FVer >= verD8 && FVer < verK1 && TagRq == drDLL))
+        if ((FVer == verD7 && FVer < verK1) || (FVer >= verD8 && FVer < verK1 && TagRq == drDLL) || (TagRq == drDLL1))
             L1 = ReadULong();
         if (FVer >= verD2009 && FVer < verK1)
             L2 = ReadUIndex();
@@ -699,8 +703,7 @@ void __fastcall ReadUses(Byte TagRq) {
         while (true) {
             Tag = ReadTag();
             if (Tag == drImpType || Tag == drImpTypeDef) {
-                if (TagRq != drDLL) // 0x68
-                {
+                if (TagRq != drDLL && TagRq != drDLL1) { // 0x68 && 0xB3
                     Ch   = 'T';
                     ImpN = ReadName();
                     if (Tag == drImpTypeDef) RTTISz = ReadUIndex();
@@ -718,13 +721,14 @@ void __fastcall ReadUses(Byte TagRq) {
                 Ch   = 'A';
                 ImpN = ReadName();
                 L    = ReadULong();
-                if (TagRq != drDLL)
+                if (TagRq != drDLL && TagRq != drDLL1)
                     AR = new TImpDef('A', ImpN, L, NULL, hUnit);
                 else
                     AR = new TDLLImpRec(ImpN, L, NULL, hUnit);
                 ndx = AddAddrDef(AR);
                 TR  = AR;
             } else if (Tag == drStop2) {
+                // Imports drConstAddInfo may be for the prev. drImpVal always
                 L = -1;
                 if (FVer >= verD8 && FVer < verK1) L = ReadULong();
                 continue;
@@ -1253,6 +1257,12 @@ int __fastcall ReadConstAddInfo(TNameDecl* LastProcDecl) {
                 hDef2  = ReadUIndex();
                 V      = ReadUIndex();
                 break;
+            case 0x8:
+                if (!(FVer >= verD11) && (FVer < verK1)) break;
+                Result = ReadUIndex();
+                // todo: Def = GetAddrDef(Result);
+                // todo: AddDefModifier(Def, TXMLDocDeclModifier.Create(ReadNDXStrRef));
+                break;
             case 0x9:
                 Result = ReadUIndex();
                 hDT    = ReadUIndex();
@@ -1595,7 +1605,7 @@ void __fastcall ReadDeclList(Byte LK, TNameDecl** Result) {
                 LoadFixups();
                 break;
             case drEmbeddedProcEnd:
-                if (!(LK == dlArgsT && FVer > verD3 || LK == dlArgs && FVer > verD3))
+                if (!((LK == dlArgsT && FVer > verD3) || (LK == dlArgs && FVer > verD3)))
                     brk = true;
                 else
                     if (IsMSIL || (FVer >= verD2009 && FVer < verK1)) WasEmbEnd = true;
@@ -1622,7 +1632,7 @@ void __fastcall ReadDeclList(Byte LK, TNameDecl** Result) {
                     Decl = new TUnitAddInfo;
                 break;
             case drConstAddInfo:
-                if (!(FVer >= verD7 && FVer < verK1 || FVer >= verK3))
+                if (!((FVer >= verD7 && FVer < verK1) || (FVer >= verK3)))
                     brk = true;
                 else
                     ReadConstAddInfo(LastProcDecl);
@@ -1708,6 +1718,12 @@ void __fastcall ReadDeclList(Byte LK, TNameDecl** Result) {
                 else
                     ReadUIndex();
                 break;
+            case drA9Info:
+                if (!(FVer >= verDXE4 && FVer < verK1))
+                    brk = true;
+                else
+                    ReadUIndex();
+                break;
             case drDynArrayDef:
                 if (!(FVer >= verD2009 && FVer < verK1))
                     brk = true;
@@ -1737,6 +1753,40 @@ void __fastcall ReadDeclList(Byte LK, TNameDecl** Result) {
                     brk = true;
                 else
                     Decl = new TDelayedImpRec;
+                break;
+            case drSegInfo: // XE2
+                if (!(FVer >= verDXE2 && FVer < verK1))
+                    brk = true;
+
+                 //        if not((Ver>=verD_XE2)and(Ver<verK1)) then
+                 //          break;
+                 //        if FSegKindTbl<>Nil then
+                 //          DCUError('2nd Segment table');
+                 //        V := ReadUIndex;
+                 //        FSegCnt := V;
+                 //        FSegKindTbl := AllocMem(V*SizeOf(TSegKind));
+                 //        for i:=0 to V-1 do begin
+                 //          FSegKindTbl^[i] := GetSegKindByName(ReadShortName);
+                 //          ReadByte;
+                 //          ReadUIndex;
+                 //        end ;
+                break;
+
+            case drAddrToSegInfo:
+                if (!(FVer >= verDXE2 && FVer < verK1))
+                    brk = true;
+                // todo: LoadAddrToSegInfo
+                break;
+            case drAssemblyData:
+                // if (FromPackage and IsMSIL)
+                //     brk = true;
+                // todo: Decl = new TAssemblyData;
+                break;
+            case arFinalFlag:
+                if (!(FVer >= verDXE3 && FVer < verK1))
+                    brk = true;
+                else
+                    V = ReadUIndex();
                 break;
             default:
                 brk = true;
@@ -2241,8 +2291,7 @@ int __fastcall ShowStrConst(Byte *DP, DWord DS, String &OutS) {
 //  -10:2 - string item size
 //  -8:4 - reference count
 //  -4:4 - Length in terms of the string item size
-int __fastcall ShowUnicodeStrConst(Byte *DP, DWord DS, String &OutS) // Ver >=verD12
-{
+int __fastcall ShowUnicodeStrConst(Byte *DP, DWord DS, String &OutS) { // Ver >=verD12
     int Result = -1;
 
     OutS = "";
@@ -2265,8 +2314,7 @@ int __fastcall ShowUnicodeStrConst(Byte *DP, DWord DS, String &OutS) // Ver >=ve
     return Result;
 }
 //------------------------------------------------------------------------------
-int __fastcall ShowUnicodeResStrConst(Byte *DP, DWord DS, String &OutS) // Ver >=verD12
-{
+int __fastcall ShowUnicodeResStrConst(Byte *DP, DWord DS, String &OutS) {  // Ver >=verD12
     int Result = -1;
 
     OutS  = "";
@@ -2358,6 +2406,12 @@ String __fastcall ShowOfsQualifier(int hDef, int Ofs) {
     return TD->GetOfsQualifier(Ofs);
 }
 //------------------------------------------------------------------------------
+/**
+ * Scan One DCU
+ * References dcu32int's TUnit.DecodeMagic()
+ * @param Filename
+ * @return
+ */
 bool __fastcall ScanOneDCU(String Filename) {
     Byte   B;
     String S, SName;
@@ -2534,6 +2588,82 @@ bool __fastcall ScanOneDCU(String Filename) {
             FVer = verK3; // Kylix 3.0
             break;
         default:
+            // All the other versions follow the common scheme of magic values assignment,
+            // which we describe here:
+            if ((Magic & 0x00FF00F9) == 0x49) {
+                u_long BVer    = Magic >> 24;
+                u_long PlMagic = Magic & 0xFF;
+                if ((BVer <= 0x24 && BVer >= 0x1B && PlMagic == 0x40) ||
+                    (BVer <= 0x1A && BVer >= 0x17 && PlMagic == 0x4B)) {
+                    PlMagic   = (Magic >> 8) & 0xFF;
+                    FVer      = BVer + (verDXE2 - 0x17);
+                    fxJmpAddr = fxJmpAddrXE;
+
+                    switch (PlMagic) {
+                        case 0x03: FPlatform = dcuplWin32; break;
+                        case 0x23:
+                            FPlatform = dcuplWin64;
+                            FPtrSize  = 8;
+                            break;
+                        case 0x04: FPlatform = dcuplOsx32; break;
+                        case 0x24: // OSX 64 support was added in 10.4 Sydney
+                            if (FVer >= verD10_4) {
+                                FPlatform = dcuplOsx64;
+                                FPtrSize  = 8;
+                            }
+                            break;
+                        case 0x84: // OSX Arm 64 support was added in 12 Athens
+                            if (FVer >= verD12) {
+                                FPlatform = dcuplOsxArm64;
+                                FPtrSize  = 8;
+                            }
+                            break;
+                        case 0x14: // iOS support was added in XE4
+                            if (FVer >= verDXE4) FPlatform = dcuplIOSEmulator;
+                            break;
+                        case 0x88: // iOS Arm 64 Simulator support was added in 12 Athens
+                            if (FVer >= verD12) {
+                                FPlatform = dcuplIOSSimArm64;
+                                FPtrSize  = 8;
+                            }
+                            break;
+                        case 0x76: // iOS support was added in XE4
+                            if (FVer >= verDXE4) FPlatform = dcuplIOSDevice;
+                            break;
+                        case 0x86: // iOS64 code was changed in Delphi 11
+                            if (FVer >= verD11) {
+                                FPlatform = dcuplIOSDevice64;
+                                FPtrSize  = 8;
+                            }
+                            break;
+                        case 0x94: // iOS64 support was added in XE8, and the code was changed in Delphi 11
+                            if (!(FVer < verDXE8 || FVer >= verD11)) {
+                                FPlatform = dcuplIOSDevice64;
+                                FPtrSize  = 8;
+                            }
+                            break;
+                        case 0x67: // Android code was changed in Delphi 10.4
+                            if (FVer >= verD10_4) FPlatform = dcuplAndroid;
+                            break;
+                        case 0x77: // Android support was added in XE4 and the code was changed in Delphi 10.4
+                            if (!(FVer < verDXE5 || FVer >= verD10_4)) FPlatform = dcuplAndroid;
+                            break;
+                        case 0x87: // Android 64 support was added in 10.4 Sydney
+                            if (FVer >= verD10_4) {
+                                FPlatform = dcuplAndroid64;
+                                FPtrSize  = 8;
+                            }
+                            break;
+                        case 0x21: // Linux support was added in XE 10.2
+                            if (FVer >= verD10_2) {
+                                FPlatform = dcuplLinux64;
+                                FPtrSize  = 8;
+                            }
+                            break;
+                        default: break;
+                    }
+                }
+            }
             printf("Error: Wrong magic %lX\n", Magic);
             delete[] FMemPtr;
             return false;
@@ -2598,7 +2728,13 @@ bool __fastcall ScanOneDCU(String Filename) {
     ReadUses(drUnit1);
     ReadUses(drDLL);
 
+    if ((FVer>=verD12) && (FPlatform == dcuplIOSSimArm64 || FPlatform == dcuplIOSDevice64))
+        ReadUses(drDLL1);
+
     ReadDeclList(dlMain, &FDecls);
+
+    // todo? SetExportNames(FDecls); //Moved before BindEmbeddedTypes, because some embedded types (like TList<T>.TEnumerator) should be exported
+
     if (FVer >= verDXE1 && FVer < verK1)
         BindEmbeddedTypes(); // try to fix the local types relocation problem of XE
 

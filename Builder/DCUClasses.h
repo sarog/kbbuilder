@@ -33,9 +33,18 @@
 #define verK3    102 // Kylix 3.0
 
 // TDCUPlatform
-#define dcuplWin32  0
-#define dcuplWin64  1
-#define dcuplOsx32  2
+#define dcuplWin32       0
+#define dcuplWin64       1
+#define dcuplOsx32       2
+#define dcuplOsx64       3
+#define dcuplOsxArm64    4
+#define dcuplIOSEmulator 5
+#define dcuplIOSSimArm64 6
+#define dcuplIOSDevice   7
+#define dcuplIOSDevice64 8
+#define dcuplAndroid     9
+#define dcuplAndroid64   10
+#define dcuplLinux64     11
 
 // Internal unit types
 #define drStop              0
@@ -369,6 +378,7 @@ public:
 // TUnitImpFlags
 #define ufImpl  0
 #define ufDLL   1
+#define ufDLL1  2
 typedef struct {
     TImpDef  *Ref;
     PName     Name;
