@@ -928,7 +928,7 @@ void __fastcall TMethodDecl::Show(String &OutS) {
             if (!D) {
                 MS = "method ";
                 MethodDeclInfo->MethodKind = 'M';
-            } else if (((TProcDecl *) D)->IsProc()) {
+            } else if (static_cast<TProcDecl *>(D)->IsProc()) {
                 MS                         = "procedure ";
                 MethodDeclInfo->MethodKind = 'P';
             } else {
@@ -1009,7 +1009,7 @@ void __fastcall TMethodDecl::Show(String &OutS) {
             D = GetTypeDef(Ndx);
 
         if (D && D->InheritsFrom(__classid(TProcTypeDef))) {
-            S = ((TProcTypeDef *) D)->ProcStr();
+            S = static_cast<TProcTypeDef *>(D)->ProcStr();
             if (S[1] == 'p')
                 MethodDeclInfo->MethodKind = 'P';
             else if (S[1] == 'f')
@@ -1020,7 +1020,7 @@ void __fastcall TMethodDecl::Show(String &OutS) {
             ShowName(S);
             PS += S;
             OutS += S;
-            ((TProcTypeDef *) D)->ShowDecl("()", S);
+            static_cast<TProcTypeDef *>(D)->ShowDecl("()", S);
             PS += S;
             OutS += S;
             ShowFlags();
