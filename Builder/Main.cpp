@@ -2162,17 +2162,14 @@ Byte *__fastcall GetBlockMem(DWord BlOfs, DWord BlSz, DWord *ResSz) {
 }
 //------------------------------------------------------------------------------
 int __fastcall GetStartFixup(DWord Ofs) {
-    int i;
-    int d;
-
     if (!FFixupTbl || !FFixupCnt) return 0;
     if (!Ofs) return 0;
     int iMin = 0;
     int iMax = FFixupCnt - 1;
     while (iMin <= iMax) {
-        i = (iMin + iMax) / 2;
+        int i = (iMin + iMax) / 2;
         TFixupRec fRec = FFixupTbl[i];
-        d = (fRec.OfsF & FixOfsMask) - Ofs;
+        int d = (fRec.OfsF & FixOfsMask) - Ofs;
         if (d < 0)
             iMin = i + 1;
         else
