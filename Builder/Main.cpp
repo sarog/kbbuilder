@@ -103,9 +103,8 @@ PUnitImpRec __fastcall GetUnitImpRec(int hUnit) {
 void __fastcall GetUnitImp(int hUnit) { PUnitImpRec UI = GetUnitImpRec(hUnit); }
 //------------------------------------------------------------------------------
 String __fastcall GetDCURecStr(TDCURec* D, int hDef) {
-    PName   N;
-    char    ScopeCh;
-    char    Pfx[32];
+    PName  N;
+    char   Pfx[32];
     String Result;
 
     if (!D)
@@ -124,9 +123,10 @@ String __fastcall GetDCURecStr(TDCURec* D, int hDef) {
         Result = PName2String(N);
     }
 
-    if (Pfx != "") {
+    if (!strcmp(Pfx, "")) {
         char *CP = StrScan(Pfx, '%');
         if (CP) {
+            char ScopeCh;
             if (!D)
                 ScopeCh = 'N';
             else {
