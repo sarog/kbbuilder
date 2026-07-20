@@ -641,42 +641,40 @@ void __fastcall ReadSourceFiles() {
 }
 //------------------------------------------------------------------------------
 void __fastcall ReadUses(Byte TagRq) {
-    char        Ch;
-    int         hPack, hImp, hUnit;
-    int         ndx, ImpBase0, ImpReBase;
-    DWord       RTTISz;
-    int         L, L1, L2;
-    PName       UseName, ImpN;
-    PUnitImpRec U;
-    TBaseDef   *TR, *AR;
-    TImpDef    *IR;
+    int       ndx;
+    DWord     RTTISz;
+    int       L;
+    PName     ImpN;
+    TBaseDef *TR, *AR;
 
     int hUses   = 0;
     int ImpBase = 0;
 
     while (Tag == TagRq) {
-        UseName = ReadName();
-        U = new TUnitImpRec;
-        memset(static_cast<void *>(U), 0, sizeof(TUnitImpRec));
-        U->Name = UseName;
-        Ch = '?';
+        PName       UseName = ReadName();
+        PUnitImpRec pUnit   = new TUnitImpRec;
+        memset(static_cast<void *>(pUnit), 0, sizeof(TUnitImpRec));
+        pUnit->Name = UseName;
+        char Ch = '?';
+
         switch (TagRq) {
             case drUnit1: // 0x65
                 Ch       = 'U';
-                U->Flags = ufImpl;
+                pUnit->Flags = ufImpl;
                 break;
             case drDLL: // 0x68
                 Ch       = 'D';
-                U->Flags = ufDLL;
+                pUnit->Flags = ufDLL;
                 break;
             case drDLL1: // 0xB3
                 Ch       = 'E';
-                U->Flags = ufDLL1;
+                pUnit->Flags = ufDLL1;
                 break;
         }
-        hUnit = FUnitImp->Count;
-        FUnitImp->Add(static_cast<void *>(U));
-        hPack = 0;
+
+        int hUnit = FUnitImp->Count;
+        FUnitImp->Add(static_cast<void *>(pUnit));
+        int hPack = 0;
 
         if (TagRq != drDLL && TagRq != drDLL1 && FVer >= verD8 && FVer < verK1)
             hPack = ReadUIndex();
@@ -687,15 +685,17 @@ void __fastcall ReadUses(Byte TagRq) {
             L = ReadULong();
 
         if ((FVer == verD7 && FVer < verK1) || (FVer >= verD8 && FVer < verK1 && TagRq == drDLL) || (TagRq == drDLL1))
-            L1 = ReadULong();
+            int L1 = ReadULong();
+
         if (FVer >= verD2009 && FVer < verK1)
-            L2 = ReadUIndex();
-            
-        hImp = 0;
-        IR = new TImpDef(Ch, UseName, L, NULL, hUnit);
-        U->Ref = IR;
-        ImpBase0 = ImpBase;
-        ImpBase = AddAddrDef(IR);
+            int L2 = ReadUIndex();
+
+        int hImp = 0;
+
+        TImpDef *IR  = new TImpDef(Ch, UseName, L, NULL, hUnit);
+        pUnit->Ref   = IR;
+        int ImpBase0 = ImpBase;
+        ImpBase      = AddAddrDef(IR);
 
         if (hPack > 0 && FVer < verD2009)
             RefAddrDef(hPack); // Reserve index for unit package number
@@ -733,9 +733,11 @@ void __fastcall ReadUses(Byte TagRq) {
                 if (FVer >= verD8 && FVer < verK1) L = ReadULong();
                 continue;
             } else if (Tag == drConstAddInfo) {
-                if (!IsMSIL) break;
-                if (hImp) printf("Warning: ConstAddInfo encountered for %s in subrecord #%d\n", UseName, hImp);
-                ImpReBase = ReadConstAddInfo(NULL);
+                if (!(FVer >= verD11 && FVer < verK1)) { // It may be used now with Tag:08 to store defines
+                    if (!IsMSIL) break;
+                    if (hImp) printf("Warning: ConstAddInfo encountered for %s in subrecord #%d\n", UseName, hImp);
+                }
+                int ImpReBase = ReadConstAddInfo(NULL);
                 continue;
             } else
                 break;
@@ -747,6 +749,7 @@ void __fastcall ReadUses(Byte TagRq) {
         Tag = ReadTag();
         // 0x9E
         if (Tag == drProcAddInfo) {
+            // The only tag by now, which was observed between imports
             if (FVer < verD7 || FVer >= verK1) break;
             hImp = ReadIndex();
             SetProcAddInfo(hImp);
