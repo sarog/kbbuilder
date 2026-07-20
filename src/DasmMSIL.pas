@@ -27,7 +27,7 @@ freely, subject to the following restrictions:
 interface
 
 uses
-  DasmDefs,FixUp;
+  DasmDefs,FixUp,DasmCF;
 
 type
 //ECMA-335 standard Common Language Infrastructure
@@ -179,7 +179,7 @@ CheckKindTbl: array[$0..$2] of PChar = (
 type
   PCmdInfo = ^TCmdInfo;
   TCmdInfo = record
-    Name: PChar;
+    Name: PAnsiChar;
     F: integer;
   end ;
 
@@ -613,12 +613,12 @@ begin
    atI8: PutSFmt(' $%x%8.8x',[Integer(Pointer(TIncPtr(DP)+4)^),Integer(DP^)]);
    atR4: begin
      PutSpace;
-     PutS(FixFloatToStr(Single(DP^)));
+     PutS(FixFloatToStr(Single(DP^),true{NeedDot}));
      //PutSFmt(' %g',[Single(DP^)]); //it is better to use FloatToStr to fix the bug of DT+
     end ;
    atR8: begin
      PutSpace;
-     PutS(FixFloatToStr(Double(DP^)));
+     PutS(FixFloatToStr(Double(DP^),true{NeedDot}));
      //PutSFmt(' %g',[Double(DP^)]);
     end ;
    atMetadata: begin
@@ -656,7 +656,7 @@ begin
   end ;
 end ;
 
-procedure ShowCommand;
+procedure ShowCommand(CmdInfo: TCmd);
 begin
   ProcessCommand(ShowCmdPart,Nil);
 end ;
@@ -715,7 +715,7 @@ end ;
 
 procedure SetMSILDisassembler;
 begin
-  SetDisassembler(ReadCommand, ShowCommand,CheckCommandRefs);
+  SetDisassembler(ReadCommand, ShowCommand,CheckCommandRefs{$IFDEF OpSem},Nil{$ENDIF});
 end ;
 
 end.

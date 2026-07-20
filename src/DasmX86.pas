@@ -33,12 +33,17 @@ procedure Set80x86Disassembler{$IFDEF I64}(I64: Boolean){$ENDIF};
 
 implementation
 
+{$IFDEF OpSem}
+uses x86DasmSem;
+{$ENDIF}
+
 procedure Set80x86Disassembler{$IFDEF I64}(I64: Boolean){$ENDIF};
 begin
  {$IFDEF I64}
   modeI64 := I64;
  {$ENDIF}
-  SetDisassembler(ReadCommand, ShowCommand,CheckCommandRefs);
+  SetDisassembler(ReadCommand, ShowCommand,CheckCommandRefs
+    {$IFDEF OpSem},{$IFDEF XMLx86}GetXMLX86CommandOperations{$ELSE}Nil{$ENDIF}{$ENDIF});
 end ;
 
 end.

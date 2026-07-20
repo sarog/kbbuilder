@@ -29,7 +29,7 @@ freely, subject to the following restrictions:
 interface
 
 uses
-  SysUtils,Classes,DCU32,DCP{$IFDEF Win32},Windows{$ENDIF},IniFiles;
+  SysUtils,Classes,DCU_In,DCU32,DCP{$IFDEF Win32},Windows{$ENDIF},IniFiles;
 
 const
   PathSep = {$IFNDEF LINUX}';'{$ELSE}':'{$ENDIF};
@@ -45,7 +45,7 @@ var
 
 function ExtractFileNamePkg(const FN: String): String;
 
-function GetDCUByName(FName,FExt: String; VerRq: integer; MSILRq: boolean;
+function GetDCUByName(const FName,FExt: String; VerRq: integer; MSILRq: boolean;
   PlatformRq: TDCUPlatform; StampRq: integer): TUnit;
 
 function GetDCUOfMemory(MemP: Pointer): TUnit;
@@ -129,7 +129,10 @@ const
     '10Seattle', //10 Seattle
     '10_1Berlin', //10.1 Berlin
     '10_2Tokyo', //10.2 Tokyo
-    '10_3Rio' //10.3 Rio
+    '10_3Rio', //10.3 Rio
+    '10_4Sydney', //10.4 Sydney
+    '11Alexandria', //11 Alexandria
+    '12Athens' //11 Athens
   );
 begin
   if Ver<verK1 then
@@ -140,8 +143,8 @@ end ;
 
 function GetPlatformTag(IsMSIL: boolean; Platf: TDCUPlatform): String;
 const
-  platfSymbol: array[TDCUPlatform]of String = ('','64','X',
-    'iOSSim','iOSDev','iOSDev64','Android','Linux64');
+  platfSymbol: array[TDCUPlatform]of String = ('','64','X','X64','XArm64',
+    'iOSSim','iOSSimArm64','iOSDev','iOSDev64','Android','Android64','Linux64');
 begin
   if IsMSIL then
     Result := 'N'
@@ -195,8 +198,9 @@ function GetDelphiLibDir(VerRq: integer; MSILRq: boolean; PlatformRq: TDCUPlatfo
 {$IFDEF Win32}
 const
   sRoot = 'RootDir';
-  sPlatformDir: array[TDCUPlatform]of String = ('win32','win64','osx32','iOSSimulator',
-    'iOSDevice','iOSDevice64','android','linux64');
+  sPlatformDir: array[TDCUPlatform]of String = ('win32','win64','osx32','osx64','osxarm64',
+    'iOSSimulator','iossimarm64','iOSDevice','iOSDevice64',
+    'android','android64','linux64');
 var
   Key: HKey;
   sPath,sRes,sLib: String;
@@ -297,7 +301,7 @@ end ;
 
 procedure FindPackagesAndAddToPathList(const Mask: String);
 var
-  SR: TSearchRec;
+  sr: TSearchRec;
   Path,Ext: String;
   lExt: Integer;
 begin
@@ -313,6 +317,7 @@ begin
         AddToPathList(Path+sr.Name,true{SurePkg});
     end ;
   until FindNext(sr) <> 0;
+  SysUtils.FindClose(sr);
 end ;
 
 procedure SetPathList(const DirList: string);
@@ -391,6 +396,66 @@ TDCUSearchRec = record
   Res: PDCPUnitHdr;
 end ;
 
+function IncludeSubFolders(const sDir: String): String;
+var
+  SR: TSearchRec;
+  sPath,S: String;
+begin
+  Result := sDir;
+  if SysUtils.FindFirst(sDir+(DirSep+'*'), faDirectory, sr)<>0 then
+    Exit;
+  sPath := sDir+DirSep;
+  repeat
+    if SR.Attr and faDirectory=0 then
+      continue;
+    if (SR.Name='.')or(SR.Name='..') then
+      continue;
+    S := IncludeSubFolders(sPath+SR.Name);
+    Result := Result+PathSep+S;
+  until FindNext(sr) <> 0;
+  SysUtils.FindClose(sr);
+end;
+
+function IncludePathSubFolders(const PASPath: String): String;
+var
+  SL: TStringList;
+  i: Integer;
+  S: string;
+  NeedSubSearch: Boolean;
+begin
+  SL := TStringList.Create;
+  try
+    SL.Delimiter := PathSep;
+    SL.DelimitedText := PASPath;
+    NeedSubSearch := false;
+    for i:=0 to SL.Count-1 do begin
+      S := SL[i];
+      if (S<>'')and(S[Length(S)]=DirSep) then begin
+        NeedSubSearch := true;
+        break;
+      end;
+    end;
+    if not NeedSubSearch then begin
+      Result := PASPath;
+      Exit;
+    end;
+    Result := '';
+    for i:=0 to SL.Count-1 do begin
+      S := SL[i];
+      if (S<>'')and(S[Length(S)]=DirSep) then begin
+        SetLength(S,Length(S)-1);
+        S := IncludeSubFolders(S);
+      end;
+      if Result='' then
+        Result := S
+      else
+        Result := Result+DirSep+S;
+    end;
+  finally
+    SL.Free;
+  end;
+end;
+
 function InitDCUSearch(FN,FExt: String; var SR: TDCUSearchRec): boolean {HasPath};
 var
   Dir: String;
@@ -408,7 +473,7 @@ begin
       if (PASPath='') then
         PASPath := Dir
       else
-        PASPath := Dir + PathSep + PASPath;
+        PASPath := Dir + PathSep + IncludePathSubFolders(PASPath);
     end ;
     AddedUnitDirToPath := true;
   end ;
@@ -504,7 +569,7 @@ begin
   end ;
 end;
 
-function GetDCUByName(FName,FExt: String; VerRq: integer; MSILRq: boolean;
+function GetDCUByName(const FName,FExt: String; VerRq: integer; MSILRq: boolean;
   PlatformRq: TDCUPlatform; StampRq: integer): TUnit;
 var
   UL: TStringList;
@@ -512,7 +577,7 @@ var
   U0: TUnit;
 //  SearchPath: String;
   SR: TDCUSearchRec;
-  FN,UnitName: String;
+  FName1,FN,UnitName: String;
   HasPath: Boolean;
   Cl: TUnitClass;
 begin
@@ -526,7 +591,7 @@ begin
       PathList.Delete(AutoLibDirNDX)
     else begin
       PathList[AutoLibDirNDX] := FN;
-      Writeln('Using Delphi lib: ',FN);
+      OnWriteMessage('Using Delphi lib: '+FN);
     end ;
     AutoLibDirNDX := -1; //Substitution for * had been made
   end ;
@@ -538,11 +603,12 @@ begin
   HasPath := Length(UnitName)<Length(FName);
   if HasPath or(FExt=''{FExt is not empty for the units from uses})  then
     UnitName := ChangeFileExt(UnitName,'');
+  FName1 := FName;
   if not HasPath and(FUnitAliases<>Nil) then begin
     FN := FUnitAliases.Values[UnitName{FName}];
     if FN<>'' then begin
       UnitName{FName} := FN;
-      FName{FName} := FN;
+      FName1{FName} := FN;
     end ;
   end ;
   if IgnoreUnitStamps or not((VerRq>verD2){In Delphi 2.0 Stamp is not used}and
@@ -552,22 +618,22 @@ begin
   if UL.Find(UnitName{FName},NDX) then
     Result := TUnit(UL.Objects[NDX])
   else begin
-    InitDCUSearch(FName,FExt,SR);
+    InitDCUSearch(FName1,FExt,SR);
    // SearchPath := DCUPath;
     Result := Nil;
     U0 := CurUnit;
     try
-      FN := FName;
+      FN := FName1;
       repeat
-        FName := FindDCU(SR);
-        if FName<>'' then begin
+        FName1 := FindDCU(SR);
+        if FName1<>'' then begin
           if VerRq=0 then
             Cl := TopLevelUnitClass
           else
             Cl := TUnit;
           Result := Cl.Create;
           try
-            if Result.Load(FName,VerRq,MSILRq,PlatformRq,SR.Res) then begin
+            if Result.Load(FName1,VerRq,MSILRq,PlatformRq,SR.Res) then begin
               if (StampRq=0)or(StampRq=Result.Stamp)
               then {Let`s check it here to try to find the correct stamp somewhere else}
                 break;
@@ -578,7 +644,7 @@ begin
                 raise;
             //The unit with the required version found, but it was wrong.
             //Report the problem and stop the search
-              Writeln(Format('!!!%s: %s',[E.ClassName,E.Message]));
+              OnException(E);
               Result.Free;
               Result := Nil;
               break;
@@ -592,7 +658,7 @@ begin
         RegisterUnit(UnitName{Result.UnitName - some units in packages may have different source file name}, Result)
       else
         RegisterUnit(FN, Nil); //Means: don't seek this name again,
-          //It's supposed that FName is a unit name without path
+          //It's supposed that FN is a unit name without path
     finally
       CurUnit := U0;
     end ;

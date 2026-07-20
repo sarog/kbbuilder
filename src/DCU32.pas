@@ -42,8 +42,9 @@ freely, subject to the following restrictions:
 interface
 uses
   {$IFDEF UNICODE}AnsiStrings,{$ENDIF}
-  {SysUtils, moved to implementation to check ANSIStrings.StrScan} Classes, DasmDefs, DCU_In, DCU_Out, FixUp, DCURecs, Win64SEH
-  {$IFDEF WIN},Windows{$ENDIF};
+  {SysUtils, moved to implementation to be able to check ANSIStrings.StrScan}
+  Classes, DCU_In, DCU_Out, FixUp, DCURecs, Win64SEH
+  {$IFDEF WIN},Windows{$ENDIF}, DasmCF;
 
 {$IFDEF UNICODE}
 {$IF declared(StrScan)} //declared(AnsiStrings.StrScan) doesn`t work
@@ -76,20 +77,27 @@ const {My own (AX) codes for Delphi/Kylix versions, the Delphi codes
   verD_10=23; //10 Seattle
   verD_10_1=24; //10.1 Berlin
   verD_10_2=25; //10.2 Tokyo
-  verD_10_3=26; //10.2 Tokyo
+  verD_10_3=26; //10.3 Rio
+  verD_10_4=27; //10.4 Sydney
+  verD_11=28; //11 Alexandria
+  verD_12=29; //12 Athens
   verK1=100; //Kylix 1.0
   verK2=101; //Kylix 2.0
   verK3=102; //Kylix 3.0
-  MaxDelphiVer = 26;
+  MaxDelphiVer = 29;
 
 type
-  TDCUPlatform = (dcuplWin32,dcuplWin64,dcuplOsx32,dcuplIOSEmulator,
-    dcuplIOSDevice,dcuplIOSDevice64,dcuplAndroid,dcuplLinux64);
+  TDCUPlatform = (dcuplWin32,dcuplWin64,dcuplOsx32,dcuplOsx64,dcuplOsxArm64,
+    dcuplIOSEmulator,dcuplIOSSimArm64,dcuplIOSDevice,dcuplIOSDevice64,
+    dcuplAndroid,dcuplAndroid64,dcuplLinux64);
 
 const
-  MobilePlatforms = [dcuplIOSEmulator,dcuplIOSDevice,dcuplIOSDevice64,dcuplAndroid];
-  LLVMPlatforms = [dcuplIOSDevice,dcuplIOSDevice64,dcuplAndroid,dcuplLinux64];
-  Platforms64bit = [dcuplWin64,dcuplIOSDevice64,dcuplLinux64];
+  MobilePlatforms = [dcuplIOSEmulator,dcuplIOSSimArm64,dcuplIOSDevice,dcuplIOSDevice64,
+    dcuplAndroid,dcuplAndroid64];
+  LLVMPlatforms = [dcuplOsx64,dcuplIOSDevice,dcuplIOSDevice64,dcuplIOSSimArm64,
+    dcuplOsxArm64,dcuplAndroid,dcuplAndroid64,dcuplLinux64];
+  Platforms64bit = [dcuplWin64,dcuplOsx64,dcuplOsxArm64,dcuplIOSSimArm64,
+    dcuplIOSDevice64,dcuplAndroid64,dcuplLinux64];
 
 { Internal unit types }
 const
@@ -222,6 +230,12 @@ const
 //ver verD_10 and higher tags
   drDependencyInfo=$B5;
 
+//ver verD_11 and higher tags
+  drInDcpWin64Info=$B7;
+
+//ver verD_12 and higher tags
+  drDLL1=$B3;
+
 //Fields
   arFld=$2C{','};
   arMethod=$2D{'-'};
@@ -252,7 +266,8 @@ const
   BlockSecKinds: TDeclSecKinds = [skNone,skLabel,skConst,skType,skVar,
     skThreadVar,skResStr,skExport,skProc];
   ClassSecKinds: array[Boolean]of TDeclSecKinds = ([skPrivate,skProtected,skPublic, skPublished],
-    [skPrivate,skProtected,skPublic, skPublished,skType,skConst,skVar]);
+    [skPrivate,skStrictPrivate,skProtected,skStrictProtected,skPublic,
+     skPublished,skType,skConst,skVar]);
 
 type
 
@@ -308,7 +323,7 @@ type
 TUnit = class;
 
 PUnitImpRec = ^TUnitImpRec;
-TUnitImpFlags = set of (ufImpl,ufDLL);
+TUnitImpFlags = set of (ufImpl,ufDLL,ufDLL1);
 TUnitImpRec = record
   Ref: TUnitImpDef;
   Name: PName;
@@ -367,7 +382,7 @@ protected
   FSegKindTbl: PSegKindTbl;
   FLoaded: boolean;
   function GetVersionStr: String;
-  function ReadMagic(Magic: ulong): Boolean;
+  function DecodeMagic(Magic: ulong): Boolean;
   procedure SetupFixups;
   procedure ReadUnitHeader;
   procedure ReadSourceFiles;
@@ -405,7 +420,7 @@ protected
   procedure DetectUniqueNames;
   function ForEachCodeBlSeqCmd(Ofs0,BlOfs,BlSz,SzMax: Cardinal; Proc: TProcDecl;
     Action: TSeqCmdAction; IP: Pointer): Cardinal{CmdOfs};
-  procedure DasmCodeBlSeq(Ofs0,BlOfs,BlSz,SzMax: Cardinal; WasPartMsg: Boolean;
+  procedure DasmCodeBlSeq(Ofs0,BlOfs,BlSz,SzMax: Cardinal; Seq: TCmdSeq; WasPartMsg: Boolean;
     Proc: TProcDecl); virtual;
   procedure DasmCodeBlCtlFlow(Ofs0,BlOfs,BlSz: Cardinal; TraceDataFlow: Boolean;
     Proc: TProcDecl); virtual;
@@ -416,13 +431,14 @@ protected
   function ShowMSILExcHandlers(Ofs0,BlOfs,Sz: Cardinal): Cardinal;
   procedure SetUnitPackageInfo(hDecl: Integer; const sInfo: String);
   procedure ReadDependencyInfo;
+  procedure ReadInDcpWin64Info;
 public { Exported for DCURecs: }
   function AddAddrDef(ND: TDCURec): integer;
   function AppendAddrDef(ND: TDCURec): integer;
   procedure RefAddrDef(V: integer);
   function GetAddrDef(hDef: integer): TDCURec;
   function GetGlobalAddrDef(hDef: integer; var U: TUnit): TDCURec;
-  procedure AddTypeDef(TD: TTypeDef);
+  function AddTypeDef(TD: TTypeDef): TNDX;
   function GetLastAddedTypeDef: TTypeDef;
   procedure ClearLastTypeDef(TD: TTypeDef);
   procedure ClearAddrDef(ND: TNameDecl);
@@ -456,6 +472,8 @@ public { Exported for DCURecs: }
   function ShowDeclList(LK: TDeclListKind; MainRec: TDCURec;
     Decl: TDCURec{TNameDecl}; Ofs: Cardinal; dScopeOfs: integer; SepF: TDeclSepFlags;
     ValidKinds: TDeclSecKinds; skDefault: TDeclSecKind): TDeclSecKind;
+  procedure VisitDeclList(Visitor: TDCURecVisitor; LK: TDeclListKind; MainRec: TDCURec;
+    Decl: TDCURec{TNameDecl});
   function GetStartFixup(Ofs: Cardinal): integer;
   procedure SetStartFixupInfo(Fix0: integer);
   property DataBlPtr: TIncPtr read FDataBlPtr;
@@ -463,6 +481,7 @@ public { Exported for DCURecs: }
   procedure DoShowFixupTbl;
   procedure FillProcLocVarTbls;
   procedure DoShowLocVarTbl;
+  procedure ReadSomeNameInfo28;
 protected
   FEmbedDepth,FMaxEmbedDepth,FEmbedLimit: Integer;
   FEmbeddedLists: PEmbeddedListInfTbl; //contains the lists which were not consumed
@@ -473,12 +492,14 @@ protected //for verD_XE - fix orphaned local types problem
   procedure RegisterEmbeddedTypes(var Embedded: TDCURec{TNameDecl}; Depth: Integer);
   procedure BindEmbeddedTypes;
 public
-  constructor Create; virtual; //Allows to extend TUnit
+  constructor Create; virtual; //May be used to extend TUnit
   function Load(const FName: String; VerRq: integer; MSILRq: boolean;
      PlatformRq: TDCUPlatform; AMem: Pointer): boolean; //Load instead of Create
     //to prevent from Destroy after Exception in constructor
   destructor Destroy; override;
   procedure Show;
+  procedure VisitDecls(Visitor: TDCURecVisitor; InterfaceOnly: Boolean);
+  procedure VisitTypes(Visitor: TDCURecVisitor);
   property VersionStr: String read GetVersionStr;
   function GetAddrStr(hDef: integer; ShowNDX: boolean): AnsiString;
   procedure PutAddrStr(hDef: integer; ShowNDX: boolean);
@@ -522,7 +543,8 @@ procedure PutDCURecStr(D: TDCURec; hDef: integer; ShowNDX: boolean);
 implementation
 
 uses
-  SysUtils, DCUTbl, DCP, DasmX86, DasmMSIL, DasmCF{, Op}, InlineOp;
+  SysUtils, DCUTbl, DCP, DasmDefs, DasmX86, DasmMSIL{, Op}, InlineOp, DasmProc
+  {$IFDEF OpSem},DasmDF{$ENDIF};
 
 {procedure FreeDCURecTList(L: TList);
 var
@@ -667,9 +689,10 @@ const
   verStrDelphi: array[0..MaxDelphiVer]of String = (
     'Error','Error 1','2','3','4','5','6','7','8','2005','2006','?2007','2009',
     'Error 13','2010','XE','XE2','XE3','XE4','XE5','XE6','XE7','XE8','10 Seattle',
-    '10.1 Berlin','10.2 Tokyo','10.3 Rio');
-  platfStr: array[TDCUPlatform]of String = ('Win32','Win64','Osx32',
-    'iOSEmulator','iOSDevice','iOSDevice64','Android','Linux64');
+    '10.1 Berlin','10.2 Tokyo','10.3 Rio','10.4 Sydney','11 Alexandria','12 Athens');
+  platfStr: array[TDCUPlatform]of String = ('Win32','Win64','Osx32','Osx64','OsxArm64',
+    'iOSEmulator','iOSSimArm64','iOSDevice','iOSDevice64',
+    'Android','Android64','Linux64');
 begin
   if Ver<verK1 then begin
     Result := 'Delphi '+verStrDelphi[Ver];
@@ -920,18 +943,19 @@ begin
     case TagRq of
       drUnit1: begin Ch := 'U'; U^.Flags := [ufImpl]; end ;
       drDLL: begin Ch := 'D'; U^.Flags := [ufDLL]; end ;
+      drDLL1: begin Ch := 'E'; U^.Flags := [ufDLL1]; end ;
     end ;
     hUnit := FUnitImp.Count;
     FUnitImp.Add(U);
     hPack := 0;
-    if (TagRq<>drDLL)and(Ver>=verD8)and(Ver<verK1) then
+    if (TagRq<>drDLL)and(TagRq<>drDLL1)and(Ver>=verD8)and(Ver<verK1) then
       hPack := ReadUIndex;
     if (Ver>=verD2006)and(Ver<verK1) then
       L := ReadUIndex
     else
       L := ReadULong;
     //if (Ver>=verD7)and(Ver<verK1) then begin
-    if (Ver=verD7)and(Ver<verK1)or(Ver>=verD8)and(Ver<verK1)and(TagRq=drDLL) then begin
+    if (Ver=verD7)and(Ver<verK1)or(Ver>=verD8)and(Ver<verK1)and((TagRq=drDLL)or(TagRq=drDLL1)) then begin
       L1 := ReadULong;
     end ;
     if (Ver>=verD2009)and(Ver<verK1) then
@@ -949,7 +973,7 @@ begin
     while true do begin
       Tag := ReadTag;
       case Tag of
-        drImpType,drImpTypeDef: if TagRq<>drDLL then begin
+        drImpType,drImpTypeDef: if (TagRq<>drDLL)and(TagRq<>drDLL1) then begin
           Ch := 'T';
           ImpN := ReadName;
           if Tag=drImpTypeDef then begin
@@ -974,7 +998,7 @@ begin
           Ch := 'A';
           ImpN := ReadName;
           L := ReadULong;
-          if TagRq<>drDLL then
+          if (TagRq<>drDLL)and(TagRq<>drDLL1) then
             AR := TImpDef.Create('A',ImpN,L,Nil{DefStart},hUnit)
           else
             AR := TDLLImpRec.Create(ImpN,L,Nil,hUnit);
@@ -993,10 +1017,12 @@ begin
           Continue;
         end ;
         drConstAddInfo: begin
+          if not((Ver>=verD_11)and(ver<verK1){It may be used now with Tag:08 to store defines}) then begin
           if not IsMSIL then
             break;
           if hImp<>0 then
             DCUErrorFmt('ConstAddInfo encountered for %s in subrecord #%d',[UseName,hImp]);
+          end;
           ImpReBase := ReadConstAddInfo(Nil); //Just skip it by now
          (* This code is not required now after detecting hPack field
           if (ImpReBase<>ImpBase) then begin
@@ -1114,7 +1140,7 @@ begin
   SetListDefName(FTypes,hDef,hDecl,Name);
 end ;
 
-procedure TUnit.AddTypeDef(TD: TTypeDef);
+function TUnit.AddTypeDef(TD: TTypeDef): TNDX;
 var
   Def: TBaseDef;
 begin
@@ -1131,7 +1157,7 @@ begin
     Def.Free;
   end ;
   FTypes[FTypeDefCnt] := TD;
-  TD.FhDT := FTypeDefCnt;
+  Result := FTypeDefCnt;
   Inc(FTypeDefCnt);
 end ;
 
@@ -1148,8 +1174,8 @@ procedure TUnit.ClearLastTypeDef(TD: TTypeDef);
 begin
   if FLoaded or(FTypeDefCnt<=0) then
     Exit;
-  if FTypes[TD.FhDT{FTypeDefCnt-1}]=TD then
-    FTypes[TD.FhDT{FTypeDefCnt-1}] := Nil;
+  if FTypes[TD.hDT{FTypeDefCnt-1}]=TD then
+    FTypes[TD.hDT{FTypeDefCnt-1}] := Nil;
     //Dec(FTypeDefCnt);
 end ;
 
@@ -1185,7 +1211,7 @@ begin
     if Result>FAddrs.Count then
       DCUErrorFmt('ProcAddInfo Value $%x>FAddrs.Count=$%x',[Result,FAddrs.Count]);
     if FAddrs[Result-1]<>Nil then begin
-      NP := TDCURec(FAddrs[Result-1]).GetName;
+      NP := TDCURec(FAddrs[Result-1]).Name;
       if NP=Nil then
         NP := @sQ;
       DCUErrorFmt('FAddrs[$%x] already used by %s',[Result,NP^.GetStr]);
@@ -1435,7 +1461,7 @@ begin
       E := Extended(DP^);
       if TFloatDef(T).Kind=fkCurrency then
         E := E*0.0001;
-      PutS(FixFloatToStr(E)); //PutsFmt('%g',[E]); starting from D7 writes 3 digits after E
+      PutS(FixFloatToStr(E,TFloatDef(T).Kind=fkComp{NeedDot})); //PutsFmt('%g',[E]); starting from D7 writes 3 digits after E
       Result := SizeOf(Extended);
      end
     else
@@ -1890,9 +1916,10 @@ end ;
 
 procedure TUnit.LoadCodeLines;
 var
-  i,CurL,dL: integer;
+  i,CurL,dL,dOfs: integer;
   CR: PCodeLineRec;
-  CurOfs,dOfs: Cardinal;
+  CurOfs: Cardinal;
+  Err: Boolean;
 begin
   if FCodeLineTbl<>Nil then
     DCUError('2nd Code Lines table');
@@ -1900,14 +1927,39 @@ begin
   FCodeLineTbl := AllocMem(FCodeLineCnt*SizeOf(TCodeLineRec));
   CurL := 0;
   CurOfs := 0;
+  Err := false;
   CR := Pointer(FCodeLineTbl);
   for i:=0 to FCodeLineCnt-1 do begin
     dL := ReadIndex;
+    {It doesn't help
+    if SignedDOfs then begin
+      dOfs := ReadIndex;  //It is possible, that it always was signed,
+        //but only in a unit of D 12 win64 debug (Data.Bind.ObjectScope.dcu) it was observed 1st
+      if (dOfs<0)and(NDXHi=-1) then
+        NDXHi := 0;
+     end
+    else}
+    //The file lib\win64\debug\Data.Bind.ObjectScope.dcu of D_12 contains some
+    //strange records with (dL:32465; dOfs:0xFFFB).
+    //In fact the max line number in drLinNum is 22980 for this file, so this
+    //value of dL is very strange. After several records of this kind we got
+    //an error of offset outside CBlock.
+    //Because I was unable to find any other files with this kind of records,
+    //I believe by now that it is a bug of template processing in D_12 compiler
+    //and stopped trying to fix it somehow
     dOfs := ReadUIndex;
+    if Err then
+      continue;
     Inc(CurOfs,dOfs);
+    if dL=0 then
+      continue; //it is an aux record to keep dOfs<=0xFFFF
     Inc(CurL,dL);
-    if not FromPackage and((NDXHi<>0)or(CurOfs>FDataBlSize)) then
-      DCUErrorFmt('Code line offset $%x>Block size = S%x',[CurOfs,FDataBlSize]);
+    if not FromPackage and((NDXHi<>0)or(CurOfs>FDataBlSize)) then begin
+     //The only fix for the 0xFFFB bug is here: I have replaced Error buy Warning
+      DCUWarningFmt{DCUErrorFmt}('Code line offset[%d] $%x>Block size = S%x',[i,CurOfs,FDataBlSize]);
+      Err := true; //Should read the table up to the end
+      continue;
+    end;
     {in the file debug\MidasLib.dcu of D2009 (which was compiled from a lot of C
      and H files) the records 17291..82826 (exactly $10000 recs)
      contain dL=0, dOfs=$FFFF. The same file in D2010 doesn't contain such records.
@@ -1916,6 +1968,7 @@ begin
     CR^.L := CurL;
     Inc(CR);
   end ;
+  FCodeLineCnt := (TIncPtr(CR)-TIncPtr(FCodeLineTbl))div SizeOf(TCodeLineRec); //Some aux records could be skipped
 end ;
 
 function TUnit.GetSrcFile(N: integer): PSrcFileRec;
@@ -2183,6 +2236,9 @@ begin
       else
         Break;
   end ;
+  with FLineRangeTbl^[Result] do //It is possible only for error tables
+    if Num0+LineNum<=L then
+      Result := FLineRangeCnt;
 end ;
 
 procedure TUnit.GetLineRange(i: integer; var LR: TLineRangeRec);
@@ -2234,6 +2290,39 @@ begin
       Ndx := ReadUIndex;
   end ;
 end ;
+
+procedure TUnit.ReadInDcpWin64Info;
+//This kind of records was found in the .dcp files with Magic='PKX1' of Delphi 11
+//By now it will be ignored
+var
+  bFF: Byte;
+  F1: ulong;
+  F2: ulong;
+begin
+  bFF := ReadByte;
+  F1 := ReadULong;
+  F2 := ReadULong;
+end;
+
+procedure TUnit.ReadSomeNameInfo28;
+var
+  Kind,V1: Integer;
+  sName,sUnit: AnsiString;
+begin
+  Kind := ReadUIndex;
+  case Kind of
+   0: ;
+   1: V1 := ReadUIndex;
+   6: begin
+     sName := ReadNDXStrX;
+     sUnit := ReadNDXStrX;
+    end;
+   10: begin
+     sName := ReadNDXStrX;
+     V1 := ReadUIndex;
+    end;
+  end;
+end;
 
 function TUnit.ReadConstAddInfo(LastProcDecl: TNameDecl): integer;
 
@@ -2294,7 +2383,7 @@ function TUnit.ReadConstAddInfo(LastProcDecl: TNameDecl): integer;
 var
   Tag,caiStop: byte;
   Ok: Boolean;
-  hDef,hDef1,hDef2,hDef3,hDef4,hDef5,hDT,F,IP,i,j: integer;
+  hDef,hDef1,hDef2,hDef3,hDef4,hDef5,hDT,Kind,Index,F,IP,i,j: integer;
   V1,V2,V3,V4,V5,cafInline,cafBigVal: integer;
   Len,Len1,V,hUnit: Cardinal;
   hDef11,hDef12,hDef13,hDef14,hDef15: integer;
@@ -2316,7 +2405,7 @@ begin
     if Ver>=verD2005 then begin
       caiStop := $0F;
       if Ver>=verD2009 then
-        caiStop := $FF;//$15;
+        caiStop := $FF;
     end ;
   end ;
   repeat
@@ -2525,6 +2614,13 @@ begin
        hDef2 := ReadUindex;
        V := ReadUindex;
       end ;
+     $08: begin
+       if not((Ver>=verD_11)and(Ver<verK1)) then
+         break;
+       Result := ReadUindex;
+       Def := GetAddrDef(Result);
+       AddDefModifier(Def,TXMLDocDeclModifier.Create(ReadNDXStrRef));
+      end ;
      $09: begin
        Result := ReadUindex;
        hDT := ReadUindex;
@@ -2653,13 +2749,14 @@ begin
      $14: begin
        if (Ver<verD2009)or(Ver>=verK1) then
          break;
-       V1 := ReadUIndex;
+       V1 := ReadUIndex; //Addr index of the aux field
        V2 := ReadUIndex;
        Len := ReadUIndex;
        for i:=1 to Len do begin
-         V1 := ReadUIndex;
-         V2 := ReadUIndex;
-         V3 := ReadUIndex;
+         Kind := ReadUIndex; //0-record,1-array
+         hDT := ReadUIndex;
+         Index := ReadUIndex;
+         if Kind=0 then
          S := ReadNDXStr;
        end ;
       end ;
@@ -2669,6 +2766,19 @@ begin
        V := ReadUIndex;
        V1 := ReadUIndex;
        V2 := ReadUIndex;
+      end ;
+     $16: begin
+       if not((Ver>=verD_11)and(Ver<verK1)) then
+         break;
+       Result := ReadUIndex;
+       S := ReadNDXStr;
+      end ;
+     $17: begin
+       if not((Ver>=verD_12)and(Ver<verK1)) then
+         break;
+       Result := ReadUIndex;
+       for i:=0 to 1 do //In fact one of the kinds is always 0
+         ReadSomeNameInfo28;
       end ;
     else
       break;
@@ -2821,8 +2931,7 @@ begin
     EmbeddedTypes[hDT-1] := Nil;
     PD := TProcDecl(EmbL[TI^.Depth-1]);
     TD := TI^.TD;
-    TD.Next := PD.Locals;
-    PD.Locals := TD;
+    PD.AddLocal(TD);
     FreeMem(TI);
     TD.EnumUsedTypes(BindEmbeddedType,IP);
   end ;
@@ -2863,8 +2972,7 @@ begin
       TI := PEmbeddedTypeInf(FEmbeddedTypes[i]);
       if TI=Nil then
         Continue;
-      TI^.TD.Next := FDecls;
-      FDecls := TI^.TD;
+      TI^.TD.ListAppend(FDecls);
       FreeMem(TI);
     end ;
   end ;
@@ -2991,8 +3099,9 @@ begin
        drThreadVar: Decl := TThreadVarDecl.Create;
        drExport: Decl := TExportDecl.Create;
        drVarC: Decl := TVarCDecl.Create(false{LK=dlMain});
-       arVal, arVar, arResult, arFld:
+       arVar, arResult, arFld:
          Decl := TLocalDecl.Create(LK);
+       arVal: Decl := TLocalValDecl.Create(LK);
        arAbsLocVar: case LK of
          dlMain,dlMainImpl: Decl := TAbsVarDecl.Create;
        else
@@ -3106,14 +3215,14 @@ begin
          SetProcAddInfo(V{,LastProcDecl});
         end ;
        drNextOverload: begin
-         if not(Ver>=verD_XE7)and(Ver<verK1) then
+         if not((Ver>=verD_XE7)and(Ver<verK1)) then
            break;
          V := ReadUIndex; //Was observed after overloaded proc header before args
          //contains index of the next overload of the procedure, 0 => the last overload
          RefAddrDef(V);
         end ;
        drDependencyInfo: begin
-         if not(Ver>=verD_10)and(Ver<verK1) then
+         if not((Ver>=verD_10)and(Ver<verK1)) then
            break;
          ReadDependencyInfo;
         end ;
@@ -3259,10 +3368,8 @@ begin
         DeclEnd^ := Decl;
         DeclEnd := @Decl.Next;
        end
-      else if Rec<>Nil then begin
-        Rec.Next := FOtherRecords;
-        FOtherRecords := Rec;
-      end ;
+      else if Rec<>Nil then
+        Rec.ListAppend(FOtherRecords);
     end ;
     Tag := ReadTag;
   end ;
@@ -3288,11 +3395,6 @@ var
 function TUnit.ShowDeclList(LK: TDeclListKind; MainRec: TDCURec;
   Decl: TDCURec{TNameDecl}; Ofs: Cardinal; dScopeOfs: integer; SepF: TDeclSepFlags;
   ValidKinds: TDeclSecKinds; skDefault: TDeclSecKind): TDeclSecKind;
-const
-  SecNames: array[TDeclSecKind] of AnsiString = (
-    '','label','const','type','var',
-    'threadvar','resourcestring','exports','',
-    'private','protected','public','published');
 var
   DeclCnt: integer;
   SepCh: AnsiChar;
@@ -3347,7 +3449,7 @@ begin
         if (SK<>Result) then begin
           Result := SK;
           Writer.NLOfs := Ofs;
-          SecN := SecNames[SK];
+          SecN := DeclSecNames[SK];
           if SecN<>'' then begin
             NL;
             if not(SK in ValidKinds) then begin
@@ -3427,7 +3529,34 @@ begin
   end ;
 end ;
 
-procedure ShowDeclTList(Title: AnsiString; L: TList);
+procedure TUnit.VisitDeclList(Visitor: TDCURecVisitor; LK: TDeclListKind; MainRec: TDCURec;
+  Decl: TDCURec{TNameDecl});
+var
+  Visible: boolean;
+  MainRec0: TDCURec;
+  CurDeclList0: TDCURec{TNameDecl};
+var {for dsSmallSameNL:}
+  NP,PrevNP: PName;
+  TD: TTypeDef;
+begin
+  MainRec0 := CurMainRec;
+  CurMainRec := MainRec;
+  CurDeclList0 := CurDeclList;
+  CurDeclList := Decl;
+  try
+    while Decl<>Nil do begin
+      Visible := Decl.IsVisible(LK);
+      if Visible then
+        Visitor.doVisit(Decl);
+      Decl := Decl.Next {as TNameDecl};
+    end ;
+  finally
+    CurDeclList := CurDeclList0;
+    CurMainRec := MainRec0;
+  end ;
+end ;
+
+procedure ShowDeclTList(const Title: AnsiString; L: TList);
 var
   i: integer;
   D: TDCURec;
@@ -3593,7 +3722,7 @@ begin
   end ;
 end ;
 
-procedure TUnit.DasmCodeBlSeq(Ofs0,BlOfs,BlSz,SzMax: Cardinal;
+procedure TUnit.DasmCodeBlSeq(Ofs0,BlOfs,BlSz,SzMax: Cardinal; Seq: TCmdSeq;
   WasPartMsg: Boolean; Proc: TProcDecl);
 var
   CmdOfs,OfsInProc,CmdSz: Cardinal;
@@ -3603,6 +3732,7 @@ var
   LR: TLineRangeRec;
   Ok: boolean;
   S: String;
+  C: TCmd;
   {FOfs0: PChar;}
 begin
   DP := GetBlockMem(BlOfs,BlSz,BlSz);
@@ -3681,7 +3811,10 @@ begin
       PutCh('?');
      end
     else begin
-      Disassembler.ShowCommand;
+      C := Nil;
+      if Seq<>Nil then
+        C := Seq.GetCmdByOfs(OfsInProc);
+      Disassembler.ShowCommand(C);
     end ;
     Dec(BlSz,CmdSz);
     if BlSz<=0 then
@@ -3695,8 +3828,8 @@ end ;
 
 type
   TDasmCodeBlState = record
-    Proc: TProc;
-    BaseOfs,BlOfs,CmdOfs,CmdEnd: Cardinal;
+    Proc: DasmProc.TProc;
+    BaseOfs,CmdOfs,CmdEnd: Cardinal;
     Seq: TCmdSeq;
   end ;
 
@@ -3708,7 +3841,7 @@ var
 begin
   with TDasmCodeBlState(IP^) do begin
     if (RefP>CmdOfs)and(RefP<CmdEnd) then
-      CmdEnd := RefP;
+      CmdEnd := RefP; //Limit the current part by the jump address
     RefSeq := Proc.AddSeq(RefP-BaseOfs);
     if RefSeq=Nil then
       Exit;
@@ -3847,17 +3980,22 @@ begin
   DP := GetBlockMem(BlOfs,BlSz,BlSz);
   if DP=Nil then
     Exit;
-  St.BlOfs := BlOfs;
+ {$IFDEF OpSem}
+  if TraceDataFlow and Assigned(Disassembler.GetCommandOperations) then
+    DefaultCmdSeqClass := TDataFlowCmdSeq
+  else
+    DefaultCmdSeqClass := TCmdSeq;
+ {$ENDIF}
   St.BaseOfs := BlOfs-Ofs0;
-  St.Proc := TProc.Create(Ofs0,BlSz);
+  St.Proc := DasmProc.TProc.Create(Proc,Ofs0,BlSz);
   try
    //If the line numbers info is present, include every line
    //start as a separate code sequence start (anyway, our decompiler
    //shouldn't be too smart to try to merge the commands from several lines
    //into a single operator):
-    hCL0 := GetStartCodeLine(St.BlOfs);
+    hCL0 := GetStartCodeLine(BlOfs);
     hCL := hCL0;
-    St.CmdOfs := St.BlOfs+BlSz; //The end offset of the procedure code in drCBlock
+    St.CmdOfs := BlOfs+BlSz; //The end offset of the procedure code in drCBlock
     repeat
       GetCodeLineRec(hCL,CL);
       if CL.Ofs>=St.CmdOfs then
@@ -3867,6 +4005,7 @@ begin
     until false;
     hPData := Proc.GetWin64UnwindInfoAddr;
     if (hPData>=0)and Win64Unwind.InitPData(hPData)and Win64Unwind.FirstPDataRec(PDataIter) then begin
+     //Add Win64UnwindInfo code parts
       iUnwind := -1;
       repeat
         St.Proc.AddSeq(PDataIter.DR^.Ofs0{-St.BaseOfs}); //The block is marked as code in PData
@@ -3906,7 +4045,7 @@ begin
         end ;
       until not Win64Unwind.NextPDataRec(PDataIter);
     end ;
-    repeat
+    repeat //The code tracing
       hCurSeq := St.Proc.GetNotReadySeqNum;
       St.Seq := TCmdSeq(St.Proc.GetProcMemPart(hCurSeq));
       if St.Seq=Nil then
@@ -3915,7 +4054,7 @@ begin
       St.CmdOfs := St.Seq.Start+St.BaseOfs;
       Fix0 := GetStartFixup(St.CmdOfs);
       St.CmdEnd := St.CmdOfs+MaxSeqSz;
-      SetCodeRange(FDataBlPtr,TIncPtr(DP){-St.Ofs0}+St.CmdOfs-St.BlOfs,St.CmdEnd);
+      SetCodeRange(FDataBlPtr,TIncPtr(DP){-St.Ofs0}+St.CmdOfs-BlOfs,St.CmdEnd);
       repeat
         if St.CmdOfs>=St.CmdEnd then begin
           St.Proc.ReachedNextS(St.Seq);
@@ -3946,9 +4085,13 @@ begin
         Fix0 := GetNextFixup(Fix0,St.CmdOfs);
       until false;
     until false;
-    St.Proc.CheckStructure;
-    St.CmdOfs := St.BlOfs;
-    St.CmdEnd := St.BlOfs;
+    St.Proc.CheckStructure; //Detect the parts hierarchy
+   {$IFDEF OpSem}
+    St.Proc.TraceData;
+   {$ENDIF}
+    //Print results
+    St.CmdOfs := BlOfs;
+    St.CmdEnd := BlOfs;
     hPart := 0;
     L0 := 0;
     for i:=0 to St.Proc.Count-1 do begin
@@ -3997,7 +4140,9 @@ begin
         ShiftNLOfs(2);
         Inc(hPart); //Now we have to numerate the code parts, because of the other kinds of memory parts
         L0 := St.Seq.Level;
-        DasmCodeBlSeq(St.Seq.Start,St.CmdOfs,St.Seq.Size,BlSz+Ofs0,true{WasPartMsg},Proc);
+        P.ShowBefore;
+        DasmCodeBlSeq(St.Seq.Start,St.CmdOfs,St.Seq.Size,BlSz+Ofs0,St.Seq,true{WasPartMsg},Proc);
+        P.ShowAfter;
        end
       else if P is TProcMemData then begin
         NL;
@@ -4006,7 +4151,7 @@ begin
       St.CmdEnd := St.CmdOfs+P.Size;
     end ;
     ShiftNLOfs(-2*L0);
-    St.CmdOfs := St.BlOfs+BlSz;
+    St.CmdOfs := BlOfs+BlSz;
     ShowNotParsedDump;
   finally
     St.Proc.Free;
@@ -4124,7 +4269,7 @@ begin
   else
     Set80x86Disassembler{$IFDEF I64}(FPlatform=dcuplWin64{I64}){$ENDIF};
   case DasmMode of
-   dasmSeq: DasmCodeBlSeq(Ofs0,BlOfs,CodeSz,0,false{WasPartMsg},Proc);
+   dasmSeq: DasmCodeBlSeq(Ofs0,BlOfs,CodeSz,0,Nil{Seq},false{WasPartMsg},Proc);
    dasmCtlFlow,dasmDataFlow: DasmCodeBlCtlFlow(Ofs0,BlOfs,CodeSz,
      DasmMode=dasmDataFlow,Proc);
   end ;
@@ -4266,7 +4411,7 @@ begin
   inherited Create;
 end;
 
-function TUnit.ReadMagic(Magic: ulong): Boolean;
+function TUnit.DecodeMagic(Magic: ulong): Boolean;
 var
   BVer,PlMagic: ulong;
 begin
@@ -4310,7 +4455,7 @@ begin
      //which we describe here:
       BVer := Magic shr 24;
       PlMagic := Magic and $FF;
-      if (BVer<=$21{10_3Rio})and(BVer>=$1B{XE6})and(PlMagic=$4D)or
+      if (BVer<=$24{12Athens})and(BVer>=$1B{XE6})and(PlMagic=$4D)or
          (BVer<=$1A{XE5})and(BVer>=$17{XE2})and(PlMagic=$4B)
       then begin
         PlMagic := (Magic shr 8)and $FF;
@@ -4323,10 +4468,25 @@ begin
         $04: begin
           FPlatform := dcuplOsx32;
          end;
+        $24: begin
+          if (FVer<verD_10_4) then
+            Exit{OSX 64 support was added in 10.4 Sydney};
+          FPlatform := dcuplOsx64;
+         end;
+        $84: begin
+          if (FVer<verD_12) then
+            Exit{OSX Arm 64 support was added in 12 Athens};
+          FPlatform := dcuplOsxArm64;
+         end;
         $14: begin
           if (FVer<verD_XE4) then
             Exit{iOS support was added in XE4};
           FPlatform := dcuplIOSEmulator;
+         end;
+        $88: begin
+          if (FVer<verD_12) then
+            Exit{iOS Arm 64 Simulator support was added in 12 Athens};
+          FPlatform := dcuplIOSSimArm64;
          end;
         $76: begin
           if (FVer<verD_XE4) then
@@ -4335,17 +4495,38 @@ begin
           //The drCBlock section is missing here, all the memory is in the corresponding
           //*.o file. Or inline info decoding is required
          end;
-        $94: begin
-          if (FVer<verD_XE8) then
-            Exit{iOS64 support was added in XE8};
+        $86: begin
+          if (FVer<verD_11) then
+            Exit{iOS64 code was changed in Delphi 11};
           FPlatform := dcuplIOSDevice64;
           //The drCBlock section is missing here, all the memory is in the corresponding
           //*.o file. Or inline info decoding is required
          end;
-        $77: begin
-          if (FVer<verD_XE5) then
-            Exit{Android support was added in XE4};
+        $94: begin
+          if (FVer<verD_XE8)or(Ver>=verD_11) then
+            Exit{iOS64 support was added in XE8 and the code was changed in Delphi 11};
+          FPlatform := dcuplIOSDevice64;
+          //The drCBlock section is missing here, all the memory is in the corresponding
+          //*.o file. Or inline info decoding is required
+         end;
+        $67: begin
+          if (FVer<verD_10_4) then
+            Exit{Android code was changed in Delphi 10.4};
           FPlatform := dcuplAndroid;
+          //The drCBlock section is missing here, all the memory is in the corresponding
+          //*.o file. Or inline info decoding is required
+         end;
+        $77: begin
+          if (FVer<verD_XE5)or(Ver>=verD_10_4) then
+            Exit{Android support was added in XE4 and the code was changed in Delphi 10.4};
+          FPlatform := dcuplAndroid;
+          //The drCBlock section is missing here, all the memory is in the corresponding
+          //*.o file. Or inline info decoding is required
+         end;
+        $87: begin
+          if (FVer<verD_10_4) then
+            Exit{Android 64 support was added in 10.4 Sydney};
+          FPlatform := dcuplAndroid64;
           //The drCBlock section is missing here, all the memory is in the corresponding
           //*.o file. Or inline info decoding is required
          end;
@@ -4489,6 +4670,12 @@ begin
         FUnitPrior := ReadUIndex;
       Tag := ReadTag;
     end ;
+    if Tag=drInDcpWin64Info then begin
+      if (Ver>=verD_11)and(Ver<verK1)and FromPackage then begin
+        ReadInDcpWin64Info;
+        Tag := ReadTag;
+      end;
+    end ;
   end ;
 end;
 
@@ -4533,7 +4720,7 @@ begin
   ChangeScanState(CP0,FMemPtr,FMemSize);
   try
     Magic := ReadULong;
-    if not ReadMagic(Magic) then
+    if not DecodeMagic(Magic) then
       DCUErrorFmt('Wrong magic: $%x',[Magic]);
     if (VerRq>0)and((FVer<>VerRq)or(MSILRq<>FIsMSIL)or(PlatformRq<>FPlatform)) then
       Exit;
@@ -4557,6 +4744,8 @@ begin
     NLOfs := 0;
     NL;}
     ReadUses(drDLL);
+    if (Ver>=verD_12)and(Platform in [dcuplIOSSimArm64,dcuplIOSDevice64]) then
+      ReadUses(drDLL1);
     try
       ReadDeclList(dlMain,Nil{Owner},FDecls);
       if not(Platform in LLVMPlatforms)and((FDataBlPtr=Nil)or(FFixupTbl=Nil)) then
@@ -4847,5 +5036,35 @@ begin
     DoShowLocVarTbl;
   FlushOut;
 end ;
+
+procedure TUnit.VisitDecls(Visitor: TDCURecVisitor; InterfaceOnly: Boolean);
+var
+  Decl: TDCURec;
+begin
+  if Self=Nil then
+    Exit;
+  CurUnit := Self;
+  Decl := DeclList;
+  while Decl<>Nil do begin
+    if not InterfaceOnly or Decl.IsVisible(dlMain) then
+      Visitor.doVisit(Decl);
+    Decl := Decl.Next;
+  end ;
+end;
+
+procedure TUnit.VisitTypes(Visitor: TDCURecVisitor);
+var
+  i: Integer;
+  D: TBaseDef;
+begin
+  if Self=Nil then
+    Exit;
+  CurUnit := Self;
+  for i := 0 to FTypes.Count-1 do begin
+    D := FTypes[i];
+    if D<>Nil{Paranoic} then
+      Visitor.doVisit(D);
+  end ;
+end;
 
 end.

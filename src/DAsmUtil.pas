@@ -26,7 +26,8 @@ freely, subject to the following restrictions:
 interface
 
 uses
-  DasmDefs,FixUp,{$IFNDEF XMLx86}DasmOpT{$ELSE}x86Reg,x86Dasm{$ENDIF};
+  DasmDefs,FixUp,{$IFNDEF XMLx86}DasmOpT{$ELSE}x86Reg,x86Dasm,x86Defs{$ENDIF},
+  DasmCF{$IFDEF OpSem},SemExpr{$ENDIF};
 
   function Identic(I: integer): integer;
   function ReadByte(var B: integer): boolean;
@@ -167,6 +168,10 @@ const
   DefRegSeg: array[0..7] of Byte = (
     hDS, hDS, hDS, hDS, hSS, hSS, hDS, hDS);
 
+const
+  MaxCmdArg = 3;
+  MaxCmdArgEx = 8; //including NoDispl args, e.g. POPAD has 8 arguments
+
 type
  // TRegNum=0..7;
   TRegCode=Byte;
@@ -200,7 +205,7 @@ type
     hCmd: TCmdIndex;
     EA:TEffAddr;
     Cnt:Byte;
-    Arg:array[1..3] of TCmArg;
+    Arg:array[1..MaxCmdArg] of TCmArg;
   end ;
 
 var
@@ -238,7 +243,7 @@ const
 
 function ReadCommand: boolean;
 
-procedure ShowCommand;
+procedure ShowCommand(CmdInfo: TCmd);
 
 {$IFNDEF XMLx86}
 var
@@ -248,10 +253,12 @@ var
   RegTbl:array[0..2] of PBMTblProc;
  {$ENDIF}
   SegRegTbl: PBMTblProc;
-{$ELSE}
+{$ELSE XMLx86}
 const
   RegTbl:array[Boolean{with REX}]of array[0..3] of TRegTblIndex = ((rtRB,rtRW,rtRD,rtRQ),(rtRB64,rtRW,rtRD,rtRQ));
-{$ENDIF}
+
+procedure WriteMnem(Mnem: TOpcodeMnem);
+{$ENDIF XMLx86}
 
 function GetIntData(hDSize,Ofs:Byte;var I: LongInt): boolean;
 
@@ -259,7 +266,7 @@ implementation
 
 uses
   {$IFDEF UNICODE}AnsiStrings{$ELSE}SysUtils{$ENDIF},
-  {$IFNDEF XMLx86}op{$ELSE}x86Defs,x86Op,TypInfo{$ENDIF}, {DCU_In,} DCU_Out;
+  {$IFNDEF XMLx86}op{$ELSE}x86Op,TypInfo{$ENDIF}, {DCU_In,} DCU_Out;
 
 var
   AdrIs32: boolean;
@@ -818,6 +825,7 @@ begin
 end ;
 
 procedure WriteRegVarInfo(hReg: TRegIndex; Ofs,Size: integer; IsFirst: boolean);
+//Show debug information about the register
 var
   S: AnsiString;
   hDecl: integer;
@@ -826,9 +834,9 @@ begin
   if not Assigned(GetRegVarInfo) then
     Exit;
   if IsFirst then {i.e. It may be an assignment target}
-    ProcOfs := CodePtr-CodeBase
+    ProcOfs := CodePtr-CodeBase //The debug info may be valid only after assignment
   else
-    ProcOfs := PrevCodePtr-CodeBase;
+    ProcOfs := PrevCodePtr-CodeBase; //The debug info should be already valid
   S := GetRegVarInfo(ProcOfs,hReg,Ofs,Size,hDecl);
   if S<>'' then begin
     PutCh('{');
@@ -1084,6 +1092,7 @@ begin
     D := 0;
   if AsExpr then
     WriteRegVarInfo(hLastReg,D{Ofs},dsToSize[DSF]{Size},false{IsFirst});
+      //Try to show debug information for the register, that may contain variable address
   PutS(']');
 end ;
 
@@ -1106,7 +1115,7 @@ end ;
 {$IFDEF XMLx86}
 procedure WriteMnem(Mnem: TOpcodeMnem);
 var
-  S: String;
+  S: AnsiString;
 begin
   S := GetEnumName(TypeInfo(TOpcodeMnem),Ord(Mnem));
   System.Delete(S,1,3);
@@ -1158,7 +1167,7 @@ begin
 //  PutKW(GetOpName(hN));
 end ;
 
-function ProcFlagsToStr(Flags: TProcessorFlags): String;
+function ProcFlagsToStr(Flags: TProcessorFlags): AnsiString;
 var
   F: TProcessorFlag0;
 begin
@@ -1213,7 +1222,7 @@ var
 
   procedure ShowGrInfo(EnumTI: PTypeInfo; V: Integer);
   var
-    S: String;
+    S: AnsiString;
   begin
     if V=0{g?_none} then
       Exit;
@@ -1223,7 +1232,7 @@ var
     PutS(S);
   end ;
 
-  procedure ShowProcFlags(const Prefix: String; Flags: TProcessorFlags);
+  procedure ShowProcFlags(const Prefix: AnsiString; Flags: TProcessorFlags);
   begin
     if Flags=[] then
       Exit;
@@ -1232,7 +1241,7 @@ var
     PutS(ProcFlagsToStr(Flags));
   end ;
 
-  procedure ShowCoProcFlags(const Prefix: String; Flags: TCoprocessorFlags);
+  procedure ShowCoProcFlags(const Prefix: AnsiString; Flags: TCoprocessorFlags);
   var
     i: Integer;
   begin
@@ -1242,7 +1251,7 @@ var
     PutS(Prefix);
     for i:=0 to 3 do
      if (1 shl i)and Flags<>0 then
-       PutCh(AnsiChar(Chr(Ord('1')+i)));
+       PutCh(AnsiChar(Ord('1')+i));
   end ;
 
 
@@ -1266,7 +1275,7 @@ end ;
 
 procedure ShowArgExtraInfo(const Arg: TOpcodeArg);
 const
-  ArgFlagName: array[TArgFlagBit]of String = ('<-','~','*');
+  ArgFlagName: array[TArgFlagBit]of AnsiString = ('<-','~','*');
 var
   Flags: TArgFlags;
   F: TArgFlagBit;
@@ -1292,16 +1301,254 @@ begin
     end ;
   ExtraInfo.Close;
 end ;
-{$ENDIF}
 
-procedure ShowCommand;
+{$IFDEF OpSem}
+(*
+function GetImmedExpr0(hDSize,Ofs:Byte; MayBeAddr: boolean; Fix: PFixupRec): TSemExpr;
+var
+  DP,DP1: Pointer;
+  DS: Byte;
+  {IsAddr: boolean;
+  A: Pointer;}
+  Fixed: boolean;
+begin
+  Result := 0;
+  DP := PrevCodePtr+Ofs;
+  DS := hDSize and dsMask;
+  Case DS of
+   dsByte: Result := Byte(DP^);
+   dsWord: Result := Word(DP^);
+   dsDbl: Result := LongInt(DP^);
+  End ;
+  Fixed := ReportFixUp(Fix,Result,ShowHeuristicRefs);
+  if Fixed then begin
+    if (DS=dsDbl){and(Result=0)} then
+      Exit;
+    PutS('{+');
+  end ;
+  Case DS of
+   dsByte: PutSFmt('$%2.2x',[Result]);
+   dsWord: PutSFmt('$%4.4x',[Result]);
+   dsDbl: PutSFmt('$%8.8x',[Result]);
+   dsPtr: begin
+       Result := LongInt(DP^);
+       PutSFmt('$%8.8x',[Result])
+     end ;
+   dsPtr6b: begin
+       DP1 := DP;
+       Inc(TIncPtr(DP1),4);
+       PutSFmt('$%4.4x:$%8.8x',[Word(DP1^),LongInt(DP^)]);
+     end ;
+   {dsPtr:
+     if not OpIs32 then begin
+       Result := LongInt(DP^);
+       PutSFmt('$%8.8x',[Result])
+      end
+     else begin
+       DP1 := DP;
+       Inc(integer(DP1),4);
+       PutSFmt('$%4.4x:$%8.8x',[Word(DP1^),LongInt(DP^)]);
+     end ;}
+   dsQWord: PutS(CharDumpStr(DP^,8));
+   dsTWord: PutS(CharDumpStr(DP^,10));
+  else
+    PutS('?Immed');
+  End ;
+  if Fixed then
+    PutS('}');
+//  if IsAddr then
+//    EndStrInfo;
+//end ;
+end ;
+
+function GetIntDataExpr(SignRq,FixSignRq,IsJmpOfs: boolean;hDSize,Ofs:Byte; Fix: PFixupRec): TSemExpr;
+var
+  DP: Pointer;
+  DS: Byte;
+  Fixed: boolean;
+begin
+  DP := PrevCodePtr+Ofs;
+  DS := hDSize and dsMask;
+  Case DS of
+   dsByte: Result := ShortInt(DP^);
+   dsWord: Result := SmallInt(DP^);
+   dsDbl: begin
+     Result := LongInt(DP^);
+     if IsJmpOfs then //The referenced address is computed from the command end (CodePtr)
+       Inc(Result,(CodePtr-TIncPtr(DP))-SizeOf(LongInt)); //required for IP-relative addressing in 64-bit mode
+    end ;
+  else
+    PutS('?Int');
+    Result := 0;
+    Exit;
+  End ;
+  if SignRq and ((Result>0)or FixSignRq and FixupOk(Fix)) then
+    PutS('+');
+//  if (ReportFixUp(Cardinal(DP)-Cardinal(CodeStart),hDSize and dsMask,DP)=0{<>0})
+//  then
+  Fixed := ReportFixUp(Fix,Result,ShowHeuristicRefs);
+  if Fixed then begin
+    if (DS=dsDbl){and(Result=0)} then
+      Exit;
+  end ;
+  if SignRq and(Result=0) then
+    Exit;
+  if Fixed then
+    PutS('{+');
+  WriteInt(Result);
+  if Fixed then
+    PutS('}');
+end ;
+
+procedure WriteJmpOfs(hDSize,Ofs:Byte; Fix: PFixupRec);
+var
+  DOfs: LongInt;
+begin
+  DOfs := WriteIntData(true,false,true{IsJmpOfs},hDSize,Ofs,Fix);
+  if Fix=Nil then begin
+    PutS(' (');
+    PutMemRefStr(Format('0x%x',[(CodePtr-CodeBase)+DOfs]),CodePtr-CodeMemBase+DOfs);
+    PutS(')');
+  end ;
+end ;
+
+function GetImmedExpr(IsInt,SignRq: boolean;DSF,hDSize,SegN,Ofs:Byte;
+  Fix: PFixupRec): TSemExpr;
+begin
+  if (not IsInt){or(RepRes>0)} then begin
+    if SignRq then
+      PutS('+');
+    Result := GetImmedExpr0(hDSize,Ofs,{RepRes>0}false{MayBeAddr},Fix);
+   end
+  else
+    Result := GetIntDataExpr(SignRq,true,false{IsJmpOfs},hDSize,Ofs,Fix);
+end ;
+
+procedure WriteEA;
+var
+  SegN,DSF: Byte;
+  Cnt,Sz:integer;
+  hLastReg: TRegIndex;
+
+  procedure Plus;
+  begin
+    if Cnt>0 then
+      PutS('+');
+    Inc(Cnt);
+  end ;
+
+  procedure WriteReg(hReg,SS:Byte; ShowVar: boolean);
+  const
+    ScaleStr: array[0..3] of String[3] = ('','2*','4*','8*');
+  var
+    iReg: TRegIndex;
+  begin
+    if hReg and hPresent=0 then
+      Exit;
+   {$IFNDEF XMLx86}
+    iReg := RegTbl{$IFDEF I64}[hReg and hRegHasRex<>0]{$ENDIF}
+        [(hReg shr hRegSizeShift)and hRegSizeMask]^[hReg and $F];
+   {$ELSE}
+    iReg := EncodeRegIndex(RegTbl[hReg and hRegHasRex<>0][(hReg shr hRegSizeShift)and hRegSizeMask],hReg and $F);
+   {$ENDIF}
+    if SS=0 then
+      hLastReg := iReg;
+    Plus;
+    if (SS>0)and(SS<=3) then
+      PutS(ScaleStr[SS]);
+    if ShowVar and(SS=0) then
+      WriteRegNameInf(iReg,false{IsFirst})
+    else
+      WriteRegName(iReg);
+  end ;
+
+var
+  hR1,hR2: byte;
+  Fixed,AsExpr: boolean;
+  D: LongInt;
+begin
+  DSF := Cmd.EA.DataSize;
+  Case DSF of
+    0:;
+    dsByte: PutS('BYTE');
+    dsWord: PutS('WORD');
+    dsDbl:  PutS('DWORD');
+    dsPtr:  PutS('DWORD');
+    dsPtr6b:PutS('FWORD');
+    dsQWord:PutS('QWORD');
+    dsTWord:PutS('TBYTE');
+  else
+    PutS('?');
+  End ;
+  if DSF<>0 then
+    PutS(' PTR ')
+  {else
+    PutS(' ')};
+  SegN := Cmd.EA.hSeg;
+  if SegN<hDefSeg then begin
+   {$IFNDEF XMLx86}
+    WriteRegName(SegRegTbl^[segN]);
+   {$ELSE}
+    WriteRegName(nbSeg+segN);
+{$ENDIF}
+    PutS(':');
+  end ;
+  Cnt := 0;
+  PutS('[');
+  Fixed := FixupOk(Cmd.EA.Fix);
+  hR1 := Cmd.EA.hBaseOnly;
+  hR2 := Cmd.EA.hIndex;
+  AsExpr := (not Fixed)and((hR1 and hPresent<>0)<>(hR2 and hPresent<>0)
+    and(Cmd.EA.SS=0));
+  WriteReg(hR1,0,not AsExpr);
+  WriteReg(hR2,Cmd.EA.SS,not AsExpr);
+  if Cmd.EA.dOfs<>0 then begin
+    Sz := Cmd.EA.dOfs shr dOfsSizeShift;
+    if Sz>=dsIPOfs then begin
+      PutS('.');
+      WriteJmpOfs(dsDbl,Cmd.EA.dOfs and dOfsOfsMask,Cmd.EA.Fix);
+      D := 0;//!!!Temp
+     end
+    else
+      D := ReportImmed(Cnt>0{IsInt},Cnt>0{SignRq},DSF,Sz{hDSize},
+        SegN and $7,Cmd.EA.dOfs and dOfsOfsMask{Ofs},Cmd.EA.Fix)
+   end
+  else
+    D := 0;
+  if AsExpr then
+    WriteRegVarInfo(hLastReg,D{Ofs},dsToSize[DSF]{Size},false{IsFirst});
+  PutS(']');
+end ;
+
+function GetCmdArgExpr(const A: TCmArg; AP: POpcodeArgs): TSemExpr;
+begin
+  Case A.CmdKind {and caMask} of
+    caReg: WriteRegNameInf(A.Inf,IsDest);
+    caEffAdr:WriteEA;
+    caVal: PutSFmt('$%x',[A.Inf]);
+    caImmed: Result := GetImmedExpr(false,false,0,A.DSize{A.Kind shr 4},hCS,A.Inf,A.Fix);
+           {WriteImmed(A.Kind shr 4,A.Inf,false);}
+    caJmpOfs: WriteJmpOfs(A.DSize{A.Kind shr 4},A.Inf,A.Fix);
+    caInt: Result := GetImmedExpr(true,false,0,A.DSize{A.Kind shr 4},hCS,A.Inf,A.Fix);
+           {WriteIntData(false,falseA.Kind shr 4,A.Inf);}
+  else
+    PutS('?');
+  End ;
+end;
+*)
+{$ENDIF OpSem}
+
+{$ENDIF XMLx86}
+
+procedure ShowCommand(CmdInfo: TCmd);
 var
   i: integer;
-  OpName: String[10];
   SeprChar: AnsiChar;
  {$IFDEF XMLx86}
   Entry: POpcodeEntry;
   Args: POpcodeArgs;
+ {$ELSE}
+  OpName: String[10];
  {$ENDIF}
 begin
  {$IFNDEF XMLx86}
@@ -1328,15 +1575,17 @@ begin
     WriteBMOpName(CmdSuffix);
     PutS(' ');
   end ;
- {$ELSE}
+ {$ELSE XMLx86}
   SeprChar := ',';
   if Cmd.PrefSize>0 then
     ShowCmdPrefixes(PrevCodePtr,Cmd.hCmd.FPrefix);
   Args := WriteCmdName(Cmd,Entry);
   if ShowX86DasmExtraInfo then
     ShowCmdExtraInfo(Entry);
+  {if CmdInfo<>Nil then
+    CmdInfo.Show;}
   PutSpace;
- {$ENDIF}
+ {$ENDIF XMLx86}
   for i:=1 to Cmd.Cnt do begin
     if i>1 then begin
       PutS(SeprChar);
@@ -1348,6 +1597,12 @@ begin
       ShowArgExtraInfo(Args^[Cmd.Arg[i].nArg]);
    {$ENDIF}
   end ;
+ {$IFDEF XMLx86}
+  if (CmdInfo<>Nil)and(CmdInfo.HasExtraInfo) then begin
+    PutS(' | ');
+    CmdInfo.Show;
+  end ;
+ {$ENDIF XMLx86}
 end ;
 
 function GetIntData(hDSize,Ofs:Byte;var I: LongInt): boolean;

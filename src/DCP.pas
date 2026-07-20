@@ -36,6 +36,9 @@ PDCPHdr = ^TDCPHdr;
 TDCPHdr = record
 { %$IF MSIL;
   ulong X0 //DCPIL files contain additional DWORD
+ %$END
+ %$IF Ver>=11;
+  ulong DCUMagic
  %$END }
   nRequires,nContains: LongInt;
   SzContains: Cardinal;
@@ -77,6 +80,7 @@ TDCPackage = class(TStringList)
   FMemSize,FSizeR: Cardinal;
   FOk: boolean;
   FLoaded: TDCPLoadState;
+  procedure DCPErr(const Msg: String);
   procedure AllLoadedRequired;
   function GetFileData(i: Integer): PDCPUnitHdr;
   function CheckDCPOfs(Ofs: Cardinal; const Msg: String): Pointer;
@@ -98,17 +102,22 @@ implementation
 type
   TIncPtr = PAnsiChar;
 
-procedure DCPErr(const Msg: String);
-begin
-  raise Exception.Create(Msg);
-end ;
-
 { TDCPackage. }
 destructor TDCPackage.Destroy;
 begin
   if FMemPtr<>Nil then
     FreeMem(FMemPtr,FMemSize);
   inherited Destroy;
+end ;
+
+procedure TDCPackage.DCPErr(const Msg: String);
+var
+  S: String;
+begin
+  S := Msg;
+  if FFName<>'' then
+    S := Format('%s in %s',[S,FFName]);
+  raise Exception.Create(S);
 end ;
 
 function TDCPackage.CheckDCPOfs(Ofs: Cardinal; const Msg: String): Pointer;
@@ -124,6 +133,7 @@ type
 const
   DCPMagic: TMagicChars = 'PKG'#0;
   DCPMagicX: TMagicChars = 'PKX0';
+  DCPMagicX1: TMagicChars = 'PKX1';
   DCPMagicMask = $00FFFFFF;
 
 function TDCPackage.Load(const FN: String; IsMain: Boolean): boolean;
@@ -134,6 +144,7 @@ var
   DP: Pointer;
   SzRq: Cardinal;
   VerCh: AnsiChar;
+  Ver: Integer;
   Hdr: PDCPHdr;
   NP,EP: PAnsiChar;
   UI,UI0: PDCPUnitInfo;
@@ -171,8 +182,12 @@ begin
     DP := FMemPtr;
     Magic := LongInt(DP^);
     Inc(TIncPtr(DP),SizeOf(LongInt));
-    if Magic=LongInt(DCPMagicX) then begin
-      VerCh := 'X';
+    if Magic=LongInt(DCPMagicX1) then begin
+      Ver := 11;
+      NChk := 3;
+     end
+    else if Magic=LongInt(DCPMagicX) then begin
+      Ver := 10;
       NChk := 3;
      end
     else begin
@@ -182,9 +197,10 @@ begin
       VerCh := TMagicChars(Magic)[3];
       if (VerCh<'4')or(VerCh>'9')or(VerCh='6')or(VerCh='8') then
         DCPErr('Wrong PKG version.');
+      Ver := Ord(VerCh)-Ord('0');
     end ;
-    if isMSIL then
-      Inc(TIncPtr(DP),SizeOf(LongInt)); //MSIL
+    if isMSIL or(Ver>=11) then
+      Inc(TIncPtr(DP),SizeOf(LongInt)); //MSIL or DCUMagic of D 11
     Hdr := DP;
     if (Hdr^.nRequires>$100{Empirical limitation})or(Hdr^.nRequires<0) then
       DCPErr('Package requires too much.');
@@ -213,11 +229,11 @@ begin
         if not TwoPhase then
           CheckDCPOfs(UI^.pData+UD^.FileSize-1,'Wrong unit data size');
         NP := TIncPtr(UI)+SizeOf(TDCPUnitInfo);
-        if VerCh>'4' then
+        if Ver>4 then
           Inc(NP,SizeOf(LongInt));
-        if (VerCh>='9')or IsMSIL then
+        if (Ver>=9)or IsMSIL then
           Inc(NP,SizeOf(LongInt));
-        if (VerCh>='X') then
+        if (Ver>=10) then
           Inc(NP,(5+NChk)*SizeOf(LongInt));
         if (TIncPtr(NP)-TIncPtr(UI0)>=Hdr^.SzContains) then
           break;
@@ -228,7 +244,7 @@ begin
         SetString(NS,NP,l);
         AddObject(NS,Pointer(UD));
         Inc(EP);
-        if VerCh>='9' then begin
+        if Ver>=9 then begin
           if (TIncPtr(EP)-TIncPtr(UI0)>=Hdr^.SzContains) then begin
             Inc(EP); //make it >Hdr^.SzContains
             break;

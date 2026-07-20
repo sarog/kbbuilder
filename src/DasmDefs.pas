@@ -26,6 +26,9 @@ freely, subject to the following restrictions:
 *)
 interface
 
+uses
+  DasmCF{$IFDEF OpSem},SemExpr{$ENDIF};
+
 const
   nf =  $40000000;
   nm =  nf-1;
@@ -52,21 +55,28 @@ type
  {$IFNDEF XMLx86}
   TBMOpRec = string[15];
  {$ELSE}
-  TBMOpRec = String;
+  TBMOpRec = AnsiString;
  {$ENDIF}
 
 type
   TReadCommandProc = function: boolean;
-  TShowCommandProc = procedure;
+  TShowCommandProc = procedure(CmdInfo: TCmd);
 
   TRegCommandRefProc = procedure(RefP: LongInt; RefKind: Byte; IP: Pointer);
   TCheckCommandRefsProc = function (RegRef: TRegCommandRefProc; CmdOfs: Cardinal;
     IP: Pointer): integer{crX};
 
+ {$IFDEF OpSem}
+  TGetCommandOperations = function (CmdInfo: TCmd): TSemOpList;
+ {$ENDIF}
+
   TDisassembler = record
     ReadCommand: TReadCommandProc;
     ShowCommand: TShowCommandProc;
     CheckCommandRefs: TCheckCommandRefsProc;
+ {$IFDEF OpSem}
+    GetCommandOperations: TGetCommandOperations;
+ {$ENDIF}
   end ;
 
 type
@@ -80,17 +90,21 @@ var
 
 procedure SetDisassembler(AReadCommand: TReadCommandProc;
   AShowCommand: TShowCommandProc;
-  ACheckCommandRefs: TCheckCommandRefsProc);
+  ACheckCommandRefs: TCheckCommandRefsProc{$IFDEF OpSem}; AGetCommandOperations: TGetCommandOperations{$ENDIF}
+  );
 
 implementation
 
 procedure SetDisassembler(AReadCommand: TReadCommandProc;
   AShowCommand: TShowCommandProc;
-  ACheckCommandRefs: TCheckCommandRefsProc);
+  ACheckCommandRefs: TCheckCommandRefsProc{$IFDEF OpSem}; AGetCommandOperations: TGetCommandOperations{$ENDIF});
 begin
   Disassembler.ReadCommand := AReadCommand;
   Disassembler.ShowCommand := AShowCommand;
   Disassembler.CheckCommandRefs := ACheckCommandRefs;
+ {$IFDEF OpSem}
+  Disassembler.GetCommandOperations := AGetCommandOperations;
+ {$ENDIF}
 end ;
 
 end.

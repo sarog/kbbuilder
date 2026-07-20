@@ -35,6 +35,12 @@
         <Cfg_1>true</Cfg_1>
         <Base>true</Base>
     </PropertyGroup>
+    <PropertyGroup Condition="('$(Platform)'=='Win64' and '$(Cfg_1)'=='true') or '$(Cfg_1_Win64)'!=''">
+        <Cfg_1_Win64>true</Cfg_1_Win64>
+        <CfgParent>Cfg_1</CfgParent>
+        <Cfg_1>true</Cfg_1>
+        <Base>true</Base>
+    </PropertyGroup>
     <PropertyGroup Condition="'$(Config)'=='Debug' or '$(Cfg_2)'!=''">
         <Cfg_2>true</Cfg_2>
         <CfgParent>Base</CfgParent>
@@ -46,6 +52,12 @@
         <Cfg_2>true</Cfg_2>
         <Base>true</Base>
     </PropertyGroup>
+    <PropertyGroup Condition="('$(Platform)'=='Win64' and '$(Cfg_2)'=='true') or '$(Cfg_2_Win64)'!=''">
+        <Cfg_2_Win64>true</Cfg_2_Win64>
+        <CfgParent>Cfg_2</CfgParent>
+        <Cfg_2>true</Cfg_2>
+        <Base>true</Base>
+    </PropertyGroup>
     <PropertyGroup Condition="'$(Base)'!=''">
         <SanitizedProjectName>dcu32int</SanitizedProjectName>
         <DCC_ConsoleTarget>true</DCC_ConsoleTarget>
@@ -53,18 +65,18 @@
         <VerInfo_Build>79</VerInfo_Build>
         <DCC_UsePackage>IBEVNT30;VCLDB30;VCL30;VCLX30;INETDB30;INET30;VCLDBX30;VCLSMP30;QRPT30;TEEUI30;TEEDB30;TEE30;DSS30;$(DCC_UsePackage)</DCC_UsePackage>
         <DCC_ImageBase>00400000</DCC_ImageBase>
-        <VerInfo_MinorVer>15</VerInfo_MinorVer>
+        <VerInfo_MinorVer>29</VerInfo_MinorVer>
         <DCC_Namespace>System;Xml;Data;Datasnap;Web;Soap;Winapi;$(DCC_Namespace)</DCC_Namespace>
         <DCC_Alignment>1</DCC_Alignment>
         <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
-        <DCC_Define>I64;$(DCC_Define)</DCC_Define>
+        <DCC_Define>I64;OpSem_;$(DCC_Define)</DCC_Define>
         <DCC_K>false</DCC_K>
         <DCC_F>false</DCC_F>
         <DCC_N>true</DCC_N>
         <VerInfo_Release>1</VerInfo_Release>
         <DCC_S>false</DCC_S>
         <DCC_SymbolReferenceInfo>1</DCC_SymbolReferenceInfo>
-        <VerInfo_Keys>CompanyName=AX;FileDescription=Parser of Delphi 2.0-8.0, 2005-2006 (.net and WIN32), 2007-2010 (WIN32 only),  XE (WIN32 only), XE2-XE7 (WIN32,WIN64,OSX32), Kylix 1.0-3.0;FileVersion=1.20.1.79;InternalName=DCU32INT;LegalCopyright=Copyright ©2000-2015, Alexei E. Hmelnov;LegalTrademarks=;OriginalFilename=DCU32INT;ProductName=DCU32INT;ProductVersion=1.20.1;Comments=</VerInfo_Keys>
+        <VerInfo_Keys>CompanyName=AX;FileDescription=Parser of Delphi 2.0-8.0, 2005-2006 (.net and WIN32), 2007-2010 (WIN32 only),  XE (WIN32 only), XE2-XE7 (WIN32,WIN64,OSX32), Kylix 1.0-3.0;FileVersion=1.29.1.79;InternalName=DCU32INT;LegalCopyright=Copyright ©2000-2015, Alexei E. Hmelnov;LegalTrademarks=;OriginalFilename=DCU32INT;ProductName=DCU32INT;ProductVersion=1.20.1;Comments=</VerInfo_Keys>
         <DCC_DcuOutput>..\dcu</DCC_DcuOutput>
         <DCC_E>false</DCC_E>
         <VerInfo_Locale>1049</VerInfo_Locale>
@@ -73,12 +85,12 @@
     </PropertyGroup>
     <PropertyGroup Condition="'$(Base_Win32)'!=''">
         <VerInfo_Build>82</VerInfo_Build>
-        <VerInfo_MinorVer>16</VerInfo_MinorVer>
         <Manifest_File>None</Manifest_File>
         <Icon_MainIcon>dcu32int_Icon1.ico</Icon_MainIcon>
         <DCC_Namespace>System.Win;Data.Win;Datasnap.Win;Web.Win;Soap.Win;Xml.Win;Bde;$(DCC_Namespace)</DCC_Namespace>
         <VerInfo_Locale>1033</VerInfo_Locale>
-        <VerInfo_Keys>CompanyName=;FileVersion=1.20.1.96;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductVersion=1.0.0.0;Comments=;ProgramID=com.embarcadero.$(MSBuildProjectName);FileDescription=$(MSBuildProjectName);ProductName=$(MSBuildProjectName)</VerInfo_Keys>
+        <VerInfo_Keys>CompanyName=;FileVersion=1.29.1.82;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductVersion=1.0.0.0;Comments=;ProgramID=com.embarcadero.$(MSBuildProjectName);FileDescription=$(MSBuildProjectName);ProductName=$(MSBuildProjectName)</VerInfo_Keys>
+        <AppDPIAwarenessMode>none</AppDPIAwarenessMode>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Base_Win64)'!=''">
         <VerInfo_Locale>1033</VerInfo_Locale>
@@ -86,6 +98,8 @@
         <VerInfo_Keys>CompanyName=;FileVersion=1.0.0.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductVersion=1.0.0.0;Comments=;ProgramID=com.embarcadero.$(MSBuildProjectName);FileDescription=$(MSBuildProjectName);ProductName=$(MSBuildProjectName)</VerInfo_Keys>
         <DCC_Namespace>System.Win;Data.Win;Datasnap.Win;Web.Win;Soap.Win;Xml.Win;$(DCC_Namespace)</DCC_Namespace>
         <Icon_MainIcon>dcu32int_Icon.ico</Icon_MainIcon>
+        <Manifest_File>(None)</Manifest_File>
+        <AppDPIAwarenessMode>none</AppDPIAwarenessMode>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_1)'!=''">
         <DCC_LocalDebugSymbols>false</DCC_LocalDebugSymbols>
@@ -95,9 +109,16 @@
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_1_Win32)'!=''">
         <VerInfo_Build>82</VerInfo_Build>
-        <VerInfo_MinorVer>16</VerInfo_MinorVer>
-        <VerInfo_Keys>CompanyName=;FileVersion=1.16.1.82;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductVersion=1.0.0.0;Comments=;ProgramID=com.embarcadero.$(MSBuildProjectName);FileDescription=$(MSBuildProjectName);ProductName=$(MSBuildProjectName)</VerInfo_Keys>
+        <VerInfo_Keys>CompanyName=;FileVersion=1.28.1.82;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductVersion=1.0.0.0;Comments=;ProgramID=com.embarcadero.$(MSBuildProjectName);FileDescription=$(MSBuildProjectName);ProductName=$(MSBuildProjectName)</VerInfo_Keys>
         <VerInfo_Locale>1033</VerInfo_Locale>
+        <Icon_MainIcon>dcu32int_Icon1.ico</Icon_MainIcon>
+        <VerInfo_MinorVer>28</VerInfo_MinorVer>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(Cfg_1_Win64)'!=''">
+        <VerInfo_IncludeVerInfo>false</VerInfo_IncludeVerInfo>
+        <VerInfo_Locale>1033</VerInfo_Locale>
+        <VerInfo_Keys>CompanyName=;FileVersion=1.0.0.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductVersion=1.0.0.0;Comments=;ProgramID=com.embarcadero.$(MSBuildProjectName);FileDescription=$(MSBuildProjectName);ProductName=$(MSBuildProjectName)</VerInfo_Keys>
+        <Icon_MainIcon>dcu32int_Icon.ico</Icon_MainIcon>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_2)'!=''">
         <DCC_Define>DEBUG;$(DCC_Define)</DCC_Define>
@@ -107,15 +128,19 @@
     <PropertyGroup Condition="'$(Cfg_2_Win32)'!=''">
         <DCC_Define>XMLx86;$(DCC_Define)</DCC_Define>
         <VerInfo_Build>82</VerInfo_Build>
-        <VerInfo_MinorVer>20</VerInfo_MinorVer>
         <DCC_DebugDCUs>true</DCC_DebugDCUs>
         <Debugger_RunParams>-KDCP.dcu -U*</Debugger_RunParams>
-        <VerInfo_Keys>CompanyName=AX;FileDescription=Parser of Delphi 2.0-8.0, 2005-2006 (.net and WIN32), 2007-2010 (WIN32 only),  XE (WIN32 only), XE2-XE7 (WIN32,WIN64,OSX32), Kylix 1.0-3.0;FileVersion=1.20.1.82;InternalName=DCU32INT;LegalCopyright=Copyright ©2000-2015, Alexei E. Hmelnov;LegalTrademarks=;OriginalFilename=DCU32INT;ProductName=DCU32INT;ProductVersion=1.20.1;Comments=;ProgramID=com.embarcadero.$(MSBuildProjectName)</VerInfo_Keys>
+        <VerInfo_Keys>CompanyName=AX;FileDescription=Parser of Delphi 2.0-8.0, 2005-2006 (.net and WIN32), 2007-2010 (WIN32 only),  XE (WIN32 only), XE2-XE7 (WIN32,WIN64,OSX32), Kylix 1.0-3.0;FileVersion=1.29.1.82;InternalName=DCU32INT;LegalCopyright=Copyright ©2000-2015, Alexei E. Hmelnov;LegalTrademarks=;OriginalFilename=DCU32INT;ProductName=DCU32INT;ProductVersion=1.20.1;Comments=;ProgramID=com.embarcadero.$(MSBuildProjectName)</VerInfo_Keys>
         <VerInfo_Locale>1033</VerInfo_Locale>
         <Debugger_CWD>C:\Desenv\Tools\IDR\dcu</Debugger_CWD>
         <DCC_UnitSearchPath>.\src;$(DCC_UnitSearchPath)</DCC_UnitSearchPath>
         <Icon_MainIcon>dcu32int_Icon1.ico</Icon_MainIcon>
-        <AppDPIAwarenessMode>none</AppDPIAwarenessMode>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(Cfg_2_Win64)'!=''">
+        <VerInfo_IncludeVerInfo>false</VerInfo_IncludeVerInfo>
+        <VerInfo_Locale>1033</VerInfo_Locale>
+        <VerInfo_Keys>CompanyName=;FileVersion=1.0.0.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductVersion=1.0.0.0;Comments=;ProgramID=com.embarcadero.$(MSBuildProjectName);FileDescription=$(MSBuildProjectName);ProductName=$(MSBuildProjectName)</VerInfo_Keys>
+        <Icon_MainIcon>dcu32int_Icon.ico</Icon_MainIcon>
     </PropertyGroup>
     <ItemGroup>
         <DelphiCompile Include="$(MainSource)">
@@ -130,10 +155,12 @@
         <DCCReference Include="src\DCURecs.pas"/>
         <DCCReference Include="src\DasmDefs.pas"/>
         <DCCReference Include="src\DasmUtil.pas"/>
+        <DCCReference Include="SEM\RefCnt.pas"/>
         <DCCReference Include="80x86\x86Reg.pas"/>
         <DCCReference Include="80x86\x86Defs.pas"/>
         <DCCReference Include="80x86\x86Op.pas"/>
         <DCCReference Include="src\DasmCF.pas"/>
+        <DCCReference Include="src\DasmProc.pas"/>
         <DCCReference Include="src\DCP.pas"/>
         <DCCReference Include="src\DasmX86.pas"/>
         <DCCReference Include="src\DasmMSIL.pas"/>
@@ -186,10 +213,8 @@
                     <VersionInfoKeys Name="Comments"/>
                 </VersionInfoKeys>
                 <Excluded_Packages>
-                    <Excluded_Packages Name="$(BDSBIN)\bcboffice2k290.bpl">Embarcadero C++Builder Office 2000 Servers Package</Excluded_Packages>
-                    <Excluded_Packages Name="$(BDSBIN)\bcbofficexp290.bpl">Embarcadero C++Builder Office XP Servers Package</Excluded_Packages>
-                    <Excluded_Packages Name="$(BDSBIN)\dcloffice2k290.bpl">Microsoft Office 2000 Sample Automation Server Wrapper Components</Excluded_Packages>
-                    <Excluded_Packages Name="$(BDSBIN)\dclofficexp290.bpl">Microsoft Office XP Sample Automation Server Wrapper Components</Excluded_Packages>
+                    <Excluded_Packages Name="$(BDSBIN)\dcloffice2k280.bpl">Microsoft Office 2000 Sample Automation Server Wrapper Components</Excluded_Packages>
+                    <Excluded_Packages Name="$(BDSBIN)\dclofficexp280.bpl">Microsoft Office XP Sample Automation Server Wrapper Components</Excluded_Packages>
                 </Excluded_Packages>
             </Delphi.Personality>
             <Platforms>

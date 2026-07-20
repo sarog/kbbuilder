@@ -66,6 +66,8 @@ type
     function EqS(const S: ShortString): Boolean;
     function HasChar(ch: AnsiChar): Boolean;
     function IsAuxName: Boolean;
+    function GetHash: LongInt;
+    function GetRightHash(Ofs: Integer): LongInt;
   end ;
 
   PShortName = PShortString;
@@ -91,8 +93,16 @@ const
   lfPrivate = $0;
   lfPublic = $2;
   lfProtected = $4;
+  lfStrict = $10;
+  //lfStrictPrivate = lfStrict or lfPrivate;
+  //lfStrictProtected = lfStrict or lfProtected;
+  lfRegister = $8; //stored in register in procedure code
   lfPublished = $A;
   lfScope = $0E { $0F};
+  lfParmFlagsMask = $30;
+  lfStackParm = $10; //parameter is on stack?
+  lfRegisterParm = $00; //parameter is in register (optimization on)
+  lfRegister1Parm = $30; //parameter is in register (optimization off)
   lfDeftProp = $20;
   lfOverride = $20;
   lfVirtual = $40;
@@ -177,6 +187,7 @@ function ReadName: PName;
 function StrLEnd(Str: PAnsiChar; L: Cardinal): PAnsiChar;
 
 function ReadNDXStr: AnsiString;
+function ReadNDXStrX: AnsiString; //Appeared in 12 Athens
 function ReadNDXStrRef: TMemStrRef;
 function GetNDXStr(DP: Pointer): AnsiString;
 function ReadByteIfEQ(V: byte): Cardinal;
@@ -213,10 +224,39 @@ function ExtractFileNameAnySep(const FN: String): String;
 function AllocName(const S: AnsiString): PName;
 procedure FreeName(NP: PName);
 
+procedure IgnoreMessage(const Msg: AnsiString);
+procedure DefaultWriteMessage(const Msg: AnsiString);
+procedure DefaultProcessExc(E: Exception);
+
+var
+  OnWriteMessage: procedure (const Msg: AnsiString) = DefaultWriteMessage;
+  OnException: procedure (E: Exception) = DefaultProcessExc;
+
+
+const
+  NoName: String[1]='?';
+
 implementation
 
 uses
   DCU32{CurUnit},TypInfo;
+
+procedure IgnoreMessage(const Msg: AnsiString);
+begin
+end ;
+
+procedure DefaultWriteMessage(const Msg: AnsiString);
+begin
+  Writeln(Msg);
+end;
+
+procedure DefaultProcessExc(E: Exception);
+var
+  ExcS: AnsiString;
+begin
+  ExcS := {$IFDEF UNICODE}AnsiStrings.{$ENDIF}Format('!!!%s: "%s"',[E.ClassName,E.Message]);
+  OnWriteMessage(ExcS);
+end;
 
 procedure DCUError(const Msg: String);
 var
@@ -262,7 +302,7 @@ begin
       [ScSt.CurPos-ScSt.StartPos,US,TIncPtr(DefStart)-ScSt.StartPos,AnsiChar(Tag),Byte(Tag),Msg])
   else
     US := Format('Warning%s: %s',[US,Msg]);
-  Writeln(US);
+  OnWriteMessage(US);
 end ;
 
 procedure DCUWarningFmt(const Msg: String; Args: array of const);
@@ -418,6 +458,7 @@ begin
   SkipBlock(L);
 end ;
 
+{$IFNDEF CPU64bits}
 function StrLEnd(Str: PAnsiChar; L: Cardinal): PAnsiChar; assembler;
 asm
         MOV     ECX,EDX
@@ -431,6 +472,16 @@ asm
         MOV     EAX,EDI
         MOV     EDI,EDX
 end;
+{$ELSE}
+function StrLEnd(Str: PAnsiChar; L: Cardinal): PAnsiChar;
+begin
+  while (L>0)and(Str^<>#0) do begin
+    Inc(Str);
+    Dec(L);
+  end;
+  Result := Str;
+end;
+{$ENDIF}
 
 function ReadNDXStr: AnsiString;
 //Was observed only in drConstAddInfo records of MSIL
@@ -443,6 +494,22 @@ begin
   SetLength(Result,L);
   ReadBlock(Result[1],L);
 end ;
+
+function ReadNDXStrX: AnsiString; //Appeared in 12 Athens
+//It is very strange, that they don't simply use ReadNDXStr
+//may be Len:Val=0 has some special meaning
+var
+  L: integer;
+begin
+  L := ReadUIndex;
+  if L>0 then
+    Dec(L);
+  if (L<0)or(L>$100000{Heuristic}) then
+    DCUError('Too long NDXX String');
+  SetLength(Result,L);
+  ReadBlock(Result[1],L);
+end;
+
 
 function ReadNDXStrRef: TMemStrRef;
 //Was observed only in drConstAddInfo records of MSIL
@@ -704,7 +771,7 @@ end ;
 { TNameRec. }
 function TNameRec.IsEmpty: Boolean;
 begin
-  Result := (@Self=Nil)or(D.bLen=0);
+  Result := (@Self=Nil)or(D.bLen=0)or(@Self=@NoName);
 end ;
 
 procedure TNameRec.GetStrInfo(var SR: TAnsiStrRec);
@@ -827,6 +894,39 @@ begin
   end ;
   Result := false;
 end ;
+
+function GetStrRecHash(const SR: TAnsiStrRec): LongInt;
+var
+  CP: PAnsiChar;
+  i: Integer;
+begin
+  Result := 0;
+  CP := SR.CP;
+  for i := 1 to SR.Len do begin
+    Result := Result*17+Ord(CP^);
+    Inc(CP);
+  end;
+end;
+
+function TNameRec.GetHash: LongInt;
+//The Hash value, which is used for computing the TNameFDecl.Inf
+var
+  SR: TAnsiStrRec;
+begin
+  GetStrInfo(SR);
+  Result := GetStrRecHash(SR);
+end;
+
+function TNameRec.GetRightHash(Ofs: Integer): LongInt;
+//The Hash value, which is used for computing the TNameFDecl.Inf
+var
+  SR: TAnsiStrRec;
+begin
+  GetStrInfo(SR);
+  Inc(SR.CP,Ofs);
+  Dec(SR.Len,Ofs);
+  Result := GetStrRecHash(SR);
+end;
 
 end.
 
