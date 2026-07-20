@@ -3,7 +3,8 @@
 #include <vcl.h>
 #pragma hdrstop
 //---------------------------------------------------------------------------
-//»нформаци¤ о смещени¤х имен и данных
+// нформаци¤ о смещени¤х имен и данных
+// information on name and data offsets
 typedef struct
 {
     DWORD	Offset;
