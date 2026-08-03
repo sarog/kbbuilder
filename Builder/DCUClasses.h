@@ -337,12 +337,15 @@ class TDCURec;
 typedef TDCURec *PDCURec;
 typedef void __fastcall (*TTypeUseAction)(PDCURec UseRec, int hDT, DWord *IP);
 
+class TDCURecVisitor; // Pattern "Visitor" for TDCURec class hierarchy
+
 class TDCURec : public TObject {
 public:
     TDCURec();
     virtual PName __fastcall GetName();
     virtual DWord __fastcall SetMem(DWord MOfs, DWord MSz);
     virtual bool __fastcall  NameIsUnique();
+    virtual void __fastcall  Visit(TDCURecVisitor *Visitor);
     virtual void __fastcall  ShowName(String &OutS);
     virtual void __fastcall  Show(String &OutS);
     virtual void __fastcall  EnumUsedTypes(TTypeUseAction Action, DWord *IP);
@@ -354,6 +357,7 @@ public:
     TBaseDef(PName AName, PNameDef ADef, int AUnit);
     void __fastcall  ShowName(String &OutS);
     void __fastcall  Show(String &OutS);
+    void __fastcall  Visit(TDCURecVisitor *Visitor) override;
     void __fastcall  ShowNamed(PName N, String &OutS);
     PName __fastcall GetName();
     DWord __fastcall SetMem(DWord MOfs, DWord MSz);
@@ -369,6 +373,7 @@ public:
     TImpDef(Byte AIK, PName AName, int AnInf, PNameDef ADef, int AUnit);
     void __fastcall Show(String &OutS);
     bool __fastcall NameIsUnique();
+    void __fastcall Visit(TDCURecVisitor *Visitor) override;
 
     char ik;
     bool FNameIsUnique;
@@ -390,6 +395,7 @@ class TDLLImpRec : public TBaseDef {
 public:
     TDLLImpRec(PName AName, int ANdx, PNameDef ADef, int AUnit);
     void __fastcall Show(String &OutS);
+    void __fastcall Visit(TDCURecVisitor *Visitor) override;
     int Ndx;
 };
 
@@ -398,6 +404,7 @@ public:
     TImpTypeDefRec(PName AName, int AnInf, DWord ARTTISz, PNameDef ADef, int AUnit);
     void __fastcall  Show(String &OutS);
     DWord __fastcall SetMem(DWord MOfs, DWord MSz);
+    void __fastcall  Visit(TDCURecVisitor *Visitor) override;
 
     DWord RTTIOfs, RTTISz;
     int   hImpUnit;
@@ -418,6 +425,7 @@ public:
     virtual Byte __fastcall GetSecKind();
     virtual bool __fastcall IsVisible(Byte LK);
     Byte __fastcall         GetTag();
+    void __fastcall  Visit(TDCURecVisitor *Visitor) override;
 
     PNameDef Def;
     int      hDecl;
@@ -428,6 +436,7 @@ typedef TNameDecl *PNameDecl;
 class TNameFDecl : public TNameDecl {
 public:
     TNameFDecl(bool NoInf);
+    void __fastcall Visit(TDCURecVisitor *Visitor) override;
     void __fastcall Show(String &OutS) override;
     bool __fastcall IsVisible(Byte LK) override;
 
@@ -445,6 +454,7 @@ public:
     PName __fastcall GetName();
     DWord __fastcall SetMem(DWord MOfs, DWord MSz);
     Byte __fastcall  GetSecKind();
+    void __fastcall  Visit(TDCURecVisitor *Visitor) override;
 
     int hDef;
 };
@@ -455,6 +465,7 @@ public:
     void __fastcall Show(String &OutS);
     void __fastcall EnumUsedTypes(TTypeUseAction Action, DWord *IP);
     Byte __fastcall GetSecKind();
+    void __fastcall Visit(TDCURecVisitor *Visitor) override;
 
     int   hDT;
     DWord Ofs;
@@ -465,6 +476,7 @@ class TVarVDecl : public TVarDecl {
     TVarVDecl();
     void __fastcall  Show(String &OutS);
     DWord __fastcall SetMem(DWord MOfs, DWord MSz);
+    void __fastcall  Visit(TDCURecVisitor *Visitor) override;
 
     DWord Sz;
 };
@@ -475,6 +487,7 @@ public:
     void __fastcall  Show(String &OutS);
     DWord __fastcall SetMem(DWord MOfs, DWord MSz);
     Byte __fastcall  GetSecKind();
+    void __fastcall  Visit(TDCURecVisitor *Visitor) override;
 
     DWord Sz;
     DWord OfsR;
@@ -484,6 +497,7 @@ class TAbsVarDecl : public TVarDecl {
 public:
     TAbsVarDecl();
     void __fastcall Show(String &OutS);
+    void __fastcall Visit(TDCURecVisitor *Visitor) override;
 };
 
 class TTypePDecl : public TVarCDecl {
@@ -491,12 +505,14 @@ public:
     TTypePDecl();
     void __fastcall Show(String &OutS);
     bool __fastcall IsVisible(Byte LK);
+    void __fastcall Visit(TDCURecVisitor *Visitor) override;
 };
 
 class TThreadVarDecl : public TVarDecl {
 public:
     TThreadVarDecl();
     Byte __fastcall GetSecKind();
+    void __fastcall Visit(TDCURecVisitor *Visitor) override;
 };
 
 // In Delphi>=8 they started to create this kind of records for string constants
@@ -510,6 +526,7 @@ public:
     // bool __fastcall IsVisible(Byte LK);
     void __fastcall Show(String &OutS);
     void __fastcall EnumUsedTypes(TTypeUseAction Action, DWord *IP);
+    void __fastcall Visit(TDCURecVisitor *Visitor) override;
 
     int   hDT;
     DWord Ofs;
@@ -525,6 +542,7 @@ public:
     void __fastcall Show(String &OutS);
     Byte __fastcall GetSecKind();
     bool __fastcall IsVisible(Byte LK);
+    void __fastcall Visit(TDCURecVisitor *Visitor) override;
 
     DWord Ofs;
 };
@@ -534,6 +552,7 @@ public:
     TExportDecl();
     void __fastcall Show(String &OutS);
     Byte __fastcall GetSecKind();
+    void __fastcall Visit(TDCURecVisitor *Visitor) override;
 
     int hSym, Index;
 };
@@ -559,6 +578,7 @@ class TMethodDecl : public TLocalDecl {
 public:
     TMethodDecl(Byte LK);
     void __fastcall Show(String &OutS);
+    void __fastcall Visit(TDCURecVisitor *Visitor) override;
 
     bool InIntrf;
     int  hImport;
@@ -569,6 +589,7 @@ public:
     TClassVarDecl(Byte LK);
     void __fastcall Show(String &OutS);
     Byte __fastcall GetSecKind();
+    void __fastcall Visit(TDCURecVisitor *Visitor) override;
 };
 
 class TPropDecl : public TNameDecl {
@@ -578,6 +599,7 @@ public:
     void __fastcall   Show(String &OutS);
     void __fastcall   EnumUsedTypes(TTypeUseAction Action, DWord *IP);
     Byte __fastcall   GetSecKind();
+    void __fastcall   Visit(TDCURecVisitor *Visitor) override;
 
     int LocFlags;
     int LocFlagsX; // Ver>=8 private, protected, public, published
@@ -593,6 +615,7 @@ public:
 class TDispPropDecl : public TLocalDecl {
 public:
     TDispPropDecl(Byte LK);
+    void __fastcall Visit(TDCURecVisitor *Visitor) override;
     void __fastcall Show(String &OutS);
 };
 
@@ -604,6 +627,7 @@ public:
     void __fastcall Show(String &OutS);
     void __fastcall EnumUsedTypes(TTypeUseAction Action, DWord *IP);
     Byte __fastcall GetSecKind();
+    void __fastcall Visit(TDCURecVisitor *Visitor) override;
 
     int     hDT;
     DWord   Kind; // hX Ver>4
@@ -619,6 +643,7 @@ class TConstDecl : public TConstDeclBase {
 public:
     TConstDecl();
     bool __fastcall IsVisible(Byte LK);
+    void __fastcall Visit(TDCURecVisitor *Visitor) override;
 };
 
 class TResStrDef : public TVarCDecl {
@@ -695,6 +720,7 @@ public:
     void __fastcall  EnumUsedTypes(TTypeUseAction Action, DWord *IP);
     bool __fastcall  IsVisible(Byte LK);
     // String __fastcall GetRegDebugInfo(int ProcOfs, int hReg, int Ofs, int* hDecl);
+    void __fastcall  Visit(TDCURecVisitor *Visitor) override;
 
     DWord      CodeOfs, AddrBase;
     DWord      Sz;
@@ -721,6 +747,7 @@ public:
     TSysProcDecl();
     void __fastcall Show(String &OutS);
     Byte __fastcall GetSecKind();
+    void __fastcall Visit(TDCURecVisitor *Visitor) override;
 
     int F;
     int Ndx;
@@ -730,6 +757,7 @@ public:
 class TSysProc8Decl : public TProcDecl {
 public:
     TSysProc8Decl();
+    void __fastcall Visit(TDCURecVisitor *Visitor) override;
 
     int F;
     int Ndx;
@@ -741,6 +769,7 @@ public:
     TUnitAddInfo();
     ~TUnitAddInfo();
     bool __fastcall IsVisible(Byte LK);
+    void __fastcall Visit(TDCURecVisitor *Visitor) override;
 
     // FVer 8.0 and higher, MSIL
     int B;
@@ -751,12 +780,14 @@ class TSpecVar : public TVarDecl {
 public:
     TSpecVar();
     void __fastcall Show(String &OutS);
+    void __fastcall Visit(TDCURecVisitor *Visitor) override;
 };
 
 class TTypeDef : public TBaseDef {
 public:
     TTypeDef();
     ~TTypeDef();
+    void __fastcall           Visit(TDCURecVisitor *Visitor) override;
     void __fastcall           ShowBase();
     virtual int __fastcall    ShowValue(Byte *DP, DWord DS, String &OutS);
     void __fastcall           Show(String &OutS);
@@ -778,6 +809,7 @@ public:
     int __fastcall  ShowValue(Byte *DP, DWord DS, String &OutS);
     void __fastcall Show(String &OutS);
     void __fastcall EnumUsedTypes(TTypeUseAction Action, DWord *IP);
+    void __fastcall Visit(TDCURecVisitor *Visitor) override;
 
     int   hDTBase;
     Byte *LH;
@@ -787,6 +819,7 @@ public:
 class TRangeDef : public TRangeBaseDef {
 public:
     TRangeDef();
+    void __fastcall Visit(TDCURecVisitor *Visitor) override;
 };
 
 class TEnumDef : public TRangeBaseDef {
@@ -795,6 +828,7 @@ public:
     ~TEnumDef();
     int __fastcall  ShowValue(Byte *DP, DWord DS, String &OutS);
     void __fastcall Show(String &OutS);
+    void __fastcall Visit(TDCURecVisitor *Visitor) override;
 
     int    Ndx;
     TList *NameTbl;
@@ -806,6 +840,7 @@ public:
     String __fastcall GetKindName();
     int __fastcall    ShowValue(Byte *DP, DWord DS, String &OutS);
     void __fastcall   Show(String &OutS);
+    void __fastcall   Visit(TDCURecVisitor *Visitor) override;
 
     Byte Kind;
 };
@@ -818,6 +853,7 @@ public:
     void __fastcall   Show(String &OutS);
     void __fastcall   EnumUsedTypes(TTypeUseAction Action, DWord *IP);
     String __fastcall GetRefOfsQualifier(int Ofs);
+    void __fastcall   Visit(TDCURecVisitor *Visitor) override;
 
     int hRefDT;
 };
@@ -826,6 +862,7 @@ class TTextDef : public TTypeDef {
 public:
     TTextDef();
     void __fastcall Show(String &OutS);
+    void __fastcall Visit(TDCURecVisitor *Visitor) override;
 };
 
 class TFileDef : public TTypeDef {
@@ -833,6 +870,7 @@ public:
     TFileDef();
     void __fastcall Show(String &OutS);
     void __fastcall EnumUsedTypes(TTypeUseAction Action, DWord *IP);
+    void __fastcall Visit(TDCURecVisitor *Visitor) override;
 
     int hBaseDT;
 };
@@ -843,6 +881,7 @@ public:
     int __fastcall  ShowValue(Byte *DP, DWord DS, String &OutS);
     void __fastcall Show(String &OutS);
     void __fastcall EnumUsedTypes(TTypeUseAction Action, DWord *IP);
+    void __fastcall Visit(TDCURecVisitor *Visitor) override;
 
     Byte BStart; // 0-based start byte number
     int  hBaseDT;
@@ -855,6 +894,7 @@ public:
     int __fastcall  ShowValue(Byte *DP, DWord DS, String &OutS);
     void __fastcall Show(String &OutS);
     void __fastcall EnumUsedTypes(TTypeUseAction Action, DWord *IP);
+    void __fastcall Visit(TDCURecVisitor *Visitor) override;
 
     Byte B1;
     int  hDTNdx;
@@ -865,6 +905,7 @@ class TArrayDef : public TArrayDef0 {
 public:
     TArrayDef(bool IsStr);
     String __fastcall GetOfsQualifier(int Ofs);
+    void __fastcall Visit(TDCURecVisitor *Visitor) override;
 };
 
 class TShortStrDef : public TArrayDef {
@@ -872,6 +913,7 @@ public:
     TShortStrDef();
     int __fastcall  ShowValue(Byte *DP, DWord DS, String &OutS);
     void __fastcall Show(String &OutS);
+    void __fastcall Visit(TDCURecVisitor *Visitor) override;
 
     int CP; // for Ver>=VerD12
 };
@@ -879,6 +921,7 @@ public:
 class TStringDef : public TArrayDef {
 public:
     TStringDef();
+    void __fastcall   Visit(TDCURecVisitor *Visitor) override;
     bool __fastcall   ShowRefValue(int Ndx, DWord Ofs, String &OutS);
     int __fastcall    ShowValue(Byte *DP, DWord DS, String &OutS);
     void __fastcall   Show(String &OutS);
@@ -891,6 +934,7 @@ class TVariantDef : public TTypeDef {
 public:
     TVariantDef();
     void __fastcall Show(String &OutS);
+    void __fastcall Visit(TDCURecVisitor *Visitor) override;
 
     Byte B;
 };
@@ -899,6 +943,7 @@ class TObjVMTDef : public TTypeDef {
 public:
     TObjVMTDef();
     void __fastcall Show(String &OutS);
+    void __fastcall Visit(TDCURecVisitor *Visitor) override;
 
     int hObjDT;
     int Ndx1;
@@ -909,6 +954,7 @@ public:
     TRecBaseDef();
     ~TRecBaseDef();
     void __fastcall        ReadFields(Byte LK);
+    void __fastcall        Visit(TDCURecVisitor *Visitor) override;
     int __fastcall         ShowFieldValues(Byte *DP, DWord DS, String &OutS);
     void __fastcall        EnumUsedTypes(TTypeUseAction Action, DWord *IP);
     virtual int __fastcall GetParentType();
@@ -924,6 +970,7 @@ public:
     int __fastcall    ShowValue(Byte *DP, DWord DS, String &OutS);
     void __fastcall   Show(String &OutS);
     String __fastcall GetOfsQualifier(int Ofs);
+    void __fastcall   Visit(TDCURecVisitor *Visitor) override;
 
     Byte B2;
 };
@@ -932,6 +979,7 @@ class TProcTypeDef : public TRecBaseDef {
 public:
     TProcTypeDef();
     int __fastcall    ShowValue(Byte *DP, DWord DS, String &OutS);
+    void __fastcall   Visit(TDCURecVisitor *Visitor) override;
     bool __fastcall   IsProc();
     String __fastcall ProcStr();
     void __fastcall   ShowDecl(char *Braces, String &OutS);
@@ -954,6 +1002,7 @@ public:
     void __fastcall   EnumUsedTypes(TTypeUseAction Action, DWord *IP);
     int __fastcall    GetParentType();
     String __fastcall GetOfsQualifier(int Ofs);
+    void __fastcall   Visit(TDCURecVisitor *Visitor) override;
 
     Byte B03;
     int  hParent;
@@ -970,6 +1019,7 @@ public:
     void __fastcall         Show(String &OutS);
     int __fastcall          GetParentType();
     String __fastcall       GetRefOfsQualifier(int Ofs);
+    void __fastcall         Visit(TDCURecVisitor *Visitor) override;
     virtual void __fastcall ReadBeforeIntf();
 
     int  hParent;
@@ -988,6 +1038,7 @@ class TMetaClassDef : public TClassDef {
 public:
     TMetaClassDef();
     void __fastcall ReadBeforeIntf();
+    void __fastcall Visit(TDCURecVisitor *Visitor) override;
 
     int hCl;
 };
@@ -996,6 +1047,7 @@ class TInterfaceDef : public TRecBaseDef {
 public:
     TInterfaceDef();
     void __fastcall Show(String &OutS);
+    void __fastcall Visit(TDCURecVisitor *Visitor) override;
 
     int   hParent;
     int   VMCnt;
@@ -1007,6 +1059,7 @@ class TVoidDef : public TTypeDef {
 public:
     TVoidDef();
     void __fastcall Show(String &OutS);
+    void __fastcall Visit(TDCURecVisitor *Visitor) override;
 };
 
 class TA6Def : public TDCURec {
@@ -1014,6 +1067,7 @@ public:
     TA6Def();
     ~TA6Def();
     void __fastcall Show(String &OutS);
+    void __fastcall Visit(TDCURecVisitor *Visitor) override;
 
     PNameDecl Args;
 };
@@ -1033,6 +1087,7 @@ class TDelayedImpRec : public TNameDecl {
 public:
     TDelayedImpRec();
     void __fastcall Show(String &OutS);
+    void __fastcall Visit(TDCURecVisitor *Visitor) override;
 
     int Inf;
     int F;
@@ -1043,6 +1098,7 @@ public:
     TORecDecl();
     ~TORecDecl();
     void __fastcall Show(String &OutS);
+    void __fastcall Visit(TDCURecVisitor *Visitor) override;
 
     int       DW;
     Byte      B0;
@@ -1056,6 +1112,7 @@ public:
     TDynArrayDef();
     void __fastcall   Show(String &OutS);
     String __fastcall GetRefOfsQualifier(int Ofs);
+    void __fastcall   Visit(TDCURecVisitor *Visitor) override;
 };
 
 // for Ver>=VerD12 - template support
@@ -1064,6 +1121,7 @@ public:
     TTemplateArgDef();
     ~TTemplateArgDef();
     void __fastcall Show(String &OutS);
+    void __fastcall Visit(TDCURecVisitor *Visitor) override;
 
     int  Cnt, V5;
     int *Tbl;
@@ -1076,11 +1134,91 @@ public:
     ~TTemplateCall();
     void __fastcall Show(String &OutS);
     void __fastcall EnumUsedTypes(TTypeUseAction Action, DWord *IP);
+    void __fastcall         Visit(TDCURecVisitor *Visitor) override;
 
     int  hDT;
     int  Cnt;
     int *Args;
     int  hDTFull;
+};
+
+// Pattern "Visitor" for TDCURec class hierarchy
+// it allows us to extend the functionality of the classes somehow, for example,
+// implement XML or DBMS export
+class TDCURecVisitor {
+public:
+    virtual void __fastcall doVisit(TDCURec *DCURec);
+
+// protected:
+    virtual void __fastcall afterVisit(TDCURec *DCURec);
+    virtual void __fastcall visitDCURec(TDCURec *DCURec);
+    virtual void __fastcall visitBaseDef(TBaseDef *BaseDef);
+    virtual void __fastcall visitImpDef(TImpDef *ImpDef);
+    virtual void __fastcall visitUnitImpDef(TUnitImpDef *UnitImpDef);
+    virtual void __fastcall visitDLLImpRec(TDLLImpRec *DLLImpRec);
+    virtual void __fastcall visitImpTypeDefRec(TImpTypeDefRec *ImpTypeDefRec);
+    virtual void __fastcall visitNameDecl(TNameDecl *NameDecl);
+    virtual void __fastcall visitNameFDecl(TNameFDecl *NameFDecl);
+    virtual void __fastcall visitTypeDecl(TTypeDecl *TypeDecl);
+    virtual void __fastcall visitVarDecl(TVarDecl *VarDecl);
+    virtual void __fastcall visitVarVDecl(TVarVDecl *VarVDecl);
+    virtual void __fastcall visitVarCDecl(TVarCDecl *VarCDecl);
+    virtual void __fastcall visitAbsVarDecl(TAbsVarDecl *AbsVarDecl);
+    virtual void __fastcall visitTypePDecl(TTypePDecl *TypePDecl);
+    virtual void __fastcall visitThreadVarDecl(TThreadVarDecl *ThreadVarDecl);
+    virtual void __fastcall visitMemBlockRef(TMemBlockRef *MemBlockRef);
+    virtual void __fastcall visitStrConstDecl(TStrConstDecl *StrConstDecl);
+    virtual void __fastcall visitLabelDecl(TLabelDecl *LabelDecl);
+    virtual void __fastcall visitExportDecl(TExportDecl *ExportDecl);
+    virtual void __fastcall visitLocalDecl(TLocalDecl *LocalDecl);
+    virtual void __fastcall visitMethodDecl(TMethodDecl *MethodDecl);
+    virtual void __fastcall visitClassVarDecl(TClassVarDecl *ClassVarDecl);
+    virtual void __fastcall visitPropDecl(TPropDecl *PropDecl);
+    virtual void __fastcall visitDispPropDecl(TDispPropDecl *DispPropDecl);
+    virtual void __fastcall visitConstDeclBase(TConstDeclBase *ConstDeclBase);
+    virtual void __fastcall visitConstDecl(TConstDecl *ConstDecl);
+    virtual void __fastcall visitResStrDef(TResStrDef *ResStrDef);
+    virtual void __fastcall visitSetDeftInfo(TSetDeftInfo *SetDeftInfo);
+    virtual void __fastcall visitCopyDecl(TCopyDecl *CopyDecl);
+    virtual void __fastcall visitProcDecl(TProcDecl *ProcDecl);
+    virtual void __fastcall visitSysProcDecl(TSysProcDecl *SysProcDecl);
+    virtual void __fastcall visitSysProc8Decl(TSysProc8Decl *SysProc8Decl);
+    virtual void __fastcall visitUnitAddInfo(TUnitAddInfo *UnitAddInfo);
+    virtual void __fastcall visitSpecVar(TSpecVar *SpecVar);
+    // types
+    virtual void __fastcall visitTypeDef(TTypeDef *TypeDef);
+    virtual void __fastcall visitRangeBaseDef(TRangeBaseDef *RangeBaseDef);
+    virtual void __fastcall visitRangeDef(TRangeDef *RangeDef);
+    virtual void __fastcall visitEnumDef(TEnumDef *EnumDef);
+    virtual void __fastcall visitFloatDef(TFloatDef *FloatDef);
+    virtual void __fastcall visitPtrDef(TPtrDef *PtrDef);
+    virtual void __fastcall visitTextDef(TTextDef *TextDef);
+    virtual void __fastcall visitFileDef(TFileDef *FileDef);
+    virtual void __fastcall visitSetDef(TSetDef *SetDef);
+    virtual void __fastcall visitArrayDef0(TArrayDef0 *ArrayDef0);
+    virtual void __fastcall visitArrayDef(TArrayDef *ArrayDef);
+    virtual void __fastcall visitShortStrDef(TShortStrDef *ShortStrDef);
+    virtual void __fastcall visitStringDef(TStringDef *StringDef);
+    virtual void __fastcall visitVariantDef(TVariantDef *VariantDef);
+    virtual void __fastcall visitObjVMTDef(TObjVMTDef *ObjVMTDef);
+    virtual void __fastcall visitRecBaseDef(TRecBaseDef *RecBaseDef);
+    virtual void __fastcall visitRecDef(TRecDef *RecDef);
+    virtual void __fastcall visitProcTypeDef(TProcTypeDef *ProcTypeDef);
+    virtual void __fastcall visitOOTypeDef(TOOTypeDef *OOTypeDef);
+    virtual void __fastcall visitObjDef(TObjDef *ObjDef);
+    virtual void __fastcall visitClassDef(TClassDef *ClassDef);
+    virtual void __fastcall visitMetaClassDef(TMetaClassDef *MetaClassDef);
+    virtual void __fastcall visitInterfaceDef(TInterfaceDef *InterfaceDef);
+    virtual void __fastcall visitVoidDef(TVoidDef *VoidDef);
+    virtual void __fastcall visitA6Def(TA6Def *A6Def);
+    virtual void __fastcall visitDelayedImpRec(TDelayedImpRec *DelayedImpRec);
+    virtual void __fastcall visitORecDecl(TORecDecl *ORecDecl);
+    virtual void __fastcall visitDynArrayDef(TDynArrayDef *DynArrayDef);
+    virtual void __fastcall visitTemplateArgDef(TTemplateArgDef *TemplateArgDef);
+    virtual void __fastcall visitTemplateCall(TTemplateCall *TemplateCall);
+    virtual void __fastcall visitAssemblyData(TAssemblyData *AssemblyData);
+
+    bool FVisited;
 };
 
 //------------------------------------------------------------------------------

@@ -49,6 +49,8 @@ DWord __fastcall TDCURec::SetMem(DWord MOfs, DWord MSz) { return 0; }
 //------------------------------------------------------------------------------
 bool __fastcall TDCURec::NameIsUnique() { return false; }
 //------------------------------------------------------------------------------
+void __fastcall TDCURec::Visit(TDCURecVisitor *Visitor) {}
+//------------------------------------------------------------------------------
 void __fastcall TDCURec::ShowName(String &OutS) { OutS = ""; }
 //------------------------------------------------------------------------------
 void __fastcall TDCURec::Show(String &OutS) { OutS = ""; }
@@ -63,6 +65,8 @@ TBaseDef::TBaseDef(PName AName, PNameDef ADef, int AUnit) : TDCURec() {
     Def   = ADef;
     hUnit = AUnit;
 }
+//------------------------------------------------------------------------------
+void TBaseDef::Visit(TDCURecVisitor *Visitor) { Visitor->visitBaseDef(this); }
 //------------------------------------------------------------------------------
 void __fastcall TBaseDef::ShowName(String &OutS) {
     PName NP = FName;
@@ -114,6 +118,8 @@ TImpDef::TImpDef(Byte AIK, PName AName, int AnInf, PNameDef ADef, int AUnit) : T
     ik  = AIK;
 }
 //------------------------------------------------------------------------------
+void TImpDef::Visit(TDCURecVisitor *Visitor) { Visitor->visitImpDef(this); }
+//------------------------------------------------------------------------------
 void __fastcall TImpDef::Show(String &OutS) {
     String S;
     OutS = String(ik) + ":";
@@ -124,7 +130,11 @@ void __fastcall TImpDef::Show(String &OutS) {
 //------------------------------------------------------------------------------
 bool __fastcall TImpDef::NameIsUnique() { return FNameIsUnique; }
 //------------------------------------------------------------------------------
+void TUnitImpDef::Visit(TDCURecVisitor *Visitor) { Visitor->visitUnitImpDef(this); }
+//------------------------------------------------------------------------------
 TDLLImpRec::TDLLImpRec(PName AName, int ANdx, PNameDef ADef, int AUnit) : TBaseDef(AName, ADef, AUnit) { Ndx = ANdx; }
+//------------------------------------------------------------------------------
+void TDLLImpRec::Visit(TDCURecVisitor *Visitor) { Visitor->visitDLLImpRec(this); }
 //------------------------------------------------------------------------------
 void __fastcall TDLLImpRec::Show(String &OutS) {
     OutS          = "";
@@ -150,6 +160,8 @@ TImpTypeDefRec::TImpTypeDefRec(PName AName, int AnInf, DWord ARTTISz, PNameDef A
     ImpName  = FName;
     FName    = NULL; // Will be named later in the corresponding TTypeDecl
 }
+//------------------------------------------------------------------------------
+void TImpTypeDefRec::Visit(TDCURecVisitor *Visitor) { Visitor->visitImpTypeDefRec(this); }
 //------------------------------------------------------------------------------
 void __fastcall TImpTypeDefRec::Show(String &OutS) {
     String Name;
@@ -188,6 +200,8 @@ TNameDecl::TNameDecl(bool All) : TDCURec() {
 };
 //------------------------------------------------------------------------------
 TNameDecl::~TNameDecl() {}
+//------------------------------------------------------------------------------
+void TNameDecl::Visit(TDCURecVisitor *Visitor) { Visitor->visitNameDecl(this); }
 //------------------------------------------------------------------------------
 void __fastcall TNameDecl::ShowName(String &OutS) {
     OutS = GetDCURecStr(this, hDecl);
@@ -228,9 +242,9 @@ TNameFDecl::TNameFDecl(bool NoInf) : TNameDecl(true) {
     }
 };
 //------------------------------------------------------------------------------
-void __fastcall TNameFDecl::Show(String& OutS) {
-    TNameDecl::Show(OutS);
-}
+void __fastcall TNameFDecl::Visit(TDCURecVisitor *Visitor) { Visitor->visitNameFDecl(this); }
+//------------------------------------------------------------------------------
+void __fastcall TNameFDecl::Show(String &OutS) { TNameDecl::Show(OutS); }
 //------------------------------------------------------------------------------
 bool __fastcall TNameFDecl::IsVisible(Byte LK) {
     if (LK == dlMain) return ((F & 0x40) != 0);
@@ -244,9 +258,9 @@ TTypeDecl::TTypeDecl() : TNameFDecl(false) {
     AddTypeName(hDef, hDecl, &Def->Name);
 }
 //------------------------------------------------------------------------------
-bool __fastcall TTypeDecl::IsVisible(Byte LK) {
-    return TNameFDecl::IsVisible(LK);
-}
+bool __fastcall TTypeDecl::IsVisible(Byte LK) { return TNameFDecl::IsVisible(LK); }
+//------------------------------------------------------------------------------
+void TTypeDecl::Visit(TDCURecVisitor *Visitor) { Visitor->visitTypeDecl(this); }
 //------------------------------------------------------------------------------
 int M = 0;
 
@@ -377,6 +391,8 @@ TVarDecl::TVarDecl() : TNameFDecl(false) {
     Ofs = ReadUIndex();
 }
 //------------------------------------------------------------------------------
+void TVarDecl::Visit(TDCURecVisitor *Visitor) { Visitor->visitVarDecl(this); }
+//------------------------------------------------------------------------------
 void __fastcall TVarDecl::Show(String& OutS) {
     String S;
 
@@ -405,6 +421,8 @@ void __fastcall TVarDecl::Show(String& OutS) {
 //------------------------------------------------------------------------------
 void __fastcall TVarDecl::EnumUsedTypes(TTypeUseAction Action, DWord *IP) {
     Action(this, hDT, IP);
+//------------------------------------------------------------------------------
+void TVarVDecl::Visit(TDCURecVisitor *Visitor) { Visitor->visitVarVDecl(this); }
 }
 //------------------------------------------------------------------------------
 Byte __fastcall TVarDecl::GetSecKind() {
@@ -416,6 +434,8 @@ TVarCDecl::TVarCDecl(bool OfsValid) : TVarDecl() {
     OfsR = Ofs;
     if (!OfsValid) Ofs = -1;
 }
+//------------------------------------------------------------------------------
+void TVarCDecl::Visit(TDCURecVisitor *Visitor) { Visitor->visitVarCDecl(this); }
 //------------------------------------------------------------------------------
 int       CodeFixupCnt;
 PFixupRec CodeFixups;
@@ -540,6 +560,8 @@ TAbsVarDecl::TAbsVarDecl() : TVarDecl() {
     RefAddrDef(Ofs); // forward references could happen e.g. by referencing Self in embedded proc
 }
 //------------------------------------------------------------------------------
+void TAbsVarDecl::Visit(TDCURecVisitor *Visitor) { Visitor->visitAbsVarDecl(this); }
+//------------------------------------------------------------------------------
 void __fastcall TAbsVarDecl::Show(String& OutS) {
     String S;
 
@@ -572,6 +594,8 @@ void __fastcall TAbsVarDecl::Show(String& OutS) {
 //------------------------------------------------------------------------------
 TTypePDecl::TTypePDecl() : TVarCDecl(false) {
 }
+//------------------------------------------------------------------------------
+void TTypePDecl::Visit(TDCURecVisitor *Visitor) { Visitor->visitTypePDecl(this); }
 //------------------------------------------------------------------------------
 void __fastcall TTypePDecl::Show(String& OutS) {
     DWord DS;
@@ -640,6 +664,10 @@ Byte __fastcall TThreadVarDecl::GetSecKind() {
 //------------------------------------------------------------------------------
 TStrConstDecl::TStrConstDecl():TNameFDecl(false) {
     Sz = ReadUIndex();
+void TThreadVarDecl::Visit(TDCURecVisitor *Visitor) { Visitor->visitThreadVarDecl(this); }
+//------------------------------------------------------------------------------
+void TMemBlockRef::Visit(TDCURecVisitor *Visitor) { Visitor->visitMemBlockRef(this); }
+//------------------------------------------------------------------------------
     hDT = ReadUIndex();
     if (FVer >= verDXE1 && FVer < verK1) int X = ReadUIndex();
     if (!Sz) Sz = static_cast<DWord>(-1);
@@ -658,6 +686,8 @@ Byte __fastcall TStrConstDecl::GetSecKind() {
     else
         return skConst;
 }
+//------------------------------------------------------------------------------
+void TStrConstDecl::Visit(TDCURecVisitor *Visitor) { Visitor->visitStrConstDecl(this); }
 //------------------------------------------------------------------------------
 void __fastcall TStrConstDecl::Show(String &OutS) {
     DWord          DS;
@@ -694,6 +724,8 @@ TLabelDecl::TLabelDecl() :TNameDecl(true) {
     if (FVer >= verD2009 && FVer < verK1) ReadUIndex();
 }
 //------------------------------------------------------------------------------
+void TLabelDecl::Visit(TDCURecVisitor *Visitor) { Visitor->visitLabelDecl(this); }
+//------------------------------------------------------------------------------
 void __fastcall TLabelDecl::Show(String& OutS) {
     TNameDecl::Show(OutS);
 }
@@ -710,6 +742,8 @@ TExportDecl::TExportDecl() :TNameDecl(true) {
     hSym = ReadUIndex();
     Index = ReadUIndex();
 }
+//------------------------------------------------------------------------------
+void TExportDecl::Visit(TDCURecVisitor *Visitor) { Visitor->visitExportDecl(this); }
 //------------------------------------------------------------------------------
 void __fastcall TExportDecl::Show(String &OutS) {
     TDCURec *D = GetAddrDef(hSym);
@@ -781,6 +815,8 @@ TLocalDecl::TLocalDecl(Byte LK) : TNameDecl(true) {
     if (GetTag() == arAbsLocVar)
         RefAddrDef(Ndx); // forward references could happen e.g. by referencing Self in embedded proc
 }
+//------------------------------------------------------------------------------
+void TLocalDecl::Visit(TDCURecVisitor *Visitor) { Visitor->visitLocalDecl(this); }
 //------------------------------------------------------------------------------
 String RegName[7] = {"EAX", "EDX", "ECX", "EBX", "ESI", "EDI", "EBP"};
 
@@ -890,8 +926,9 @@ TMethodDecl::TMethodDecl(Byte LK) : TLocalDecl(LK) {
     }
 }
 //------------------------------------------------------------------------------
-void __fastcall ShowFlags() {
-}
+void TMethodDecl::Visit(TDCURecVisitor *Visitor) { Visitor->visitMethodDecl(this); }
+//------------------------------------------------------------------------------
+void __fastcall ShowFlags() {}
 //------------------------------------------------------------------------------
 void __fastcall TMethodDecl::Show(String &OutS) {
     String   MS, PS, S;
@@ -1040,8 +1077,9 @@ void __fastcall TMethodDecl::Show(String &OutS) {
     if (MethodsList) MethodsList->Add(static_cast<void *>(MethodDeclInfo));
 }
 //------------------------------------------------------------------------------
-TClassVarDecl::TClassVarDecl(Byte LK) : TLocalDecl(LK) {
-}
+TClassVarDecl::TClassVarDecl(Byte LK) : TLocalDecl(LK) {}
+//------------------------------------------------------------------------------
+void TClassVarDecl::Visit(TDCURecVisitor *Visitor) { Visitor->visitClassVarDecl(this); }
 //------------------------------------------------------------------------------
 void __fastcall TClassVarDecl::Show(String& OutS) {
     OutLog1("class var ");
@@ -1096,6 +1134,8 @@ String __fastcall TPropDecl::PutOp(String Name, int hOp) {
     return V;
 }
 //------------------------------------------------------------------------------
+void TPropDecl::Visit(TDCURecVisitor *Visitor) { Visitor->visitPropDecl(this); }
+//------------------------------------------------------------------------------
 void __fastcall TPropDecl::Show(String &OutS) {
     String S;
     OutS = "";
@@ -1142,6 +1182,8 @@ Byte __fastcall TPropDecl::GetSecKind() {
 //------------------------------------------------------------------------------
 TDispPropDecl::TDispPropDecl(Byte LK) : TLocalDecl(LK) {
 }
+//------------------------------------------------------------------------------
+void TDispPropDecl::Visit(TDCURecVisitor *Visitor) { Visitor->visitDispPropDecl(this); }
 //------------------------------------------------------------------------------
 void __fastcall TDispPropDecl::Show(String& OutS) {
     String S;
@@ -1216,6 +1258,8 @@ void __fastcall TConstDeclBase::ShowValue(String &OutS) {
     OutS += S;
 }
 //------------------------------------------------------------------------------
+void TConstDeclBase::Visit(TDCURecVisitor *Visitor) { Visitor->visitConstDeclBase(this); }
+//------------------------------------------------------------------------------
 void __fastcall TConstDeclBase::Show(String &OutS) {
     String S;
 
@@ -1277,6 +1321,8 @@ bool __fastcall TConstDecl::IsVisible(Byte LK) {
     }
     return TNameFDecl::IsVisible(LK);
 }
+//------------------------------------------------------------------------------
+void TConstDecl::Visit(TDCURecVisitor *Visitor) { Visitor->visitConstDecl(this); }
 //------------------------------------------------------------------------------
 TResStrDef::TResStrDef() : TVarCDecl(false) {
     OfsR = Ofs;
@@ -1474,6 +1520,8 @@ bool __fastcall TProcDecl::IsProc() {
     return TypeIsVoid(hDTRes);
 }
 //------------------------------------------------------------------------------
+void __fastcall TProcDecl::Visit(TDCURecVisitor *Visitor) { Visitor->visitProcDecl(this); }
+//------------------------------------------------------------------------------
 void __fastcall TProcDecl::ShowDef(bool All, String &OutS) {
     String S = "";
 
@@ -1576,6 +1624,8 @@ TSysProcDecl::TSysProcDecl() : TNameDecl(true) {
     Ndx = ReadIndex();
 }
 //------------------------------------------------------------------------------
+void TSysProcDecl::Visit(TDCURecVisitor *Visitor) { Visitor->visitSysProcDecl(this); }
+//------------------------------------------------------------------------------
 void __fastcall TSysProcDecl::Show(String& OutS) {
     OutLog1("sysproc ");
     TNameDecl::Show(OutS);
@@ -1601,9 +1651,12 @@ TUnitAddInfo::~TUnitAddInfo() {
 bool __fastcall TUnitAddInfo::IsVisible(Byte LK) {
     return  false;
 }
+bool __fastcall TUnitAddInfo::IsVisible(Byte LK) { return false; }
 //------------------------------------------------------------------------------
-TSpecVar::TSpecVar() : TVarDecl() {
-}
+void TUnitAddInfo::Visit(TDCURecVisitor *Visitor) { Visitor->visitUnitAddInfo(this); }
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+void TSpecVar::Visit(TDCURecVisitor *Visitor) { Visitor->visitSpecVar(this); }
 //------------------------------------------------------------------------------
 void __fastcall TSpecVar::Show(String& OutS) {
     String  S;
@@ -1650,6 +1703,8 @@ TTypeDef::~TTypeDef() {
     // ???
 }
 //------------------------------------------------------------------------------
+void TTypeDef::Visit(TDCURecVisitor *Visitor) { Visitor->visitTypeDef(this); }
+//------------------------------------------------------------------------------
 void __fastcall TTypeDef::ShowBase() {
     if (RTTISz > 0) ShowDataBl(0, RTTIOfs, RTTISz);
 }
@@ -1692,6 +1747,8 @@ void __fastcall TRangeBaseDef::GetRange(PInt64Rec Lo, PInt64Rec Hi) {
     ReadIndex64(Hi);
     CurPos = Tmp;
 }
+//------------------------------------------------------------------------------
+void TRangeBaseDef::Visit(TDCURecVisitor *Visitor) { Visitor->visitRangeBaseDef(this); }
 //------------------------------------------------------------------------------
 String __fastcall WCharStr(wchar_t WCh) {
     wchar_t WStr[2];
@@ -1875,6 +1932,8 @@ TRangeDef::TRangeDef() : TRangeBaseDef() {
         B = ReadByte(); // It could be index too, but I'm not sure
 }
 //------------------------------------------------------------------------------
+void TRangeDef::Visit(TDCURecVisitor *Visitor) { Visitor->visitRangeDef(this); }
+//------------------------------------------------------------------------------
 TEnumDef::TEnumDef() : TRangeBaseDef() {
     hDTBase = ReadUIndex();
     if (FVer >= verD2009 && FVer < verK1) ReadUIndex();
@@ -1941,6 +2000,8 @@ void __fastcall TEnumDef::Show(String& OutS) {
     OutLog1(");");
 }
 //------------------------------------------------------------------------------
+void TEnumDef::Visit(TDCURecVisitor *Visitor) { Visitor->visitEnumDef(this); }
+//------------------------------------------------------------------------------
 TFloatDef::TFloatDef() : TTypeDef() {
     Byte B = ReadByte();
     Kind   = B;
@@ -1956,6 +2017,8 @@ String __fastcall TFloatDef::GetKindName() {
         case 5: return "fkCurrency";
     }
 }
+//------------------------------------------------------------------------------
+void TFloatDef::Visit(TDCURecVisitor *Visitor) { Visitor->visitFloatDef(this); }
 //------------------------------------------------------------------------------
 int __fastcall TFloatDef::ShowValue(Byte *DP, DWord DS, String &OutS) {
     long double E;
@@ -2183,6 +2246,8 @@ bool __fastcall TPtrDef::ShowRefValue(int Ndx, DWord Ofs, String& OutS) {
     return true;
 }
 //------------------------------------------------------------------------------
+void TPtrDef::Visit(TDCURecVisitor *Visitor) { Visitor->visitPtrDef(this); }
+//------------------------------------------------------------------------------
 int __fastcall TPtrDef::ShowValue(Byte *DP, DWord DS, String &OutS) {
     OutS = "";
     if (Sz > DS) return -1;
@@ -2212,6 +2277,8 @@ String __fastcall TPtrDef::GetRefOfsQualifier(int Ofs) {
 //------------------------------------------------------------------------------
 TTextDef::TTextDef() : TTypeDef() {}
 //------------------------------------------------------------------------------
+void TTextDef::Visit(TDCURecVisitor *Visitor) { Visitor->visitTextDef(this); }
+//------------------------------------------------------------------------------
 void __fastcall TTextDef::Show(String& OutS) {
     String S;
     TTypeDef::Show(S);
@@ -2222,6 +2289,8 @@ void __fastcall TTextDef::Show(String& OutS) {
 TFileDef::TFileDef() : TTypeDef() {
     hBaseDT = ReadUIndex();
 }
+//------------------------------------------------------------------------------
+void TFileDef::Visit(TDCURecVisitor *Visitor) { Visitor->visitFileDef(this); }
 //------------------------------------------------------------------------------
 void __fastcall TFileDef::Show(String& OutS) {
     String S;
@@ -2239,6 +2308,8 @@ TSetDef::TSetDef() : TTypeDef() {
     BStart  = ReadByte();
     hBaseDT = ReadUIndex();
 }
+//------------------------------------------------------------------------------
+void TSetDef::Visit(TDCURecVisitor *Visitor) { Visitor->visitSetDef(this); }
 //------------------------------------------------------------------------------
 int __fastcall TSetDef::ShowValue(Byte *DP, DWord DS, String &OutS) {
     int    K;
@@ -2333,6 +2404,8 @@ TArrayDef0::TArrayDef0(bool IsStr) : TTypeDef() {
     if (!IsStr && IsMSIL) ReadUIndex();
 }
 //------------------------------------------------------------------------------
+void TArrayDef0::Visit(TDCURecVisitor *Visitor) { Visitor->visitArrayDef0(this); }
+//------------------------------------------------------------------------------
 int __fastcall TArrayDef0::ShowValue(Byte *DP, DWord DS, String &OutS) {
     String S;
 
@@ -2396,11 +2469,15 @@ String __fastcall TArrayDef::GetOfsQualifier(int Ofs) {
         int ElSz = TD->Sz;
         return Format("[%d]%s", ARRAYOFCONST((Ofs / ElSz, ShowOfsQualifier(hDTEl, Ofs % ElSz))));
     }
+//------------------------------------------------------------------------------
+void TArrayDef::Visit(TDCURecVisitor *Visitor) { Visitor->visitArrayDef(this); }
 }
 //------------------------------------------------------------------------------
 TShortStrDef::TShortStrDef() : TArrayDef(true) {
     if (FVer >= verD2009 && FVer < verK1) CP = ReadUIndex();
 }
+//------------------------------------------------------------------------------
+void TShortStrDef::Visit(TDCURecVisitor *Visitor) { Visitor->visitShortStrDef(this); }
 //------------------------------------------------------------------------------
 int __fastcall TShortStrDef::ShowValue(Byte *DP, DWord DS, String &OutS) {
     int L;
@@ -2430,6 +2507,8 @@ void __fastcall TShortStrDef::Show(String &OutS) {
 TStringDef::TStringDef() : TArrayDef(true) {
     if (FVer >= verD2009 && FVer < verK1) CP = ReadUIndex();
 }
+//------------------------------------------------------------------------------
+void TStringDef::Visit(TDCURecVisitor *Visitor) { Visitor->visitStringDef(this); }
 //------------------------------------------------------------------------------
 bool __fastcall TStringDef::ShowRefValue(int Ndx, DWord Ofs, String& OutS) {
     if (Ofs < 8) return false;
@@ -2473,6 +2552,8 @@ TVariantDef::TVariantDef() : TTypeDef() {
     if (FVer > verD2) B = ReadByte();
 }
 //------------------------------------------------------------------------------
+void TVariantDef::Visit(TDCURecVisitor *Visitor) { Visitor->visitVariantDef(this); }
+//------------------------------------------------------------------------------
 void __fastcall TVariantDef::Show(String& OutS) {
     OutLog1("variant");
     TTypeDef::Show(OutS);
@@ -2487,6 +2568,8 @@ TObjVMTDef::TObjVMTDef() : TTypeDef() {
 //------------------------------------------------------------------------------
 void __fastcall TObjVMTDef::Show(String& OutS)
 {
+void TObjVMTDef::Visit(TDCURecVisitor *Visitor) { Visitor->visitObjVMTDef(this); }
+//------------------------------------------------------------------------------
     TTypeDef::Show(OutS);
     OutS += "class of ";
     OutLog1("class of ");
@@ -2502,6 +2585,8 @@ void __fastcall TRecBaseDef::ReadFields(Byte LK) {
     ReadDeclList(LK, &Fields);
     if (Tag != drStop1) printf("Error: Stop Tag\n");
 }
+//------------------------------------------------------------------------------
+void TRecBaseDef::Visit(TDCURecVisitor *Visitor) { Visitor->visitRecBaseDef(this); }
 //------------------------------------------------------------------------------
 int __fastcall TRecBaseDef::ShowFieldValues(Byte *DP, DWord DS, String &OutS) {
     int        Ofs;
@@ -2627,6 +2712,8 @@ TRecDef::TRecDef() : TRecBaseDef() {
     }
     ReadFields(dlFields);
 }
+//------------------------------------------------------------------------------
+void TRecDef::Visit(TDCURecVisitor *Visitor) { Visitor->visitRecDef(this); }
 //------------------------------------------------------------------------------
 int __fastcall TRecDef::ShowValue(Byte *DP, DWord DS, String &OutS) {
     return ShowFieldValues(DP, DS, OutS);
@@ -2803,6 +2890,8 @@ TProcTypeDef::TProcTypeDef() : TRecBaseDef() {
     ReadFields(dlArgsT);
 }
 //------------------------------------------------------------------------------
+void TProcTypeDef::Visit(TDCURecVisitor *Visitor) { Visitor->visitProcTypeDef(this); }
+//------------------------------------------------------------------------------
 int __fastcall TProcTypeDef::ShowValue(Byte *DP, DWord DS, String &OutS) {
     OutS = "";
     if (Sz > DS) return -1;
@@ -2864,6 +2953,8 @@ void __fastcall TProcTypeDef::EnumUsedTypes(TTypeUseAction Action, DWord *IP) {
     if (!IsProc()) Action(this, hDTRes, IP);
 }
 //------------------------------------------------------------------------------
+void TOOTypeDef::Visit(TDCURecVisitor *Visitor) { Visitor->visitOOTypeDef(this); }
+//------------------------------------------------------------------------------
 __fastcall TObjDef::TObjDef() : TRecBaseDef() {
     B03     = ReadByte();
     hParent = ReadUIndex();
@@ -2872,6 +2963,8 @@ __fastcall TObjDef::TObjDef() : TRecBaseDef() {
     B00     = ReadByte();
     ReadFields(dlFields);
 }
+//------------------------------------------------------------------------------
+void TObjDef::Visit(TDCURecVisitor *Visitor) { Visitor->visitObjDef(this); }
 //------------------------------------------------------------------------------
 int __fastcall TObjDef::ShowValue(Byte *DP, DWord DS, String &OutS) { return ShowFieldValues(DP, DS, OutS); }
 //------------------------------------------------------------------------------
@@ -2926,6 +3019,8 @@ TClassDef::TClassDef() : TRecBaseDef() {
 TClassDef::~TClassDef() {
     if (ITbl) delete[] ITbl;
 }
+//------------------------------------------------------------------------------
+void TClassDef::Visit(TDCURecVisitor *Visitor) { Visitor->visitClassDef(this); }
 //------------------------------------------------------------------------------
 int __fastcall TClassDef::ShowValue(Byte *DP, DWord DS, String &OutS) {
     OutS = "";
@@ -2986,6 +3081,8 @@ void __fastcall TClassDef::ReadBeforeIntf() {}
 //------------------------------------------------------------------------------
 TMetaClassDef::TMetaClassDef() : TClassDef() {}
 //------------------------------------------------------------------------------
+void TMetaClassDef::Visit(TDCURecVisitor *Visitor) { Visitor->visitMetaClassDef(this); }
+//------------------------------------------------------------------------------
 void __fastcall TMetaClassDef::ReadBeforeIntf() {
     hCl = ReadUIndex();
     ReadUIndex(); // Ignore - was always 0
@@ -3021,6 +3118,8 @@ TInterfaceDef::TInterfaceDef() : TRecBaseDef() {
     ReadFields(LK);
 }
 //------------------------------------------------------------------------------
+void TInterfaceDef::Visit(TDCURecVisitor *Visitor) { Visitor->visitInterfaceDef(this); }
+//------------------------------------------------------------------------------
 void __fastcall TInterfaceDef::Show(String &OutS) {
     char   guid[1024];
     String S, S1;
@@ -3046,6 +3145,8 @@ TVoidDef::TVoidDef() : TTypeDef() {
     if (FVer >= verDXE1 && FVer < verK1) int X = ReadUIndex();
 }
 //------------------------------------------------------------------------------
+void TVoidDef::Visit(TDCURecVisitor *Visitor) { Visitor->visitVoidDef(this); }
+//------------------------------------------------------------------------------
 void __fastcall TVoidDef::Show(String &OutS) {
     String SType;
     OutS = "void";
@@ -3061,6 +3162,8 @@ TA6Def::TA6Def() : TDCURec() {
 }
 //------------------------------------------------------------------------------
 TA6Def::~TA6Def() { FreeDCURecList(Args); }
+//------------------------------------------------------------------------------
+void TA6Def::Visit(TDCURecVisitor *Visitor) { Visitor->visitA6Def(this); }
 //------------------------------------------------------------------------------
 void __fastcall TA6Def::Show(String &OutS) { ShowDeclList(dlA6, Args, OutS); }
 //------------------------------------------------------------------------------
@@ -3094,6 +3197,8 @@ TDelayedImpRec::TDelayedImpRec() : TNameDecl(true) {
     RefAddrDef(F);
 }
 //------------------------------------------------------------------------------
+void TDelayedImpRec::Visit(TDCURecVisitor *Visitor) { Visitor->visitDelayedImpRec(this); }
+//------------------------------------------------------------------------------
 void __fastcall TDelayedImpRec::Show(String &OutS) {
     TNameDecl::Show(OutS);
     OutLog1("B0");
@@ -3112,6 +3217,8 @@ TORecDecl::TORecDecl() : TNameDecl(true) {
 //------------------------------------------------------------------------------
 TORecDecl::~TORecDecl() { FreeDCURecList(Args); }
 //------------------------------------------------------------------------------
+void TORecDecl::Visit(TDCURecVisitor *Visitor) { Visitor->visitORecDecl(this); }
+//------------------------------------------------------------------------------
 void __fastcall TORecDecl::Show(String &OutS) {
     TNameDecl::Show(OutS);
     OutLog1("ORec");
@@ -3120,6 +3227,8 @@ void __fastcall TORecDecl::Show(String &OutS) {
 }
 //------------------------------------------------------------------------------
 TDynArrayDef::TDynArrayDef() : TPtrDef() {}
+//------------------------------------------------------------------------------
+void TDynArrayDef::Visit(TDCURecVisitor *Visitor) { Visitor->visitDynArrayDef(this); }
 //------------------------------------------------------------------------------
 void __fastcall TDynArrayDef::Show(String &OutS) {
     ShowBase();
@@ -3151,6 +3260,8 @@ TTemplateArgDef::~TTemplateArgDef() {
     if (Tbl) delete[] Tbl;
 }
 //------------------------------------------------------------------------------
+void TTemplateArgDef::Visit(TDCURecVisitor *Visitor) { Visitor->visitTemplateArgDef(this); }
+//------------------------------------------------------------------------------
 void __fastcall TTemplateArgDef::Show(String &OutS) {
     TTypeDef::Show(OutS);
     OutLog1("template arg");
@@ -3180,6 +3291,8 @@ TTemplateCall::~TTemplateCall() {
     if (Args) delete[] Args;
 }
 //------------------------------------------------------------------------------
+void TTemplateCall::Visit(TDCURecVisitor *Visitor) { Visitor->visitTemplateCall(this); }
+//------------------------------------------------------------------------------
 void __fastcall TTemplateCall::Show(String &OutS) {
     TTypeDef::Show(OutS);
     if (hDTFull) OutS += ShowTypeName(hDTFull);
@@ -3197,3 +3310,144 @@ void __fastcall TTemplateCall::Show(String &OutS) {
 //------------------------------------------------------------------------------
 void __fastcall TTemplateCall::EnumUsedTypes(TTypeUseAction Action, DWord *IP) { Action(this, hDT, IP); }
 //------------------------------------------------------------------------------
+void __fastcall TDCURecVisitor::doVisit(TDCURec *DCURec) {
+    bool SaveVisited = FVisited;
+    SaveVisited = FVisited;
+    FVisited = true;
+    DCURec->Visit(this);
+    if (FVisited) afterVisit(DCURec);
+    FVisited = SaveVisited;
+}
+//------------------------------------------------------------------------------
+void __fastcall TDCURecVisitor::afterVisit(TDCURec *DCURec) {}
+
+void __fastcall TDCURecVisitor::visitDCURec(TDCURec *DCURec) {}
+
+void __fastcall TDCURecVisitor::visitBaseDef(TBaseDef *BaseDef) { visitDCURec(BaseDef); }
+
+void __fastcall TDCURecVisitor::visitImpDef(TImpDef *ImpDef) { visitBaseDef(ImpDef); }
+
+void __fastcall TDCURecVisitor::visitUnitImpDef(TUnitImpDef *UnitImpDef) { visitImpDef(UnitImpDef); }
+
+void __fastcall TDCURecVisitor::visitDLLImpRec(TDLLImpRec *DLLImpRec) { visitBaseDef(DLLImpRec); }
+
+void __fastcall TDCURecVisitor::visitImpTypeDefRec(TImpTypeDefRec *ImpTypeDefRec) { visitImpDef(ImpTypeDefRec); }
+
+void __fastcall TDCURecVisitor::visitNameDecl(TNameDecl *NameDecl) { visitDCURec(NameDecl); }
+
+void __fastcall TDCURecVisitor::visitNameFDecl(TNameFDecl *NameFDecl) { visitNameDecl(NameFDecl); }
+
+void __fastcall TDCURecVisitor::visitTypeDecl(TTypeDecl *TypeDecl) { visitNameFDecl(TypeDecl); }
+
+void __fastcall TDCURecVisitor::visitVarDecl(TVarDecl *VarDecl) { visitNameFDecl(VarDecl); }
+
+void __fastcall TDCURecVisitor::visitVarVDecl(TVarVDecl *VarVDecl) { visitVarDecl(VarVDecl); }
+
+void __fastcall TDCURecVisitor::visitVarCDecl(TVarCDecl *VarCDecl) { visitVarDecl(VarCDecl); }
+
+void __fastcall TDCURecVisitor::visitAbsVarDecl(TAbsVarDecl *AbsVarDecl) { visitVarDecl(AbsVarDecl); }
+
+void __fastcall TDCURecVisitor::visitTypePDecl(TTypePDecl *TypePDecl) { visitVarCDecl(TypePDecl); }
+
+void __fastcall TDCURecVisitor::visitThreadVarDecl(TThreadVarDecl *ThreadVarDecl) { visitVarDecl(ThreadVarDecl); }
+
+void __fastcall TDCURecVisitor::visitMemBlockRef(TMemBlockRef *MemBlockRef) { visitNameFDecl(MemBlockRef); }
+
+void __fastcall TDCURecVisitor::visitStrConstDecl(TStrConstDecl *StrConstDecl) { visitMemBlockRef(StrConstDecl); }
+
+void __fastcall TDCURecVisitor::visitLabelDecl(TLabelDecl *LabelDecl) { visitNameDecl(LabelDecl); }
+
+void __fastcall TDCURecVisitor::visitExportDecl(TExportDecl *ExportDecl) { visitNameDecl(ExportDecl); }
+
+void __fastcall TDCURecVisitor::visitLocalDecl(TLocalDecl *LocalDecl) { visitNameDecl(LocalDecl); }
+
+void __fastcall TDCURecVisitor::visitMethodDecl(TMethodDecl *MethodDecl) { visitLocalDecl(MethodDecl); }
+
+void __fastcall TDCURecVisitor::visitClassVarDecl(TClassVarDecl *ClassVarDecl) { visitLocalDecl(ClassVarDecl); }
+
+void __fastcall TDCURecVisitor::visitPropDecl(TPropDecl *PropDecl) { visitNameDecl(PropDecl); }
+
+void __fastcall TDCURecVisitor::visitDispPropDecl(TDispPropDecl *DispPropDecl) { visitLocalDecl(DispPropDecl); }
+
+void __fastcall TDCURecVisitor::visitConstDeclBase(TConstDeclBase *ConstDeclBase) { visitNameFDecl(ConstDeclBase); }
+
+void __fastcall TDCURecVisitor::visitConstDecl(TConstDecl *ConstDecl) { visitConstDeclBase(ConstDecl); }
+
+void __fastcall TDCURecVisitor::visitResStrDef(TResStrDef *ResStrDef) { visitVarCDecl(ResStrDef); }
+
+void __fastcall TDCURecVisitor::visitSetDeftInfo(TSetDeftInfo *SetDeftInfo) { visitDCURec(SetDeftInfo); }
+
+void __fastcall TDCURecVisitor::visitCopyDecl(TCopyDecl *CopyDecl) { visitNameDecl(CopyDecl); }
+
+void __fastcall TDCURecVisitor::visitProcDecl(TProcDecl *ProcDecl) { visitMemBlockRef(ProcDecl); }
+
+void __fastcall TDCURecVisitor::visitSysProcDecl(TSysProcDecl *SysProcDecl) { visitNameDecl(SysProcDecl); }
+
+void __fastcall TDCURecVisitor::visitSysProc8Decl(TSysProc8Decl *SysProc8Decl) { visitProcDecl(SysProc8Decl); }
+
+void __fastcall TDCURecVisitor::visitUnitAddInfo(TUnitAddInfo *UnitAddInfo) { visitNameFDecl(UnitAddInfo); }
+
+void __fastcall TDCURecVisitor::visitSpecVar(TSpecVar *SpecVar) { visitVarDecl(SpecVar); }
+
+void __fastcall TDCURecVisitor::visitTypeDef(TTypeDef *TypeDef) { visitBaseDef(TypeDef); }
+
+void __fastcall TDCURecVisitor::visitRangeBaseDef(TRangeBaseDef *RangeBaseDef) { visitTypeDef(RangeBaseDef); }
+
+void __fastcall TDCURecVisitor::visitRangeDef(TRangeDef *RangeDef) { visitRangeBaseDef(RangeDef); }
+
+void __fastcall TDCURecVisitor::visitEnumDef(TEnumDef *EnumDef) { visitRangeBaseDef(EnumDef); }
+
+void __fastcall TDCURecVisitor::visitFloatDef(TFloatDef *FloatDef) { visitTypeDef(FloatDef); }
+
+void __fastcall TDCURecVisitor::visitPtrDef(TPtrDef *PtrDef) { visitTypeDef(PtrDef); }
+
+void __fastcall TDCURecVisitor::visitTextDef(TTextDef *TextDef) { visitTypeDef(TextDef); }
+
+void __fastcall TDCURecVisitor::visitFileDef(TFileDef *FileDef) { visitTypeDef(FileDef); }
+
+void __fastcall TDCURecVisitor::visitSetDef(TSetDef *SetDef) { visitTypeDef(SetDef); }
+
+void __fastcall TDCURecVisitor::visitArrayDef0(TArrayDef0 *ArrayDef0) { visitTypeDef(ArrayDef0); }
+
+void __fastcall TDCURecVisitor::visitArrayDef(TArrayDef *ArrayDef) { visitArrayDef0(ArrayDef); }
+
+void __fastcall TDCURecVisitor::visitShortStrDef(TShortStrDef *ShortStrDef) { visitArrayDef(ShortStrDef); }
+
+void __fastcall TDCURecVisitor::visitStringDef(TStringDef *StringDef) { visitArrayDef0(StringDef); }
+
+void __fastcall TDCURecVisitor::visitVariantDef(TVariantDef *VariantDef) { visitTypeDef(VariantDef); }
+
+void __fastcall TDCURecVisitor::visitObjVMTDef(TObjVMTDef *ObjVMTDef) { visitTypeDef(ObjVMTDef); }
+
+void __fastcall TDCURecVisitor::visitRecBaseDef(TRecBaseDef *RecBaseDef) { visitTypeDef(RecBaseDef); }
+
+void __fastcall TDCURecVisitor::visitRecDef(TRecDef *RecDef) { visitRecBaseDef(RecDef); }
+
+void __fastcall TDCURecVisitor::visitProcTypeDef(TProcTypeDef *ProcTypeDef) { visitRecBaseDef(ProcTypeDef); }
+
+void __fastcall TDCURecVisitor::visitOOTypeDef(TOOTypeDef *OOTypeDef) { visitRecBaseDef(OOTypeDef); }
+
+void __fastcall TDCURecVisitor::visitObjDef(TObjDef *ObjDef) { visitOOTypeDef(ObjDef); }
+
+void __fastcall TDCURecVisitor::visitClassDef(TClassDef *ClassDef) { visitOOTypeDef(ClassDef); }
+
+void __fastcall TDCURecVisitor::visitMetaClassDef(TMetaClassDef *MetaClassDef) { visitClassDef(MetaClassDef); }
+
+void __fastcall TDCURecVisitor::visitInterfaceDef(TInterfaceDef *InterfaceDef) { visitOOTypeDef(InterfaceDef); }
+
+void __fastcall TDCURecVisitor::visitVoidDef(TVoidDef *VoidDef) { visitTypeDef(VoidDef); }
+
+void __fastcall TDCURecVisitor::visitA6Def(TA6Def *A6Def) { visitDCURec(A6Def); }
+
+void __fastcall TDCURecVisitor::visitDelayedImpRec(TDelayedImpRec *DelayedImpRec) { visitNameDecl(DelayedImpRec); }
+
+void __fastcall TDCURecVisitor::visitORecDecl(TORecDecl *ORecDecl) { visitNameDecl(ORecDecl); }
+
+void __fastcall TDCURecVisitor::visitDynArrayDef(TDynArrayDef *DynArrayDef) { visitPtrDef(DynArrayDef); }
+
+void __fastcall TDCURecVisitor::visitTemplateArgDef(TTemplateArgDef *TemplateArgDef) { visitTypeDef(TemplateArgDef); }
+
+void __fastcall TDCURecVisitor::visitTemplateCall(TTemplateCall *TemplateCall) { visitTypeDef(TemplateCall); }
+
+void __fastcall TDCURecVisitor::visitAssemblyData(TAssemblyData *AssemblyData) { visitDCURec(AssemblyData); }
+
