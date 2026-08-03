@@ -2538,20 +2538,20 @@ bool __fastcall ScanOneDCU(String Filename) {
             fxEnd     = fxEnd2010;
             fxJmpAddr = fxJmpAddrXE; // Was checked for XE only
             break;
-        case 0x1700034B:
+        /*case 0x1700034B:
             FVer      = verDXE2; // DelphiXE2
             fxStart   = fxStart2010;
             fxEnd     = fxEnd2010;
             fxJmpAddr = fxJmpAddrXE; // Was checked for XE only
             break;
         case 0x1700234B:
-            FVer      = verDXE2; // DelphiXE2
+            FVer      = verDXE2; // DelphiXE2 (Win64)
             FPlatform = dcuplWin64;
             FPtrSize  = 8;
             fxJmpAddr = fxJmpAddrXE; // Was checked for XE only
             break;
         case 0x1700044B:
-            FVer      = verDXE2; // DelphiXE2
+            FVer      = verDXE2; // DelphiXE2 (OSX)
             FPlatform = dcuplOsx32;
             fxJmpAddr = fxJmpAddrXE; // Was checked for XE only
             break;
@@ -2562,16 +2562,16 @@ bool __fastcall ScanOneDCU(String Filename) {
             fxJmpAddr = fxJmpAddrXE; // Was checked for XE only
             break;
         case 0x1800234B:
-            FVer      = verDXE3; // DelphiXE3
+            FVer      = verDXE3; // DelphiXE3 (Win64)
             FPlatform = dcuplWin64;
             FPtrSize  = 8;
             fxJmpAddr = fxJmpAddrXE; // Was checked for XE only
             break;
         case 0x1800044B:
-            FVer      = verDXE3; // DelphiXE3
+            FVer      = verDXE3; // DelphiXE3 (OSX)
             FPlatform = dcuplOsx32;
             fxJmpAddr = fxJmpAddrXE; // Was checked for XE only
-            break;
+            break;*/
         case 0xF21F148C:
             FVer    = verK1; // Kylix 1.0
             fxStart = fxStart30;
@@ -2593,14 +2593,18 @@ bool __fastcall ScanOneDCU(String Filename) {
             if ((Magic & 0x00FF00F9) == 0x49) {
                 u_long BVer    = Magic >> 24;
                 u_long PlMagic = Magic & 0xFF;
-                if ((BVer <= 0x24 && BVer >= 0x1B && PlMagic == 0x40) ||
+                if ((BVer <= 0x24 && BVer >= 0x1B && PlMagic == 0x4D) ||
                     (BVer <= 0x1A && BVer >= 0x17 && PlMagic == 0x4B)) {
                     PlMagic   = (Magic >> 8) & 0xFF;
                     FVer      = BVer + (verDXE2 - 0x17);
                     fxJmpAddr = fxJmpAddrXE;
 
                     switch (PlMagic) {
-                        case 0x03: FPlatform = dcuplWin32; break;
+                        case 0x03:
+                            FPlatform = dcuplWin32;
+                            fxStart   = fxStart2010;
+                            fxEnd     = fxEnd2010;
+                            break;
                         case 0x23:
                             FPlatform = dcuplWin64;
                             FPtrSize  = 8;
@@ -2660,14 +2664,22 @@ bool __fastcall ScanOneDCU(String Filename) {
                                 FPtrSize  = 8;
                             }
                             break;
-                        default: break;
+                        default:
+                            printf("[Error] Unable to decode magic value %lX\n", Magic);
+                            return false;
+                            break;
                     }
                 }
+            } else {
+                printf("Error: Wrong magic %lX\n", Magic);
+                delete[] FMemPtr;
+                return false;
             }
-            printf("Error: Wrong magic %lX\n", Magic);
-            delete[] FMemPtr;
-            return false;
+            break;
     }
+
+    printf("Magic: %lX\n", Magic);
+
     /*
     if (fxStart > 0)
       fxValid = [0..fxStart-1];
