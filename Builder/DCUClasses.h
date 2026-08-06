@@ -46,6 +46,22 @@
 #define dcuplAndroid64   10
 #define dcuplLinux64     11
 
+enum class TDCUPlatform {};
+enum class Platform : int {
+    Win32       = 0,
+    Win64       = 1,
+    Osx32       = 2,
+    Osx64       = 3,
+    OsxArm64    = 4,
+    IOSEmulator = 5,
+    IOSSimArm64 = 6,
+    IOSDevice   = 7,
+    IOSDevice64 = 8,
+    Android     = 9,
+    Android64   = 10,
+    Linux64     = 11
+};
+
 // Internal unit types
 #define drStop              0
 #define drStop_a            0x61    //'a' - Last Tag in all files
@@ -66,6 +82,7 @@
 #define drObj               0x71    //'q'
 #define drRes               0x72    //'r'
 #define drAsm               0x73    //'s' - Found in D5 Debug versions
+#define drAssemblySrc       0x74    //'t'
 #define drStop2             0x9F    //'Ÿ'
 #define drConst             0x25    //'%'
 #define drResStr            0x32    //'2'
@@ -110,7 +127,7 @@
 
 // ver70 or higher tags (all of unknown purpose)
 #define drUnitAddInfo       0x34    //'4'
-#define drInfo98            0x98
+#define drCPPFlags          0x98    // was drInfo98
 #define drConstAddInfo      0x9C
 #define drProcAddInfo       0x9E
 #define drAssemblyInfo      0x9D    // Ver 2005,2006 .Net
@@ -189,24 +206,24 @@
 #define arSafeCall          0x84
 
 // Fixup type constants
-#define fxAddr      1
-#define fxJmpAddr0  2
-#define fxDataAddr  3
+#define fxAddr      1 // absolute data address should be substituted
+#define fxJmpAddr0  2 // relative data address should be substituted (for jmp or call near instructions).
+#define fxDataAddr  3 // imported data reference (from another unit) this interpretation appears only in Delphi 3.0+
 #define fxJmpAddrXE 5
 
-#define fxStart20   3
-#define fxEnd20     4
-#define fxStart30   5
-#define fxEnd30     6
-#define fxStart70   6
-#define fxEnd70     7
+#define fxStart20   3 // Start of block marker in Delhi 2.0 units
+#define fxEnd20     4 // End of block marker in Delhi 2.0 units
+#define fxStart30   5 // Start of block marker in Delhi 3.0+ units
+#define fxEnd30     6 // End of block marker in Delhi 3.0-6.0 and Kylix units
+#define fxStart70   6 // Start of block marker in Delhi 7.0, 2005 (WIN32) units
+#define fxEnd70     7 // End of block marker in Delhi 7.0, 2005 (WIN32) units
 
 #define fxVirtMethodMSIL 10 // 0x0A
-#define fxStartMSIL      11 // 0x0B
-#define fxEndMSIL        12 // 0x0C
+#define fxStartMSIL      11 // 0x0B Start of block marker in Delhi 8.0, 2005 .net units
+#define fxEndMSIL        12 // 0x0C End of block marker in Delhi 8.0, 2005 .net units
 
-#define fxStart100  12
-#define fxEnd100    13
+#define fxStart100  12 // 0x0C Start of block marker in Delhi 2006 (WIN32) units
+#define fxEnd100    13 // 0x0D End of block marker in Delhi 2006 (WIN32) units
 
 #define fxMaxXE     15
 #define fxMax       23 // 0x17 Max over all Delphi versions
@@ -218,8 +235,23 @@
 #define fxStart2010 0
 #define fxEnd2010   1
 
-#define FixOfsMask  0xFFFFFF
+#define FixOfsMask  0xFFFFFF // used to extract the fixup Offset value from the OfsF field.
 #define FixOfsShift  24
+
+// todo:
+enum class TDeclListKind : int {
+    dlMain          = 0,
+    dlMainImpl      = 1,
+    dlArgs          = 2,
+    dlArgsT         = 3,
+    dlEmbedded      = 4,
+    dlFields        = 5,
+    dlClass         = 6,
+    dlInterface     = 7,
+    dlDispInterface = 8,
+    dlUnitAddInfo   = 9,
+    dlA6            = 10
+};
 
 // TDeclListKind
 #define dlMain          0
@@ -253,8 +285,16 @@
 #define lfPrivate       0
 #define lfPublic        2
 #define lfProtected     4
+#define lfStrict        0x10
+// lfStrictPrivate = lfStrict or lfPrivate;
+// lfStrictProtected = lfStrict or lfProtected;
+#define lfRegister      0x8 // stored in register in procedure code
 #define lfPublished     0xA
 #define lfScope         0xE
+#define lfParmFlagsMask 0x30
+#define lfStackParm     0x10 // parameter is on stack?
+#define lfRegisterParm  0x00 // parameter is in register (optimization on)
+#define lfRegister1Parm 0x30 // parameter is in register (optimization off)
 #define lfDeftProp      0x20
 #define lfOverride      0x20
 #define lfVirtual       0x40
@@ -274,8 +314,20 @@
 #define skProtected     10
 #define skPublic        11
 #define skPublished     12
+// skStrictPrivate
+// skStrictProtected
+
+#define cvScalar         0
+#define cvString         1
+#define cvResourceString 2
+#define cvFloat          3
+#define cvSet            4
+#define cvUnicodeString  5
+#define cvxPointer       MAXINT // Aux const for inline code, not in DCU
 
 #define drAlias         0x5A
+
+// enum class TFloatKind : byte {fkReal48 = 0, fkSingle = 1, fkDouble = 2, fkExtended = 3, fkComp = 4, fkCurrency = 5};
 
 // TFloatKind
 #define fkReal48        0
@@ -284,37 +336,116 @@
 #define fkExtended      3
 #define fkComp          4
 #define fkCurrency      5
+
+#define fkExtra 0x80
+
+// enum class TShowProcCtx { spcMain, spcMainImpl, spcOther };
+// TShowProcCtx
+#define spcMain     0
+#define spcMainImpl 1
+#define spcOther    2
 //------------------------------------------------------------------------------
+typedef int TNDX;
+// typedef TNDX     TNDXTbl[256];
+// typedef TNDXTbl *PNDXTbl;
+// typedef PNDXTbl *PPNDXTbl;
+
+using TDefNDX  = TNDX;
+using TNDXTbl  = TNDX[256];
+using PNDXTbl  = TNDXTbl*;
+using PPNDXTbl = PNDXTbl*;
+
+/*#pragma pack(push, 1)
+struct TNameRecData {
+    union {
+        // Case 0: ShortString (256-byte Pascal string: 1 length byte + 255 chars)
+        System::ShortString S;
+
+        // Case 1: Length fields + raw character array
+        struct {
+            std::uint8_t bLen;
+            std::int32_t dwLen;
+            AnsiChar lS[65536]; // Fixed array indexed by Pascal Word (0..65535)
+        };
+    };
+};
+#pragma pack(pop)
+
+using PNameRecData = TNameRecData*;
+
+struct TAnsiStrRec {
+    PAnsiChar CP;
+    DWord Len;
+};
+
+struct TNameRec;
+using PName = TNameRec*;
+
+struct TNameRec {
+// protected:
+    TNameRecData *D = nullptr;
+    void __fastcall GetStrInfo(TAnsiStrRec& SR);
+
+public:
+    bool __fastcall         IsEmpty();
+    AnsiChar __fastcall     Get1stChar();
+    AnsiString __fastcall   GetStr();
+    AnsiString __fastcall   GetRightStr(std::int32_t dl);
+    bool __fastcall         Eq(PName N);
+    bool __fastcall         EqS(const System::ShortString &S);
+    bool __fastcall         HasChar(AnsiChar ch);
+    bool __fastcall         IsAuxName();
+    std::int32_t __fastcall GetHash();             // LongInt
+    std::int32_t __fastcall GetRightHash(int Ofs); // LongInt
+};*/
+
+using PShortName = PShortString;
+
 typedef struct {
     DWord Lo;
     DWord Hi;
 } TInt64Rec, *PInt64Rec;
 
-// Pascal ShortString
+// Pascal ShortString // PShortString, used by PShortName
+// Since 1.15.1: PName was changed from PShortString to the data structure TNameRec
+//               describing long strings (longer than 255 bytes), which can happen as
+//               a result of mangling or template instantiation starting from D2009.
 typedef struct {
     Byte Len;
     char Name[255]; // position of String
 } TShortString, *PName;
 
+// DCU_IN.pas
 typedef struct {
-    Byte         Tag;
+    Byte      Tag; // TDCURecTag
     TShortString Name;
+    // new: TNameRec* Name;
 } TNameDef, *PNameDef;
 
 typedef struct {
     PNameDef Def;
     int      Ndx;
+    int      FT; // File Time (LongInt)
+    // PSrcFileRec Next;
+    // TStringList Lines;
 } TSrcFileRec, *PSrcFileRec;
 
+
 typedef struct {
-    int   OfsF; // Low 3 bytes - ofs, high 1 byte - B1
-    DWord Ndx;
+    int  OfsF; // Low 3 bytes - ofs, high 1 byte - B1
+    TNDX Ndx;  // The index of the target address
 } TFixupRec, *PFixupRec;
+
+typedef struct {
+    TFixupRec* items;  // Array of TFixupRec (indexed by Word/unsigned short)
+    unsigned int count;
+} TFixupTbl, *PFixupTbl;
 
 typedef struct {
     int       FixCnt;
     PFixupRec Fix;
     Byte     *FixEnd;
+    // Byte     *FixUnit; // TUnit
 } TFixupState, *PFixupState;
 
 typedef struct {
@@ -332,35 +463,81 @@ typedef struct {
     int       Depth;
 } TEmbeddedTypeInf, *PEmbeddedTypeInf;
 
+typedef Byte TDCURecTag;
+
+// typedef Byte TSegKind;
+enum class TSegKind {None, Text, IText, IData, BSS, TLS, PData, XData, TBSS, RDATA};
+
+// TSegKind
+#define tskNone 0
+#define tskText 1 // +OsX
+#define tskItext 2
+#define tskiData 3 // +OsX
+#define tskBss 4 // +OsX
+#define tskTLS 5
+#define tskPData 6
+#define tskXdata 7
+#define tskTbss 8 // +OsX
+#define tskRData 9 // +OsX
+
+// todo?
+// TSegKind = (seg_none,seg_text{+OsX},seg_itext,seg_data{+OsX},seg_bss{+OsX},
+//   seg_tls,seg_pdata,seg_xdata,seg_tbss{OsX},seg_rdata{OsX});
+
+int FSegCnt;
+typedef TSegKind     TSegKindTbl[256];
+typedef TSegKindTbl *PSegKindTbl;
+
 //------------------------------------------------------------------------------
 class TDCURec;
-typedef TDCURec *PDCURec;
+typedef TDCURec *PDCURec; // PTDCURec
+
 typedef void __fastcall (*TTypeUseAction)(PDCURec UseRec, int hDT, DWord *IP);
 
 class TDCURecVisitor; // Pattern "Visitor" for TDCURec class hierarchy
 
 class TDCURec : public TObject {
+protected:
+    TDCURec *FNext;
+    virtual PName __fastcall GetName();
 public:
     TDCURec();
-    virtual PName __fastcall GetName();
+    // virtual PName __fastcall GetName();
     virtual DWord __fastcall SetMem(DWord MOfs, DWord MSz);
     virtual bool __fastcall  NameIsUnique();
     virtual void __fastcall  Visit(TDCURecVisitor *Visitor);
     virtual void __fastcall  ShowName(String &OutS);
     virtual void __fastcall  Show(String &OutS);
     virtual void __fastcall  EnumUsedTypes(TTypeUseAction Action, DWord *IP);
-    TDCURec                 *Next;
+    virtual Byte __fastcall  GetTag(); // TDCURecTag
+    virtual bool __fastcall  IsVisible(Byte LK);
+    virtual Byte __fastcall  GetSecKind(); // TDeclSecKind
+    virtual void __fastcall  ShowDef(bool All, String &OutS);
+    virtual void __fastcall  ListAppend(TDCURec *List);
+    virtual void __fastcall  SetSegKind(TSegKind V);
+
+    // These are overridden separately
+    // for verD_XE - fix orphaned local types problem
+    // virtual TDeclSecKind __fastcall GetSecKind(); // Byte
+    // virtual TDCURecTag __fastcall GetTag(); // Byte
+
+    // TDCURec *Next; // FNext
+    __property PName Name = { read = GetName };
+    __property TDCURec *Next = { read = FNext, write = FNext };
 };
 
+
 class TBaseDef : public TDCURec {
+protected:
+
 public:
     TBaseDef(PName AName, PNameDef ADef, int AUnit);
-    void __fastcall  ShowName(String &OutS);
-    void __fastcall  Show(String &OutS);
     void __fastcall  Visit(TDCURecVisitor *Visitor) override;
+    void __fastcall  ShowName(String &OutS) override;
+    void __fastcall  Show(String &OutS) override;
     void __fastcall  ShowNamed(PName N, String &OutS);
-    PName __fastcall GetName();
-    DWord __fastcall SetMem(DWord MOfs, DWord MSz);
+    PName __fastcall GetName() override;
+    DWord __fastcall SetMem(DWord MOfs, DWord MSz) override;
 
     PName    FName;
     PNameDef Def;
@@ -368,69 +545,243 @@ public:
     int      hDecl;
 };
 
+typedef AnsiChar TImpKind; // char
+
 class TImpDef : public TBaseDef {
 public:
-    TImpDef(Byte AIK, PName AName, int AnInf, PNameDef ADef, int AUnit);
-    void __fastcall Show(String &OutS);
-    bool __fastcall NameIsUnique();
+    TImpDef(TImpKind AIK, PName AName, int AnInf, PNameDef ADef, int AUnit);
     void __fastcall Visit(TDCURecVisitor *Visitor) override;
+    void __fastcall Show(String &OutS) override;
+    bool __fastcall NameIsUnique() override;
 
-    char ik;
+    TImpKind ik; // char
     bool FNameIsUnique;
     int  Inf;
 };
 
+class TUnitImpDef : public TImpDef {
+public:
+    TUnitImpDef(TImpKind AIK, PName AName, int AnInf, PNameDef ADef, int AUnit);
+    void __fastcall Visit(TDCURecVisitor *Visitor) override;
+    void __fastcall Show(String &OutS) override;
+
+    AnsiString sPackage; // for .NET // was String
+};
+
+
+// typedef Byte TUnitImpFlags;
 // TUnitImpFlags
-#define ufImpl  0
-#define ufDLL   1
-#define ufDLL1  2
+#define ufImpl 0
+#define ufDLL 1
+#define ufDLL1 2
 typedef struct {
-    TImpDef  *Ref;
-    PName     Name;
-    TBaseDef *Decls;
-    Byte      Flags;
+    TUnitImpDef *Ref;
+    PName        Name;
+    TBaseDef    *Decls;
+    Byte         Flags; // TUnitImpFlags
+    // TUnit       U;
 } TUnitImpRec, *PUnitImpRec;
 
 class TDLLImpRec : public TBaseDef {
 public:
     TDLLImpRec(PName AName, int ANdx, PNameDef ADef, int AUnit);
-    void __fastcall Show(String &OutS);
     void __fastcall Visit(TDCURecVisitor *Visitor) override;
+    void __fastcall Show(String &OutS) override;
     int Ndx;
 };
 
 class TImpTypeDefRec : public TImpDef {
 public:
     TImpTypeDefRec(PName AName, int AnInf, DWord ARTTISz, PNameDef ADef, int AUnit);
-    void __fastcall  Show(String &OutS);
-    DWord __fastcall SetMem(DWord MOfs, DWord MSz);
     void __fastcall  Visit(TDCURecVisitor *Visitor) override;
+    void __fastcall  Show(String &OutS) override;
+    DWord __fastcall SetMem(DWord MOfs, DWord MSz) override;
 
     DWord RTTIOfs, RTTISz;
     int   hImpUnit;
     PName ImpName;
 };
 
+struct TConstValInfoBase {
+    DWord Kind; // Ver>4
+                // O - scalar, 1 - string (offset=8), 2 - resourcestring,
+                // 3-float, 4 - set,
+                // [ver>=verD12] 5 - Unicode string (offset=12)
+    Byte *ValPtr;
+    DWord ValSz;
+    int Val;
+    void __fastcall Show0(TDefNDX hDT, bool IsNamed);
+};
+
+struct TConstValInfo : TConstValInfoBase {
+    TDefNDX hDT;
+    void __fastcall Read();
+    void __fastcall Show(bool IsNamed);
+};
+
+// Name Declaration Modifiers - store some important information from
+// drConstAddInfo records and other records like this if any
+class TDeclModifier;
+typedef TDeclModifier TDeclModifierClass;
+
+class TDeclModifier : public TObject {
+protected:
+    TDeclModifier *FNext;
+
+public:
+    TDeclModifier(); // test
+    virtual ~TDeclModifier();
+    virtual void __fastcall   Show(String &OutS);
+    static bool __fastcall    ShowBefore();
+    TDeclModifier *__fastcall GetNextOfClass(TDeclModifierClass *Cl);
+    __property TDeclModifier* Next = { read = FNext, write = FNext };
+};
+
+// Representation of a string from DCU memory without copying chars
+struct TMemStrRef {
+protected:
+    const char *FChars; // PAnsiChar
+    unsigned int FLen; // Cardinal
+
+public:
+    TMemStrRef(const char *f_chars, unsigned int f_len) : FChars(f_chars), FLen(f_len) {}
+    AnsiString S() const {
+        return AnsiString(FChars, FLen);
+    }
+
+    unsigned int Len() const { return FLen; }
+};
+
+class TStrDeclModifier : public TDeclModifier {
+public:
+    // TStrDeclModifier();
+    TStrDeclModifier(TMemStrRef *AMsg); // Constructor.Create
+    // AnsiString __fastcall GetMsg();
+
+    TMemStrRef *FMsg;
+};
+
+class TDeprecatedDeclModifier : public TStrDeclModifier {
+public:
+    TDeprecatedDeclModifier(TMemStrRef *AMsg) : TStrDeclModifier(AMsg) {}
+    void __fastcall Show(String &OutS) override;
+};
+
+// XML Docs (recorded here since D 11)
+class TXMLDocDeclModifier : public TStrDeclModifier {
+public:
+    // TXMLDocDeclModifier();
+    TXMLDocDeclModifier(TMemStrRef * AMsg);
+    void __fastcall Show(String &OutS) override;
+    static bool __fastcall ShowBefore();
+};
+
+struct TAttributeDeclAddrArg {
+    int hDT;
+    int hDTAddr;
+};
+
+struct TAttributeDeclArg {
+    int Kind;
+    union {
+        TConstValInfo C;
+        TAttributeDeclAddrArg A;
+    };
+};
+
+typedef TAttributeDeclArg TAttributeDeclArgs[256];
+typedef TAttributeDeclArgs *PAttributeDeclArgs;
+
+class TAttributeDeclModifier : public TDeclModifier {
+public:
+    TAttributeDeclModifier(); // Attention! In contrast to the other modifiers the constructor reads the data
+    ~TAttributeDeclModifier();
+    void __fastcall Show(String &OutS) override;
+    static bool __fastcall ShowBefore();
+
+    int hAttrDT;
+    int hMember;
+    int hAttrCtor;
+    int ArgCnt;
+
+    PAttributeDeclArgs Args;
+};
+
+// .Net information (was observed in DCUIL but may be used somewhere else)
+// The value in the generated code
+class TGeneratedNameDeclModifier : public TStrDeclModifier {
+public:
+    TGeneratedNameDeclModifier(TMemStrRef * AMsg);
+    void __fastcall Show(String &OutS) override;
+};
+
+typedef struct {
+    TMemStrRef *Name;
+    int V, V1; // Unknown
+    int hDT;
+} TExtraProcArg, *PExtraProcArg;
+
+typedef TExtraProcArg TExtraProcArgs[256];
+typedef TExtraProcArgs *PExtraProcArgs;
+
+// class PExtraProcArgs {
+// public:
+//     TExtraProcArg *Arg[Byte];
+// };
+
+// In DCUIL aux records are used as an owner frame for embedded subroutines.
+// The records are passed as extra parameters of procedures, and the table contains info about the parameters
+class TExtraArgsDeclModifier : public TDeclModifier {
+public:
+    TExtraArgsDeclModifier();
+    ~TExtraArgsDeclModifier();
+    // void __fastcall Read(); // Attention! In contrast to the other modifiers, the constructor reads the data
+    void __fastcall Show(String &OutS) override;
+
+    int ArgCnt;
+    PExtraProcArgs Args;
+};
+
+class TTemplateParmsDeclModifier : public TDeclModifier {
+public:
+    TTemplateParmsDeclModifier();
+    ~TTemplateParmsDeclModifier();
+    void __fastcall Read(TDCURec *Owner);
+    void __fastcall Show(String &OutS) override;
+    static bool __fastcall ShowBefore();
+
+    TNDX    hFn; // 0 => formal parameters, else - actual parameters
+    int     Cnt;
+    PNDXTbl Tbl;
+};
+
 class TNameDecl : public TDCURec {
 public:
-    TNameDecl();
-    TNameDecl(bool All);
+    TNameDecl(); // Create
+    TNameDecl(bool All); // Create0 / Create00
     ~TNameDecl();
-    void __fastcall         ShowName(String &OutS);
-    void __fastcall         Show(String &OutS);
-    void __fastcall         ShowConstAddInfo(String &OutS);
-    virtual void __fastcall ShowDef(bool All, String &OutS);
-    PName __fastcall        GetName();
-    DWord __fastcall        SetMem(DWord MOfs, DWord MSz);
-    virtual Byte __fastcall GetSecKind();
-    virtual bool __fastcall IsVisible(Byte LK);
-    Byte __fastcall         GetTag();
     void __fastcall  Visit(TDCURecVisitor *Visitor) override;
+    void __fastcall  ShowName(String &OutS) override;
+    void __fastcall  Show(String &OutS) override;
+    void __fastcall  ShowConstAddInfo(String &OutS);
+    void __fastcall  ShowDef(bool All, String &OutS) override;
+    PName __fastcall GetName() override;
+    DWord __fastcall SetMem(DWord MOfs, DWord MSz) override;
+    Byte __fastcall  GetSecKind() override;
+    bool __fastcall  IsVisible(Byte LK) override;
+    Byte __fastcall  GetTag() override; // TDCURecTag
+    void __fastcall  AddModifier(TDeclModifier *M);
+    void __fastcall  ShowModifiers(bool Before);
+    TDeclModifier *__fastcall GetModifierOfClass(TDeclModifierClass *Cl);
+    // Create00
 
     PNameDef Def;
     int      hDecl;
-    int      ConstAddInfoFlags;
+    int      ConstAddInfoFlags; // From the corresponding ConstAddInfo
+
+    TDeclModifier *FModifiers;
 };
+
 typedef TNameDecl *PNameDecl;
 
 class TNameFDecl : public TNameDecl {
@@ -439,44 +790,48 @@ public:
     void __fastcall Visit(TDCURecVisitor *Visitor) override;
     void __fastcall Show(String &OutS) override;
     bool __fastcall IsVisible(Byte LK) override;
+    virtual void __fastcall ShowStamps();
 
-    int F, F1;
+    TNDX F, F1;
     int Inf;
-    int B2; // D8+
+    TNDX B2; // D8+
+    TNDX PkgNdx;
 };
 
 class TTypeDecl : public TNameFDecl {
 public:
     TTypeDecl();
-    bool __fastcall  IsVisible(Byte LK);
-    void __fastcall  Show(String &OutS);
-    void __fastcall  EnumUsedTypes(TTypeUseAction Action, DWord *IP);
-    PName __fastcall GetName();
-    DWord __fastcall SetMem(DWord MOfs, DWord MSz);
-    Byte __fastcall  GetSecKind();
+    bool __fastcall  IsVisible(Byte LK) override;
     void __fastcall  Visit(TDCURecVisitor *Visitor) override;
+    void __fastcall  Show(String &OutS) override;
+    void __fastcall  EnumUsedTypes(TTypeUseAction Action, DWord *IP) override;
+    PName __fastcall GetName() override;
+    DWord __fastcall SetMem(DWord MOfs, DWord MSz) override;
+    Byte __fastcall  GetSecKind() override;
+    void __fastcall  ShowStamps() override;
 
-    int hDef;
+    TDefNDX hDef;
 };
 
 class TVarDecl : public TNameFDecl {
 public:
     TVarDecl();
-    void __fastcall Show(String &OutS);
-    void __fastcall EnumUsedTypes(TTypeUseAction Action, DWord *IP);
-    Byte __fastcall GetSecKind();
     void __fastcall Visit(TDCURecVisitor *Visitor) override;
+    void __fastcall Show(String &OutS) override;
+    void __fastcall EnumUsedTypes(TTypeUseAction Action, DWord *IP) override;
+    Byte __fastcall GetSecKind() override;
 
-    int   hDT;
-    DWord Ofs;
+    TDefNDX hDT;
+    DWord   Ofs;
 };
 
 class TVarVDecl : public TVarDecl {
+public:
     // In DXE2 win64 an auxiliary variable __puiHead has memory image
     TVarVDecl();
-    void __fastcall  Show(String &OutS);
-    DWord __fastcall SetMem(DWord MOfs, DWord MSz);
     void __fastcall  Visit(TDCURecVisitor *Visitor) override;
+    void __fastcall  Show(String &OutS) override;
+    DWord __fastcall SetMem(DWord MOfs, DWord MSz) override;
 
     DWord Sz;
 };
@@ -484,65 +839,82 @@ class TVarVDecl : public TVarDecl {
 class TVarCDecl : public TVarDecl {
 public:
     TVarCDecl(bool OfsValid);
-    void __fastcall  Show(String &OutS);
-    DWord __fastcall SetMem(DWord MOfs, DWord MSz);
-    Byte __fastcall  GetSecKind();
     void __fastcall  Visit(TDCURecVisitor *Visitor) override;
+    void __fastcall  Show(String &OutS) override;
+    DWord __fastcall SetMem(DWord MOfs, DWord MSz) override;
+    Byte __fastcall  GetSecKind() override; // TSegKind
+    void __fastcall  SetSegKind(TSegKind seg_kind) override;
+    void __fastcall  SetPDataLinks(); // //Called from TVarCDecl.SetSegKind
+    bool __fastcall  IsSpecialConst();
 
-    DWord Sz;
-    DWord OfsR;
+    DWord Sz; // Cardinal
+    DWord OfsR; // Cardinal
+    TSegKind FSeg; // For PData and XData in 64-bit mode
 };
 
 class TAbsVarDecl : public TVarDecl {
 public:
     TAbsVarDecl();
-    void __fastcall Show(String &OutS);
     void __fastcall Visit(TDCURecVisitor *Visitor) override;
+    void __fastcall Show(String &OutS) override;
 };
 
 class TTypePDecl : public TVarCDecl {
 public:
     TTypePDecl();
-    void __fastcall Show(String &OutS);
-    bool __fastcall IsVisible(Byte LK);
     void __fastcall Visit(TDCURecVisitor *Visitor) override;
+    void __fastcall Show(String &OutS) override;
+    bool __fastcall IsVisible(Byte LK) override;
+    void __fastcall ShowStamps() override;
 };
 
 class TThreadVarDecl : public TVarDecl {
 public:
     TThreadVarDecl();
-    Byte __fastcall GetSecKind();
+    Byte __fastcall GetSecKind() override;
     void __fastcall Visit(TDCURecVisitor *Visitor) override;
+};
+
+// Abstract base class - ancestor of TStrConstDecl and TProcDecl
+class TMemBlockRef : public TNameFDecl {
+public:
+    explicit TMemBlockRef(bool NoInf) : TNameFDecl(NoInf), Ofs(0), Sz(0) {}
+
+    virtual void __fastcall MemRefFound(); // abstract
+    void __fastcall Visit(TDCURecVisitor *Visitor) override;
+
+    DWord Ofs;
+    DWord Sz;
 };
 
 // In Delphi>=8 they started to create this kind of records for string constants
 // and other data blocks (instead of TProcDecl, which was used earlier)
-class TStrConstDecl : public TNameFDecl {
+class TStrConstDecl : public TMemBlockRef {
 public:
     TStrConstDecl();
-    DWord __fastcall SetMem(DWord MOfs, DWord MSz);
-    Byte __fastcall  GetSecKind();
-    void __fastcall  MemRefFound();
+    DWord __fastcall SetMem(DWord MOfs, DWord MSz) override;
+    Byte __fastcall  GetSecKind() override;
+    void __fastcall  MemRefFound() override;
     // bool __fastcall IsVisible(Byte LK);
-    void __fastcall Show(String &OutS);
-    void __fastcall EnumUsedTypes(TTypeUseAction Action, DWord *IP);
     void __fastcall Visit(TDCURecVisitor *Visitor) override;
+    void __fastcall Show(String &OutS) override;
+    void __fastcall EnumUsedTypes(TTypeUseAction Action, DWord *IP) override;
 
-    int   hDT;
-    DWord Ofs;
-    DWord Sz;
-    // DWord   FX;
-    // DWord   FX1;
-    // bool    FMemUsed;
+    TDefNDX hDT;
+    // DWord   Ofs;
+    // DWord   Sz;
+    DWord   FX;
+    DWord   FX1;
+    bool    FMemUsed;
 };
 
 class TLabelDecl : public TNameDecl {
 public:
     TLabelDecl();
-    void __fastcall Show(String &OutS);
-    Byte __fastcall GetSecKind();
-    bool __fastcall IsVisible(Byte LK);
     void __fastcall Visit(TDCURecVisitor *Visitor) override;
+    void __fastcall Show(String &OutS) override;
+    Byte __fastcall GetSecKind() override;
+    bool __fastcall IsVisible(Byte LK) override;
 
     DWord Ofs;
 };
@@ -550,73 +922,99 @@ public:
 class TExportDecl : public TNameDecl {
 public:
     TExportDecl();
-    void __fastcall Show(String &OutS);
-    Byte __fastcall GetSecKind();
     void __fastcall Visit(TDCURecVisitor *Visitor) override;
+    void __fastcall Show(String &OutS) override;
+    Byte __fastcall GetSecKind() override;
+    bool __fastcall IsVisible(Byte LK) override;
 
-    int hSym, Index;
+    TNDX hSym;
+    TNDX Index;
 };
 
-class TLocalDecl : public TNameDecl {
+// The common parent for TLocalDecl and TPropDecl
+class TLocalDeclBase : public TNameDecl {
+public:
+    TLocalDeclBase();
+    Byte __fastcall GetLocFlagsSecKind(); // TDeclSecKind
+
+    TNDX    LocFlags;
+    TNDX    LocFlagsX; // Ver>=8 private, protected, public, published
+    TDefNDX hDT;
+};
+
+class TLocalDecl : public TLocalDeclBase {
 public:
     TLocalDecl(Byte LK);
-    // void __fastcall ShowName(String& OutS);
-    void __fastcall Show(String &OutS);
-    void __fastcall EnumUsedTypes(TTypeUseAction Action, DWord *IP);
-    Byte __fastcall GetLocFlagsSecKind();
-    Byte __fastcall GetSecKind();
+    void __fastcall   Visit(TDCURecVisitor *Visitor) override;
+    void __fastcall   ShowName(String &OutS) override { TLocalDeclBase::ShowName(OutS); }
+    String __fastcall GetPrefix(bool &IsConst);
+    void __fastcall   Show(String &OutS) override;
+    void __fastcall   EnumUsedTypes(TTypeUseAction Action, DWord *IP) override;
+    // Byte __fastcall   GetLocFlagsSecKind();
+    Byte __fastcall   GetSecKind() override;
     // bool __fastcall IsVisible(Byte LK);
 
-    int LocFlags;
-    int LocFlagsX; // Ver>=8 private, protected, public, published
-    int hDT;
-    int NdxB;
-    int Ndx;
+    TNDX NdxB; // B: Byte; //Interface only
+               // when LocFlagsX and lfauxPropField<>0 it is used to hold the actual field (TLocalDecl) of the reference
+    TNDX Ndx;
 };
+
+class TLocalValDecl : public TLocalDecl {
+public:
+    TLocalValDecl(Byte lk);
+    void __fastcall Show(String &OutS) override;
+
+    // We don't set it to -1, because it can't be zero: the const always goes after argument
+    TDefNDX hDeftVal; // Default value, which may be set by TSetDeftInfo
+};
+
+// TByteSet = set of Byte;
+typedef System::Set<System::Byte, 0, 255> TByteSet;
 
 class TMethodDecl : public TLocalDecl {
 public:
     TMethodDecl(Byte LK);
-    void __fastcall Show(String &OutS);
     void __fastcall Visit(TDCURecVisitor *Visitor) override;
+    void __fastcall Show(String &OutS) override;
 
     bool InIntrf;
-    int  hImport;
+    TNDX  hImport;  // for property P:X read Proc{virtual,Implemented in parent class}
+                    // or VProc copy of the corresponding procedure
 };
 
 class TClassVarDecl : public TLocalDecl {
 public:
     TClassVarDecl(Byte LK);
-    void __fastcall Show(String &OutS);
-    Byte __fastcall GetSecKind();
     void __fastcall Visit(TDCURecVisitor *Visitor) override;
+    void __fastcall Show(String &OutS) override;
+    Byte __fastcall GetSecKind() override;
 };
 
-class TPropDecl : public TNameDecl {
+class TPropDecl : public TLocalDeclBase {
 public:
     TPropDecl();
     String __fastcall PutOp(String Name, int hOp);
-    void __fastcall   Show(String &OutS);
-    void __fastcall   EnumUsedTypes(TTypeUseAction Action, DWord *IP);
-    Byte __fastcall   GetSecKind();
     void __fastcall   Visit(TDCURecVisitor *Visitor) override;
+    void __fastcall   Show(String &OutS) override;
+    void __fastcall   EnumUsedTypes(TTypeUseAction Action, DWord *IP) override;
+    Byte __fastcall   GetSecKind() override; // TDeclSecKind
 
-    int LocFlags;
-    int LocFlagsX; // Ver>=8 private, protected, public, published
-    int hDT;
-    int Ndx;
-    int hIndex;
-    int hRead;
-    int hWrite;
-    int hStored;
-    int hDeft;
+    // int LocFlags;
+    // int LocFlagsX; // Ver>=8 private, protected, public, published
+    // int hDT;
+    TNDX Ndx;
+    TNDX hIndex;
+    TNDX hRead;
+    TNDX hWrite;
+    TNDX hStored;
+    TNDX hDeft;
 };
 
 class TDispPropDecl : public TLocalDecl {
 public:
     TDispPropDecl(Byte LK);
     void __fastcall Visit(TDCURecVisitor *Visitor) override;
-    void __fastcall Show(String &OutS);
+    void __fastcall Show(String &OutS) override;
 };
 
 class TConstDeclBase : public TNameFDecl {
@@ -624,52 +1022,59 @@ public:
     TConstDeclBase();
     void __fastcall ReadConstVal();
     void __fastcall ShowValue(String &OutS);
-    void __fastcall Show(String &OutS);
-    void __fastcall EnumUsedTypes(TTypeUseAction Action, DWord *IP);
-    Byte __fastcall GetSecKind();
     void __fastcall Visit(TDCURecVisitor *Visitor) override;
+    void __fastcall Show(String &OutS) override;
+    void __fastcall EnumUsedTypes(TTypeUseAction Action, DWord *IP) override;
+    Byte __fastcall GetSecKind() override;
 
-    int     hDT;
-    DWord   Kind; // hX Ver>4
-    // 0 - scalar, 1 - string (offset=8), 2 - resourcestring,
-    // 3-float, 4 - set,
-    //[ver>=verD12] 5 - Unicode string (offset=12)
-    Byte    *ValPtr;
-    DWord   ValSz;
-    int     Val;
+    // Moved all this to TConstValInfo:
+    // int     hDT;
+    // DWord   Kind; // hX Ver>4 // 0 - scalar, 1 - string (offset=8), 2 - resourcestring, 3-float, 4 - set, [ver>=verD12] 5 - Unicode string (offset=12)
+    // Byte    *ValPtr;
+    // DWord   ValSz;
+    // int     Val;
+
+    TConstValInfo Value;
 };
 
 class TConstDecl : public TConstDeclBase {
 public:
     TConstDecl();
-    bool __fastcall IsVisible(Byte LK);
+    bool __fastcall IsVisible(Byte LK) override;
     void __fastcall Visit(TDCURecVisitor *Visitor) override;
+
+    bool Adopted; // true -> it is a default value of argument
 };
 
 class TResStrDef : public TVarCDecl {
 public:
     TResStrDef();
-    void __fastcall Show(String &OutS);
-    Byte __fastcall GetSecKind();
+    void __fastcall Show(String &OutS) override;
+    Byte __fastcall GetSecKind() override; // TDeclSecKind
 
     DWord OfsR;
 };
 
-class TSetDeftInfo : public TNameDecl {
+class TSetDeftInfo : public TDCURec {
+protected:
+    bool Adopted;
 public:
     TSetDeftInfo();
-    void __fastcall Show(String &OutS);
+    void __fastcall Visit(TDCURecVisitor *Visitor) override;
+    void __fastcall Show(String &OutS) override;
+    bool __fastcall IsVisible(Byte LK) override;
 
-    int hConst, hArg;
+    TDefNDX hConst, hArg;
 };
 
 class TCopyDecl : public TNameDecl {
 public:
-    TCopyDecl();
-    void __fastcall Show(String &OutS);
-    Byte __fastcall GetSecKind();
+    TCopyDecl(); // Create
+    void __fastcall Visit(TDCURecVisitor *Visitor) override;
+    void __fastcall Show(String &OutS) override;
+    Byte __fastcall GetSecKind() override; // TDeclSecKind
 
-    int hBase;
+    TDefNDX hBase;
     TNameDecl *Base; // Just in case and for convenience
 };
 
@@ -706,35 +1111,45 @@ typedef struct {
     TList *Fixups;
 } PROCDECLINFO, *PPROCDECLINFO;
 
-class TProcDecl : public TNameFDecl {
+class TProcDecl : public TMemBlockRef {
 public:
-    TProcDecl(TNameDecl *AnEmbedded, bool NoInf);
+    TProcDecl(TDCURec *AnEmbedded, bool NoInf); // Create
     ~TProcDecl();
     bool __fastcall  IsUnnamed();
-    DWord __fastcall SetMem(DWord MOfs, DWord MSz);
-    Byte __fastcall  GetSecKind();
+    DWord __fastcall SetMem(DWord MOfs, DWord MSz) override;
+    Byte __fastcall  GetSecKind() override; // TDeclSecKind
     void __fastcall  ShowArgs(String &OutS, PPROCDECLINFO pInfo);
+    void __fastcall  AddLocal(TDCURec *Loc);
+    // IsStaticMethod
     bool __fastcall  IsProc();
-    void __fastcall  ShowDef(bool All, String &OutS);
-    void __fastcall  Show(String &OutS);
-    void __fastcall  EnumUsedTypes(TTypeUseAction Action, DWord *IP);
-    bool __fastcall  IsVisible(Byte LK);
-    // String __fastcall GetRegDebugInfo(int ProcOfs, int hReg, int Ofs, int* hDecl);
+    // bool __fastcall  IsProcEx(Pointer ProcUnit);
     void __fastcall  Visit(TDCURecVisitor *Visitor) override;
+    // String __fastcall GetProcKindStr();
+    void __fastcall  ShowDef(bool All, String &OutS) override;
+    void __fastcall  Show(String &OutS) override;
+    void __fastcall  EnumUsedTypes(TTypeUseAction Action, DWord *IP) override;
+    bool __fastcall  IsVisible(Byte LK) override;
+    // bool __fastcall GetRegDebugInfo(int ProcOfs, int hReg, int Ofs, TRegDebugInfo* Info);
+    // String __fastcall GetRegDebugInfoStr(int ProcOfs, int hReg, int Ofs, int* hDecl);
+    // TLocalDecl * __fastcall GetResultVar();
+    void __fastcall MemRefFound() override;
+    bool __fastcall IsStaticMethod();
 
-    DWord      CodeOfs, AddrBase;
-    DWord      Sz;
-    int        B0;
-    int        VProc;
-    int        hDTRes;
-    int        hClass;
-    TNameDecl *Args;
-    TNameDecl *Locals;
-    TNameDecl *Embedded;
-    Byte       CallKind;
-    Byte       MethodKind; // maybe this information is encoded by some flag, but
-    // I can't detect it. Maybe it would be enough to analyse the structure of
-    // the procedure name, but this way it will be safer.
+    // DWord    CodeOfs;
+    DWord    AddrBase; // May be>0 if the procedure is from a block of a *.obj file, usually AddrBase=0
+    DWord    Sz;
+    TNDX     B0;
+    TNDX     VProc;
+    TNDX     hDTRes;
+    TNDX     hClass;
+    TDCURec *Args;
+    TDCURec *Locals; // FLocals
+    TDCURec *Embedded;
+    Byte     CallKind;
+    Byte     MethodKind; // maybe this information is encoded by some flag, but
+                         // I can't detect it. Maybe it would be enough to analyse the structure of
+                         // the procedure name, but this way it will be safer.
+    bool       OfClass;  // may be this information is encoded by some flag too, but by now it is set by the corresponding method too
     bool       JustData; // This flag is turned on by Fixups from String-typed consts
     PLocVarRec FProcLocVarTbl;
     int        FProcLocVarCnt;
@@ -745,9 +1160,9 @@ typedef TProcDecl *PProcDecl;
 class TSysProcDecl : public TNameDecl {
 public:
     TSysProcDecl();
-    void __fastcall Show(String &OutS);
-    Byte __fastcall GetSecKind();
     void __fastcall Visit(TDCURecVisitor *Visitor) override;
+    void __fastcall Show(String &OutS) override;
+    Byte __fastcall GetSecKind() override;
 
     int F;
     int Ndx;
@@ -768,48 +1183,67 @@ class TUnitAddInfo : public TNameFDecl {
 public:
     TUnitAddInfo();
     ~TUnitAddInfo();
-    bool __fastcall IsVisible(Byte LK);
+    bool __fastcall IsVisible(Byte LK) override;
     void __fastcall Visit(TDCURecVisitor *Visitor) override;
 
     // FVer 8.0 and higher, MSIL
     int B;
-    TNameDecl *Sub;
+    TDCURec *Sub;
 };
 
 class TSpecVar : public TVarDecl {
 public:
     TSpecVar();
-    void __fastcall Show(String &OutS);
     void __fastcall Visit(TDCURecVisitor *Visitor) override;
+    void __fastcall Show(String &OutS) override;
 };
 
+enum class TTypeValKind { vkNone, vkOrdinal, vkFloat, vkStr, vkPointer, vkClass, vkInterface, vkDynArray, vkMethod, vkComplex };
+
 class TTypeDef : public TBaseDef {
+protected:
+    TNDX FhDT;
 public:
     TTypeDef();
     ~TTypeDef();
     void __fastcall           Visit(TDCURecVisitor *Visitor) override;
     void __fastcall           ShowBase();
     virtual int __fastcall    ShowValue(Byte *DP, DWord DS, String &OutS);
-    void __fastcall           Show(String &OutS);
-    DWord __fastcall          SetMem(DWord MOfs, DWord MSz);
+    void __fastcall           Show(String &OutS) override;
+    DWord __fastcall          SetMem(DWord MOfs, DWord MSz) override;
     virtual String __fastcall GetOfsQualifier(int Ofs);
     virtual String __fastcall GetRefOfsQualifier(int Ofs);
+    void __fastcall           AddModifier(TDeclModifier *M);
+    TDeclModifier *__fastcall GetModifierOfClass(TDeclModifierClass *Cl);
+    virtual TTypeValKind __fastcall ValKind() { return TTypeValKind::vkNone; }
 
-    int   RTTISz; // Size of RTTI for type, if available
-    int   Sz;     // Size of corresponding variable
-    int   hAddrDef;
-    int   X;
+    TNDX  RTTISz; // Size of RTTI for type, if available
+    TNDX  Sz;     // Size of corresponding variable
+    TNDX  hAddrDef;
+    TNDX  X;
     DWord RTTIOfs;
+
+    // Duplicates the Modifier infrastructure from TNameDecl.
+    // It is required just for TTemplateParmsDeclModifier,
+    // but the general implementation may become useful later
+    TDeclModifier *FModifiers;
+
+    // Aux field, to be able to get quickly the type index of the data type
+    __property TNDX hDT = { read = FhDT, write = FhDT };
 };
 
 class TRangeBaseDef : public TTypeDef {
 public:
     TRangeBaseDef();
     void __fastcall GetRange(PInt64Rec Lo, PInt64Rec Hi);
-    int __fastcall  ShowValue(Byte *DP, DWord DS, String &OutS);
-    void __fastcall Show(String &OutS);
-    void __fastcall EnumUsedTypes(TTypeUseAction Action, DWord *IP);
+    bool __fastcall IsChar();
     void __fastcall Visit(TDCURecVisitor *Visitor) override;
+    int __fastcall  ShowValue(Byte *DP, DWord DS, String &OutS) override;
+    void __fastcall Show(String &OutS) override;
+    void __fastcall EnumUsedTypes(TTypeUseAction Action, DWord *IP) override;
+    TTypeValKind __fastcall ValKind() override { return TTypeValKind::vkOrdinal; }
+
+    // TInt64Rec *__fastcall GetValCount() override;
 
     int   hDTBase;
     Byte *LH;
@@ -826,34 +1260,38 @@ class TEnumDef : public TRangeBaseDef {
 public:
     TEnumDef();
     ~TEnumDef();
-    int __fastcall  ShowValue(Byte *DP, DWord DS, String &OutS);
-    void __fastcall Show(String &OutS);
+    int __fastcall  ShowValue(Byte *DP, DWord DS, String &OutS) override;
+    void __fastcall Show(String &OutS) override;
     void __fastcall Visit(TDCURecVisitor *Visitor) override;
 
-    int    Ndx;
+    int    Ndx; // TNDX
     TList *NameTbl;
+    TConstDecl *CStart; // Filled in TUnit.SetEnumConsts
+    bool HasEq; // Some const was defined by �=�prev and not included into NameTbl
 };
 
 class TFloatDef : public TTypeDef {
 public:
     TFloatDef();
-    String __fastcall GetKindName();
-    int __fastcall    ShowValue(Byte *DP, DWord DS, String &OutS);
-    void __fastcall   Show(String &OutS);
+    AnsiString __fastcall GetKindName();
     void __fastcall   Visit(TDCURecVisitor *Visitor) override;
+    int __fastcall    ShowValue(Byte *DP, DWord DS, String &OutS) override;
+    void __fastcall   Show(String &OutS) override;
+    TTypeValKind __fastcall ValKind() override { return TTypeValKind::vkFloat; }
 
-    Byte Kind;
+    Byte Kind; // TFloatKind
 };
 
 class TPtrDef : public TTypeDef {
 public:
     TPtrDef();
     bool __fastcall   ShowRefValue(int Ndx, DWord Ofs, String &OutS);
-    int __fastcall    ShowValue(Byte *DP, DWord DS, String &OutS);
-    void __fastcall   Show(String &OutS);
-    void __fastcall   EnumUsedTypes(TTypeUseAction Action, DWord *IP);
-    String __fastcall GetRefOfsQualifier(int Ofs);
     void __fastcall   Visit(TDCURecVisitor *Visitor) override;
+    int __fastcall    ShowValue(Byte *DP, DWord DS, String &OutS) override;
+    void __fastcall   Show(String &OutS) override;
+    void __fastcall   EnumUsedTypes(TTypeUseAction Action, DWord *IP) override;
+    String __fastcall GetRefOfsQualifier(int Ofs) override;
+    TTypeValKind __fastcall ValKind() override { return TTypeValKind::vkPointer; }
 
     int hRefDT;
 };
@@ -861,16 +1299,16 @@ public:
 class TTextDef : public TTypeDef {
 public:
     TTextDef();
-    void __fastcall Show(String &OutS);
     void __fastcall Visit(TDCURecVisitor *Visitor) override;
+    void __fastcall Show(String &OutS) override;
 };
 
 class TFileDef : public TTypeDef {
 public:
     TFileDef();
-    void __fastcall Show(String &OutS);
-    void __fastcall EnumUsedTypes(TTypeUseAction Action, DWord *IP);
     void __fastcall Visit(TDCURecVisitor *Visitor) override;
+    void __fastcall Show(String &OutS) override;
+    void __fastcall EnumUsedTypes(TTypeUseAction Action, DWord *IP) override;
 
     int hBaseDT;
 };
@@ -878,10 +1316,11 @@ public:
 class TSetDef : public TTypeDef {
 public:
     TSetDef();
-    int __fastcall  ShowValue(Byte *DP, DWord DS, String &OutS);
-    void __fastcall Show(String &OutS);
-    void __fastcall EnumUsedTypes(TTypeUseAction Action, DWord *IP);
     void __fastcall Visit(TDCURecVisitor *Visitor) override;
+    int __fastcall  ShowValue(Byte *DP, DWord DS, String &OutS) override;
+    void __fastcall Show(String &OutS) override;
+    void __fastcall EnumUsedTypes(TTypeUseAction Action, DWord *IP) override;
+    TTypeValKind __fastcall ValKind() override { return TTypeValKind::vkComplex; }
 
     Byte BStart; // 0-based start byte number
     int  hBaseDT;
@@ -891,10 +1330,10 @@ public:
 class TArrayDef0 : public TTypeDef {
 public:
     TArrayDef0(bool IsStr);
-    int __fastcall  ShowValue(Byte *DP, DWord DS, String &OutS);
-    void __fastcall Show(String &OutS);
-    void __fastcall EnumUsedTypes(TTypeUseAction Action, DWord *IP);
     void __fastcall Visit(TDCURecVisitor *Visitor) override;
+    int __fastcall  ShowValue(Byte *DP, DWord DS, String &OutS) override;
+    void __fastcall Show(String &OutS) override;
+    void __fastcall EnumUsedTypes(TTypeUseAction Action, DWord *IP) override;
 
     Byte B1;
     int  hDTNdx;
@@ -904,16 +1343,18 @@ public:
 class TArrayDef : public TArrayDef0 {
 public:
     TArrayDef(bool IsStr);
-    String __fastcall GetOfsQualifier(int Ofs);
+    String __fastcall GetOfsQualifier(int Ofs) override;
     void __fastcall Visit(TDCURecVisitor *Visitor) override;
+    TTypeValKind __fastcall ValKind() override;
 };
 
 class TShortStrDef : public TArrayDef {
 public:
     TShortStrDef();
-    int __fastcall  ShowValue(Byte *DP, DWord DS, String &OutS);
-    void __fastcall Show(String &OutS);
     void __fastcall Visit(TDCURecVisitor *Visitor) override;
+    int __fastcall  ShowValue(Byte *DP, DWord DS, String &OutS) override;
+    void __fastcall Show(String &OutS) override;
+    TTypeValKind __fastcall ValKind() override { return TTypeValKind::vkStr; }
 
     int CP; // for Ver>=VerD12
 };
@@ -923,9 +1364,10 @@ public:
     TStringDef();
     void __fastcall   Visit(TDCURecVisitor *Visitor) override;
     bool __fastcall   ShowRefValue(int Ndx, DWord Ofs, String &OutS);
-    int __fastcall    ShowValue(Byte *DP, DWord DS, String &OutS);
-    void __fastcall   Show(String &OutS);
-    String __fastcall GetRefOfsQualifier(int Ofs);
+    int __fastcall    ShowValue(Byte *DP, DWord DS, String &OutS) override;
+    void __fastcall   Show(String &OutS) override;
+    String __fastcall GetRefOfsQualifier(int Ofs) override;
+    TTypeValKind __fastcall ValKind() override { return TTypeValKind::vkStr; }
 
     int CP; // for Ver>=VerD12
 };
@@ -933,8 +1375,8 @@ public:
 class TVariantDef : public TTypeDef {
 public:
     TVariantDef();
-    void __fastcall Show(String &OutS);
     void __fastcall Visit(TDCURecVisitor *Visitor) override;
+    void __fastcall Show(String &OutS) override;
 
     Byte B;
 };
@@ -942,8 +1384,8 @@ public:
 class TObjVMTDef : public TTypeDef {
 public:
     TObjVMTDef();
-    void __fastcall Show(String &OutS);
     void __fastcall Visit(TDCURecVisitor *Visitor) override;
+    void __fastcall Show(String &OutS) override;
 
     int hObjDT;
     int Ndx1;
@@ -956,21 +1398,23 @@ public:
     void __fastcall        ReadFields(Byte LK);
     void __fastcall        Visit(TDCURecVisitor *Visitor) override;
     int __fastcall         ShowFieldValues(Byte *DP, DWord DS, String &OutS);
-    void __fastcall        EnumUsedTypes(TTypeUseAction Action, DWord *IP);
+    void __fastcall        EnumUsedTypes(TTypeUseAction Action, DWord *IP) override;
     virtual int __fastcall GetParentType();
     TPropDecl *__fastcall  GetFldProperty(PNameDecl Fld, int hDT);
     String __fastcall      GetFldOfsQualifier(int Ofs, int TotSize, bool Sorted);
+    TMethodDecl *__fastcall GetMethodByVMTNDX(int VMTNDX, int VMTCnt);
 
-    TNameDecl *Fields;
+    TDCURec *Fields;
 };
 
 class TRecDef : public TRecBaseDef {
 public:
     TRecDef();
-    int __fastcall    ShowValue(Byte *DP, DWord DS, String &OutS);
-    void __fastcall   Show(String &OutS);
-    String __fastcall GetOfsQualifier(int Ofs);
     void __fastcall   Visit(TDCURecVisitor *Visitor) override;
+    int __fastcall    ShowValue(Byte *DP, DWord DS, String &OutS) override;
+    void __fastcall   Show(String &OutS) override;
+    String __fastcall GetOfsQualifier(int Ofs) override;
+    TTypeValKind __fastcall ValKind() override { return TTypeValKind::vkComplex; }
 
     Byte B2;
 };
@@ -978,13 +1422,14 @@ public:
 class TProcTypeDef : public TRecBaseDef {
 public:
     TProcTypeDef();
-    int __fastcall    ShowValue(Byte *DP, DWord DS, String &OutS);
     void __fastcall   Visit(TDCURecVisitor *Visitor) override;
+    int __fastcall    ShowValue(Byte *DP, DWord DS, String &OutS) override;
     bool __fastcall   IsProc();
     String __fastcall ProcStr();
     void __fastcall   ShowDecl(char *Braces, String &OutS);
-    void __fastcall   Show(String &OutS);
-    void __fastcall   EnumUsedTypes(TTypeUseAction Action, DWord *IP);
+    void __fastcall   Show(String &OutS) override;
+    void __fastcall   EnumUsedTypes(TTypeUseAction Action, DWord *IP) override;
+    TTypeValKind __fastcall ValKind() override;
 
     int     Ndx0; // B0: Byte; //Ver>2
     int     hDTRes;
@@ -994,63 +1439,77 @@ public:
     PDCURec AddInfo; // for Ver>=verD2009
 };
 
-class TObjDef : public TRecBaseDef {
+class TOOTypeDef : public TRecBaseDef {
 public:
-    TObjDef();
-    int __fastcall    ShowValue(Byte *DP, DWord DS, String &OutS);
-    void __fastcall   Show(String &OutS);
-    void __fastcall   EnumUsedTypes(TTypeUseAction Action, DWord *IP);
-    int __fastcall    GetParentType();
-    String __fastcall GetOfsQualifier(int Ofs);
-    void __fastcall   Visit(TDCURecVisitor *Visitor) override;
+    void __fastcall Visit(TDCURecVisitor *Visitor) override;
+    // TMethodDecl *__fastcall GetMethodByVMTOfs(int Ofs);
+    virtual bool __fastcall hasVMT();
 
-    Byte B03;
-    int  hParent;
-    Byte BFE;
-    int  Ndx1;
-    Byte B00;
+    int hParent; // TNDX
+    int VMCnt; // TNDX - Number of virtual methods
 };
 
-class TClassDef : public TRecBaseDef {
+class TObjDef : public TOOTypeDef {
+public:
+    TObjDef();
+    void __fastcall   Visit(TDCURecVisitor *Visitor) override;
+    int __fastcall    ShowValue(Byte *DP, DWord DS, String &OutS) override;
+    void __fastcall   Show(String &OutS) override;
+    void __fastcall   EnumUsedTypes(TTypeUseAction Action, DWord *IP) override;
+    int __fastcall    GetParentType() override;
+    String __fastcall GetOfsQualifier(int Ofs) override;
+    bool __fastcall   hasVMT() override;
+
+    Byte B03;
+    // Byte BFE;
+    // int  Ndx1;
+    // Byte B00;
+    TNDX VMTOfs;
+    TNDX hVMT; // the TTypePDecl, which contains VMT
+
+};
+
+class TClassDef : public TOOTypeDef {
 public:
     TClassDef();
     ~TClassDef();
-    int __fastcall          ShowValue(Byte *DP, DWord DS, String &OutS);
-    void __fastcall         Show(String &OutS);
-    int __fastcall          GetParentType();
-    String __fastcall       GetRefOfsQualifier(int Ofs);
     void __fastcall         Visit(TDCURecVisitor *Visitor) override;
+    int __fastcall          ShowValue(Byte *DP, DWord DS, String &OutS) override;
+    void __fastcall         Show(String &OutS) override;
+    int __fastcall          GetParentType() override;
+    String __fastcall       GetRefOfsQualifier(int Ofs) override;
     virtual void __fastcall ReadBeforeIntf();
+    TTypeValKind __fastcall ValKind() override { return TTypeValKind::vkClass; }
 
-    int  hParent;
     int  InstBaseRTTISz; // Size of RTTI for the type, if available
     int  InstBaseSz;     // Size of corresponding variable
-    int  InstBaseV;
-    int  VMCnt;  // number of virtual methods
-    int  NdxFE;  // BFE: Byte
-    int  Ndx00a; // B00a: Byte
-    int  B04;
-    int  ICnt;
+    int  InstBaseV;      // hAddr of VMT
+    int  NdxFE;          // BFE: Byte
+    int  PropCnt;        // Ndx00a B00a: Byte
+    TNDX Flags;
+    // int  B04;
+    int  ICnt; // FVer > 2
     int *ITbl;
 };
 
 class TMetaClassDef : public TClassDef {
 public:
     TMetaClassDef();
-    void __fastcall ReadBeforeIntf();
     void __fastcall Visit(TDCURecVisitor *Visitor) override;
+    void __fastcall ReadBeforeIntf() override;
 
     int hCl;
 };
 
-class TInterfaceDef : public TRecBaseDef {
+class TInterfaceDef : public TOOTypeDef {
 public:
     TInterfaceDef();
-    void __fastcall Show(String &OutS);
     void __fastcall Visit(TDCURecVisitor *Visitor) override;
+    void __fastcall Show(String &OutS) override;
+    TTypeValKind __fastcall ValKind() override { return TTypeValKind::vkInterface; }
 
-    int   hParent;
-    int   VMCnt;
+    // int   hParent;
+    // int   VMCnt;
     PGUID GUID;
     Byte  B;
 };
@@ -1058,21 +1517,22 @@ public:
 class TVoidDef : public TTypeDef {
 public:
     TVoidDef();
-    void __fastcall Show(String &OutS);
     void __fastcall Visit(TDCURecVisitor *Visitor) override;
+    void __fastcall Show(String &OutS) override;
 };
 
 class TA6Def : public TDCURec {
 public:
     TA6Def();
     ~TA6Def();
-    void __fastcall Show(String &OutS);
     void __fastcall Visit(TDCURecVisitor *Visitor) override;
+    void __fastcall Show(String &OutS) override;
 
-    PNameDecl Args;
+    PDCURec Args;
+    // PNameDecl Args;
 };
 
-class TA7Def : public TDCURec {
+/*class TA7Def : public TDCURec {
 public:
     TA7Def();
     ~TA7Def();
@@ -1081,13 +1541,13 @@ public:
     int  hClass;
     int  Cnt;
     int *Tbl;
-};
+};*/
 
 class TDelayedImpRec : public TNameDecl {
 public:
     TDelayedImpRec();
-    void __fastcall Show(String &OutS);
     void __fastcall Visit(TDCURecVisitor *Visitor) override;
+    void __fastcall Show(String &OutS) override;
 
     int Inf;
     int F;
@@ -1097,22 +1557,24 @@ class TORecDecl : public TNameDecl {
 public:
     TORecDecl();
     ~TORecDecl();
-    void __fastcall Show(String &OutS);
     void __fastcall Visit(TDCURecVisitor *Visitor) override;
+    void __fastcall Show(String &OutS) override;
 
     int       DW;
     Byte      B0;
     Byte      B1;
-    PNameDecl Args;
+    PDCURec Args;
+    // PNameDecl Args;
 };
 
 // for Ver>=VerD12
 class TDynArrayDef : public TPtrDef {
 public:
     TDynArrayDef();
-    void __fastcall   Show(String &OutS);
-    String __fastcall GetRefOfsQualifier(int Ofs);
     void __fastcall   Visit(TDCURecVisitor *Visitor) override;
+    void __fastcall   Show(String &OutS) override;
+    String __fastcall GetRefOfsQualifier(int Ofs) override;
+    TTypeValKind __fastcall ValKind() override { return TTypeValKind::vkDynArray; }
 };
 
 // for Ver>=VerD12 - template support
@@ -1120,8 +1582,8 @@ class TTemplateArgDef : public TTypeDef {
 public:
     TTemplateArgDef();
     ~TTemplateArgDef();
-    void __fastcall Show(String &OutS);
     void __fastcall Visit(TDCURecVisitor *Visitor) override;
+    void __fastcall Show(String &OutS) override;
 
     int  Cnt, V5;
     int *Tbl;
@@ -1132,14 +1594,45 @@ class TTemplateCall : public TTypeDef {
 public:
     TTemplateCall();
     ~TTemplateCall();
-    void __fastcall Show(String &OutS);
-    void __fastcall EnumUsedTypes(TTypeUseAction Action, DWord *IP);
     void __fastcall         Visit(TDCURecVisitor *Visitor) override;
+    void __fastcall         Show(String &OutS) override;
+    int __fastcall          ShowValue(Byte *DP, DWord DS, String &OutS) override;
+    void __fastcall         EnumUsedTypes(TTypeUseAction Action, DWord *IP) override;
+    TTypeValKind __fastcall ValKind() override;
+    // void __fastcall FixDTName(); // unused
 
     int  hDT;
     int  Cnt;
     int *Args;
     int  hDTFull;
+
+    PName OldName;   // The Name of hDT as it was shown in DCU
+    PName FixedName; // The fixed name of hDT - should be freed by this object
+};
+
+class TAssemblyData : public TDCURec {
+public:
+    TAssemblyData();
+    ~TAssemblyData() override;
+    void __fastcall Visit(TDCURecVisitor *Visitor) override;
+    void __fastcall Show(String &OutS) override;
+    bool __fastcall IsVisible(Byte LK) override;
+    // procedure Visit(Visitor: TDCURecVisitor); override;
+
+    int  HdrSz;
+    int  F;
+    int  SzPublicKey;
+    int  SzPublicKeyToken;
+    int  Y;
+    int  hClass;
+    int  Cnt, Cnt1, Cnt2, Cnt3;
+    int *Tbl, *Tbl1, *Tbl2, *Tbl3, *Tbl4, *Tbl5, *Tbl6;
+    Byte *PublicKey;
+    Byte *PublicKeyToken;
+    int *SomeData;
+
+    PAnsiChar AssemblyName;
+    PName Descr;
 };
 
 // Pattern "Visitor" for TDCURec class hierarchy

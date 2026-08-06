@@ -1,2 +1,3 @@
-﻿#include <vcl.h>
+﻿#pragma once
 #include <tchar.h>
+#include <vcl.h>

@@ -1,7 +1,25 @@
 cmake_minimum_required(VERSION 3.21)
 
-set(APP "Builder")
+set(APP "BuildKB")
 project(${APP} VERSION 1.0.0.0 LANGUAGES CXX)
+
+include(FetchContent)
+
+#FetchContent_Declare(
+#        trace
+#        GIT_REPOSITORY https://github.com/GPMueller/trace
+#        GIT_TAG        b9fea96ccaee2f55f6fca7be8b05be7b204ecbe5 # <HASH or TAG>
+#)
+#FetchContent_MakeAvailable(trace)
+
+#FetchContent_Declare(
+#        cpptrace
+#        GIT_REPOSITORY https://github.com/jeremy-rifkin/cpptrace.git
+#        GIT_TAG        v1.0.4 # <HASH or TAG>
+#)
+#FetchContent_MakeAvailable(cpptrace)
+
+#set(CMAKE_CXX_COMPILER_ID "Clang")
 
 add_compile_options(-D_DEBUG) # -DUSEPACKAGES
 
@@ -46,7 +64,22 @@ target_link_libraries(${APP} PRIVATE
         "${EMBT_BPI_DIR}/bcbsmp.bpi"
         "${EMBT_BPI_DIR}/vclx.bpi"
         "${EMBT_BPI_DIR}/vclimg.bpi"
+        # cpptrace:cpptrace
 )
+
+# include_directories("${CMAKE_BINARY_DIR}/_deps/trace-src/include/")
+# include_directories("${cpptrace_BINARY_DIR}/include/")
+
+# Needed for shared library builds on windows:  copy cpptrace.dll to the same directory as the
+# executable for your_target
+#[[if(WIN32)
+    add_custom_command(
+            TARGET ${APP} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "$<TARGET_FILE:cpptrace::cpptrace>"
+            "$<TARGET_FILE_DIR:${APP}/cpptrace.dll>"
+    )
+endif()]]
 
 install(TARGETS ${APP}
         RUNTIME DESTINATION bin
