@@ -1480,6 +1480,7 @@ public:
     String __fastcall       GetRefOfsQualifier(int Ofs) override;
     virtual void __fastcall ReadBeforeIntf();
     TTypeValKind __fastcall ValKind() override { return TTypeValKind::vkClass; }
+    void __fastcall         MarkAuxFields();
 
     int  InstBaseRTTISz; // Size of RTTI for the type, if available
     int  InstBaseSz;     // Size of corresponding variable
@@ -1489,7 +1490,7 @@ public:
     TNDX Flags;
     // int  B04;
     int  ICnt; // FVer > 2
-    int *ITbl;
+    PNDXTbl ITbl;
 };
 
 class TMetaClassDef : public TClassDef {

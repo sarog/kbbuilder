@@ -121,6 +121,7 @@ PCodeLineTbl FCodeLineTbl;
 
 int         FLineRangeCnt;
 
+int         FLocVarSize; // The actual number of records in FLocVarTbl (required for XE2 64bit)
 int         FLocVarCnt;
 PLocVarRec  FLocVarTbl = nullptr;
 
@@ -455,8 +456,11 @@ PShortName __fastcall ReadShortName() {
 PName __fastcall ReadName() {
     PName Result = reinterpret_cast<PName>(CurPos);
     int L = ReadByte();
-    if (L == 0xFF && FVer >= verD2009 && FVer < verK1)
-        L = ReadULong();
+
+    // todo:
+    // new: needs TNameRec for chars > 255
+    // if (L == 0xFF && FVer >= verD2009 && FVer < verK1)
+    //     L = ReadULong();
 
     SkipBlock(L);
 
@@ -813,40 +817,67 @@ Byte __fastcall ReadCallKind() {
     return Result;
 }
 //------------------------------------------------------------------------------
-int __fastcall ReadClassInterfaces(int** PITbl) {
+/**
+ * From DCURecs.pas
+ *
+ * @param PITbl
+ * @return
+ */
+int __fastcall ReadClassInterfaces(PPNDXTbl PITbl) {
     int Result = ReadIndex();
     if (Result <= 0) return Result;
-    int *ITbl = NULL;
+    PNDXTbl ITbl = nullptr;
     if (PITbl) {
-        ITbl   = new int[Result * 2];
+        ITbl   = new TNDXTbl[Result * 2 * sizeof(TNDX)];
         *PITbl = ITbl;
     }
+    printf("Debug: ReadClassInterfaces: Result = %d\n", Result);
     for (int i = 0; i < Result; i++) {
+        TNDX MatchCnt;
+        int X1;
         int hIntf = ReadUIndex();
-        int MCnt  = ReadUIndex();
+        if (IsMSIL && FVer >= verD2006 && FVer < verK1) {
+            X1 = ReadUIndex();
+            MatchCnt = ReadUIndex();
+        }
+        printf("Debug: ReadClassInterfaces: 2\n");
+        int MCnt = ReadUIndex();
         if (ITbl) {
-            ITbl[2 * i]     = hIntf;
-            ITbl[2 * i + 1] = MCnt;
+            *ITbl[2 * i]     = hIntf;
+            *ITbl[2 * i + 1] = MCnt;
         }
+        printf("Debug: ReadClassInterfaces: 3\n");
         if (IsMSIL) {
-            for (int j = 0; j < MCnt; j++) {
-                int N       = ReadUIndex();
-                int hMember = ReadUIndex();
+            printf("Debug: ReadClassInterfaces: 4a\n");
+            // for j:=1 to MCnt do begin
+            for (int j = 1; j <= MCnt; j++) {
+                ReadUIndex(); // N
+                ReadUIndex(); // hMember
             }
-        }
-        if (FVer >= verD2006 && FVer < verK1) {
-            int X1 = ReadIndex(); // ReadUIndex?
-            if (FVer >= verD2010 && FVer < verK1) {
-                int Cnt = ReadUIndex();
-                for (int j = 0; j < Cnt; j++) {
-                    ReadUIndex(); // +4
-                    ReadUIndex(); // +8
-                    ReadByte();   // =1
-                    ReadName();
+        } else if (FVer >= verD2006 && FVer < verK1) {
+            // printf("Debug: ReadClassInterfaces: i=%d, 4b\n", i);
+            X1 = ReadUIndex();
+            MatchCnt = ReadUIndex();
+            if (FVer >= verD2010) {
+                ReadUIndex(); // X3
+                ReadUIndex(); // X4
+                for (int j = 1; j <= MatchCnt; j++) {
+                    printf("Debug: ReadClassInterfaces: 5: MatchCnt=%d, %d\n", MatchCnt, j);
+                    ReadByte(); // B
+                    PName MName = ReadName(); // MName
+                    ReadUIndex(); // N
+                    ReadUIndex(); // hMember
+                    // ReadUIndex(); // +4
+                    // ReadUIndex(); // +8
+                    // ReadByte();   // =1
+                    // ReadName();
+                    // printf("Debug: ReadClassInterfaces: Name: %s\n", MName->Name);
+                }
+                if (FVer >= verD12) {
+                    printf("Debug: ReadClassInterfaces: 6\n");
+                    AnsiString AName = ReadNDXStrX();
                 }
             }
-            int X2 = ReadUIndex();
-            if (FVer >= verD2010 && FVer < verK1) int X3 = ReadUIndex();
         }
     }
     return Result;
@@ -1333,9 +1364,14 @@ void LoadLineRanges() {
     }
 }
 //------------------------------------------------------------------------------
+/**
+ * TUnit.LoadStrucScope
+ */
 void LoadStrucScope() {
     int Cnt = ReadUIndex();
-    for (int i = 0; i < Cnt * 5; i++) ReadUIndex();
+    int N = 5;
+    if (FVer >= verD10_3 && FVer < verK1) N++; // Some field was added
+    for (int i = 0; i < Cnt * N; i++) ReadUIndex(); // hType,hVar,Ofs,LnStart,LnCnt
 }
 //------------------------------------------------------------------------------
 /**
@@ -1351,11 +1387,75 @@ void LoadSymbolInfo() {
         int hDef    = ReadUIndex(); // index of symbol definition in the L array
         for (int j = 0; j < Sz; j++) ReadUIndex();
     }
+    printf("Debug: LoadSymbolInfo: end\n");
 }
 //------------------------------------------------------------------------------
+/**
+ * TUnit.LoadLocVarTbl
+ */
 void LoadLocVarTbl() {
+    if (FLocVarTbl)
+        printf("[Error] LoadLocVarTbl: FLocVarTbl already allocated (2nd Local Vars table)\n"); // DCUError
+
     FLocVarCnt = ReadUIndex();
-    FLocVarTbl = new TLocVarRec[FLocVarCnt];
+    FLocVarSize = FLocVarCnt;
+
+    if (FPlatform != dcuplWin64) {
+        FLocVarTbl = new TLocVarRec[FLocVarCnt];
+        memset(FLocVarTbl, 0, FLocVarCnt * sizeof(FLocVarCnt));
+        PLocVarRec LR = FLocVarTbl;
+
+        for (int i = 0; i < FLocVarCnt; i++) {
+            LR->sym   = ReadUIndex();
+            LR->ofs   = ReadUIndex();
+            LR->frame = ReadIndex();
+            LR++;
+        }
+    } else {
+        int F;
+        // They write additional record in 64-bit mode for each procedure without fixing FLocVarCnt
+        FLocVarSize = (FLocVarCnt * 3) / 2;
+        FLocVarTbl = new TLocVarRec[FLocVarCnt];
+        memset(FLocVarTbl, 0, FLocVarCnt * sizeof(FLocVarCnt));
+        PLocVarRec LR = FLocVarTbl;
+        int ProcRec = 0;
+        int i = 0;
+        while (i < FLocVarCnt) {
+            int Sym = ReadUIndex();
+            if (ProcRec == 0) {
+                if (Sym != 0) {
+                    TDCURec *D = GetAddrDef(Sym);
+                    if (TProcDecl *PD = dynamic_cast<TProcDecl*>(D)) {
+                        ProcRec = 3;
+                        i--;
+                    }
+                }
+
+                LR->sym = Sym;
+                LR->ofs = ReadUIndex();
+
+                if (ProcRec > 1)
+                    F = ReadUIndex();
+                else
+                    F = ReadIndex();
+
+                LR->frame = F;
+                LR++;
+                i++;
+
+                if (ProcRec > 0)
+                    ProcRec--;
+            }
+        }
+
+        int Sz = (TIncPtr(LR) - TIncPtr(FLocVarTbl)) / sizeof(TLocVarRec);
+        if (FLocVarSize != Sz) {
+            ReallocMemory(FLocVarTbl, FLocVarSize * sizeof(TLocVarRec));
+            FLocVarSize = Sz;
+        }
+    }
+
+    /*FLocVarTbl = new TLocVarRec[FLocVarCnt];
     memset(FLocVarTbl, 0, FLocVarCnt * sizeof(FLocVarCnt));
     PLocVarRec LR = FLocVarTbl;
 
@@ -1364,7 +1464,7 @@ void LoadLocVarTbl() {
         LR->ofs   = ReadUIndex();
         LR->frame = ReadIndex();
         LR++;
-    }
+    }*/
 }
 //------------------------------------------------------------------------------
 void ClearAddrDef(TNameDecl *ND) {
@@ -2290,11 +2390,12 @@ int __fastcall ReadConstAddInfo(TNameDecl *LastProcDecl) {
             default:
                 break;
         }
-        if (Tag != caiStop) {
-            // DCUErrorFmt('Unexpected Tag=$%x in TConstAddInfoRec',[Tag]);
-            printf("Debug: ReadConstInfo: Unexpected Tag=$%x in TConstAddInfoRec\n", Tag);
-            return Result;
-        };
+    }
+
+    if (Tag != caiStop) {
+        // DCUErrorFmt('Unexpected Tag=$%x in TConstAddInfoRec',[Tag]);
+        printf("Debug: ReadConstInfo: Unexpected Tag=$%x in TConstAddInfoRec\n", Tag);
+        return Result;
     }
 
     printf("Debug: ReadConstAddInfo End\n");

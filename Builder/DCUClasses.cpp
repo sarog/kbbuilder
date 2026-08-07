@@ -331,8 +331,8 @@ void TDeprecatedDeclModifier::Show(String &OutS) {
 }
 //------------------------------------------------------------------------------
 TXMLDocDeclModifier::TXMLDocDeclModifier(TMemStrRef *AMsg) : TStrDeclModifier(AMsg) {
-    printf("Debug: TXMLDocDeclModifier: init\n");
-    printf("Debug: TXMLDocDeclModifier: AMsg: %s\n", AnsiString(AMsg->S()).c_str());
+    // printf("Debug: TXMLDocDeclModifier: init\n");
+    // printf("Debug: TXMLDocDeclModifier: AMsg: %s\n", AnsiString(AMsg->S()).c_str());
 }
 //------------------------------------------------------------------------------
 // TXMLDocDeclModifier::TXMLDocDeclModifier() : TStrDeclModifier() {}
@@ -3614,24 +3614,27 @@ TMethodDecl *TRecBaseDef::GetMethodByVMTNDX(int VMTNDX, int VMTCnt) {
 }
 //------------------------------------------------------------------------------
 TRecDef::TRecDef() : TRecBaseDef() {
-    Byte  B1;
-    DWord X0, X, XX;
-
-    if (FVer >= verD2009 && FVer < verK1) ReadUIndex();
     B2 = ReadByte();
+
     if (IsMSIL) {
-        X = ReadUIndex();
+        if (FVer >= verD2006 && FVer < verK1)
+            Byte B1 = ReadByte();
+
+        TNDX X = ReadUIndex();
         // !Temp Skip interface info - should make it stored in recs too
         ReadClassInterfaces(nullptr);
     } else if (FVer >= verD2005 && FVer < verK1) {
         if (FVer >= verD2006 && FVer < verK1) {
-            B1 = ReadByte();
-            if (FVer >= verD2009 && FVer < verK1) XX = ReadUIndex();
-            if (FVer >= verD2010 && FVer < verK1) XX = ReadUIndex();
-            X0 = ReadUIndex();
+            Byte B1 = ReadByte();
+            TNDX X0 = ReadByte();
         }
-        ReadClassInterfaces(nullptr);
-        // X = ReadUIndex();     // ???????????????
+        TNDX X = ReadUIndex();
+        if (FVer >= verD2009) {
+            ReadUIndex();
+            ReadUIndex();
+            if (FVer >= verD2010)
+                ReadUIndex();
+        }
     }
     ReadFields(dlFields);
 }
@@ -3991,7 +3994,6 @@ bool TObjDef::hasVMT() { return VMTOfs >= 0; }
 TClassDef::TClassDef() : TOOTypeDef() {
     TNDX Msk;
 
-    // if (FVer >= verD2009 && FVer < verK1) ReadUIndex();
     if (FVer >= verD2006 && FVer < verK1)
         Byte BX = ReadByte(); // Some flags
 
@@ -4003,7 +4005,6 @@ TClassDef::TClassDef() : TOOTypeDef() {
 
         ReadByte(); // BX2
     }
-
 
     hParent        = ReadUIndex();
     InstBaseRTTISz = ReadUIndex();
@@ -4039,6 +4040,8 @@ TClassDef::TClassDef() : TOOTypeDef() {
     }
 
     ReadFields(dlClass);
+    MarkAuxFields();
+    printf("Debug: TClassDef: end\n");
 }
 //------------------------------------------------------------------------------
 TClassDef::~TClassDef() {
@@ -4061,6 +4064,16 @@ void __fastcall TClassDef::Show(String &OutS) {
     String S;
     OutS = "class";
     OutLog1("class");
+    if (FVer >= verD8 && FVer < verK1) {
+        if ((Flags & 0x04) != 0) {
+            OutS += " abstract";
+            OutLog1(" abstract");
+        }
+        if ((Flags & 0x40) != 0) {
+            OutS += " sealed";
+            OutLog1(" sealed");
+        }
+    }
     if (hParent || ICnt) {
         OutS += "(";
         OutLog1("(");
@@ -4076,7 +4089,7 @@ void __fastcall TClassDef::Show(String &OutS) {
                 OutS += ",";
                 OutLog1(",");
             }
-            S = ShowTypeName(ITbl[2 * j]);
+            S = ShowTypeName(*ITbl[2 * j]);
             OutS += S;
         }
         OutS += ")";
@@ -4085,6 +4098,7 @@ void __fastcall TClassDef::Show(String &OutS) {
     OutLog2("VMCnt:%d\n", VMCnt);
     TRecBaseDef::Show(S);
     CaseN = -1;
+    // dcu32: ShowDeclList(dlClass,Self{MainRec},Fields,Ofs0,2,[dsLast],ClassSecKinds[(CurUnit.Ver>=verD8)and(CurUnit.Ver<verK1)],skNone);
     ShowDeclList(dlClass, Fields, S);
     OutLog1("end");
 }
@@ -4102,7 +4116,12 @@ String __fastcall TClassDef::GetRefOfsQualifier(int Ofs) {
         return TRecBaseDef::GetRefOfsQualifier(Ofs);
 }
 //------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
 void __fastcall TClassDef::ReadBeforeIntf() {}
+//------------------------------------------------------------------------------
+void TClassDef::MarkAuxFields() {
+
+}
 //------------------------------------------------------------------------------
 TMetaClassDef::TMetaClassDef() : TClassDef() {}
 //------------------------------------------------------------------------------

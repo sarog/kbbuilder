@@ -54,7 +54,7 @@ void __fastcall         ReadByteIfEQ(Byte V);
 int __fastcall          ReadByteFrom(bool b);
 int __fastcall          ReadByteFrom(TByteSet S);
 Byte __fastcall         ReadCallKind();
-int __fastcall          ReadClassInterfaces(int** PITbl);
+int __fastcall          ReadClassInterfaces(PPNDXTbl PITbl);
 int __fastcall          ReadConstAddInfo(TNameDecl* LastProcDecl);
 void __fastcall         ReadDeclList(Byte LK, TDCURec *Owner, TDCURec **Result);
 void __fastcall         ReadDependencyInfo();
