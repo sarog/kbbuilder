@@ -66,7 +66,7 @@ PName __fastcall        ReadName();
 TMemStrRef *__fastcall  ReadNDXStrRef();
 void __fastcall         ReadInDcpWin64Info();
 void __fastcall         ReadSomeNameInfo28();
-Byte __fastcall         ReadTag();
+TDCURecTag __fastcall   ReadTag();
 int __fastcall          ReadUIndex();
 DWord __fastcall        ReadULong();
 int __fastcall          AppendAddrDef(TDCURec *ND);
@@ -109,7 +109,7 @@ typedef struct {
     DWord Size;
     int   ModId; // Modules
     int   NamId; // Names
-} OFFSETSINFO, *POFFSETSINFO;
+} OFFSETSINFO, *POFFSETSINFO; // IDR
 
 // Module info
 typedef struct {
@@ -120,14 +120,14 @@ typedef struct {
     String       Name;     // Unit Name
     String       Filename; // Unit Filename
     TStringList *UsesList; // List of Uses
-} MODULEINFO, *PMODULEINFO;
+} MODULEINFO, *PMODULEINFO; // IDR
 
 // Fixup info (from KB.pas)
 typedef struct {
     Byte   Type; // A-ADR;J-JMP;D-DAT
     DWord  Ofs;  // Offset from RTTI data begin
     String Name; // Name
-} FIXUPINFO, *PFIXUPINFO; // FIXUP_INFO
+} FIXUPINFO, *PFIXUPINFO; // IDR - FIXUP_INFO
 
 // ConstInfo (from KB.pas)
 #define CI_CONSTDECL    'C'
@@ -146,7 +146,7 @@ typedef struct {
     DWord  RTTISz;  // Size of RTTI data
     DWord  RTTIOfs; // Offset of RTTI data
     TList *Fixups;  // If VMT
-} CONSTINFO, *PCONSTINFO;
+} CONSTINFO, *PCONSTINFO; // IDR
 
 // TypeInfo
 typedef struct {
@@ -164,7 +164,7 @@ typedef struct {
     TList *Fields;     // List of Fields
     TList *Properties; // List of Properties
     TList *Methods;    // List of Methods
-} TYPEINFO, *PTYPEINFO;
+} TYPEINFO, *PTYPEINFO; // IDR
 
 // VarInfo
 #define VI_VAR          'V'
@@ -182,7 +182,7 @@ typedef struct {
     DWord  DumpSz;  // Size of binary data
     String AbsName;
     String TypeDef;
-} VARINFO, *PVARINFO;
+} VARINFO, *PVARINFO; // IDR
 
 // ResourseStringInfo (from KB.pas)
 typedef struct {
@@ -195,7 +195,7 @@ typedef struct {
     DWord  DumpSz;  // Size of binary data
     String TypeDef;
     String Context; // Context of ResStr
-} RESSTRINFO, *PRESSTRINFO;
+} RESSTRINFO, *PRESSTRINFO; // IDR
 
 // LocalDeclInfo
 typedef struct {
@@ -208,7 +208,7 @@ typedef struct {
     String Name;
     String TypeDef;
     String AbsName;
-} LOCALDECLINFO, *PLOCALDECLINFO;
+} LOCALDECLINFO, *PLOCALDECLINFO; // IDR
 
 // PropertyInfo
 typedef struct {
@@ -220,14 +220,14 @@ typedef struct {
     String ReadName;
     String WriteName;
     String StoredName;
-} PROPERTYINFO, *PPROPERTYINFO;
+} PROPERTYINFO, *PPROPERTYINFO; // IDR
 
 // MethodDeclInfo
 typedef struct {
     Byte   Scope;
     Byte   MethodKind; // 'M'-method,'P'-procedure,'F'-function,'C'-constructor,'D'-destructor
     String Prototype;
-} METHODDECLINFO, *PMETHODDECLINFO;
+} METHODDECLINFO, *PMETHODDECLINFO; // IDR
 
 //------------------------------------------------------------------------------
 

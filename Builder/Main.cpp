@@ -9,6 +9,8 @@
 #include <algorithm>
 #include <cctype>
 #include "Main.h"
+
+#include "InputParser.h"
 // #include <trace/trace.hpp>
 // #include <cpptrace/cpptrace.hpp>
 //------------------------------------------------------------------------------
@@ -40,20 +42,23 @@ TList      *ProcList   = nullptr; // List of Procedures
 long        CurOffset  = 0L;
 int         CaseN      = -1; // Number of current cases
 
-// new: static String NoName[1] = {"?"};
-TShortString NoName = {1, "?"};
+TList *FSrcFiles = nullptr; // List of Source files
 
-bool        GenVarCAsVars = false;
-bool        FromPackage   = false;
-int         FVer = 0;
-int         FPtrSize = 4;
-int         FPlatform = dcuplWin32;
-Platform    FPlatform2 = Platform::Win32; // todo
+// new:
+static String NoName[1] = {"?"};
+// was: TShortString NoName = {1, "?"};
 
-int         FEmbedDepth = 0;
-int         FMaxEmbedDepth = 0;
-int         FEmbedLimit = 0;
-TList       *FEmbeddedTypes = nullptr; // contains embedding depths // contains PEmbeddedTypeInf, it is indexed by TD.hDef, not by FEmbedDepth
+bool         GenVarCAsVars = false;
+bool         FromPackage   = false;
+int          FVer          = 0;
+int          FPtrSize      = 4;
+int          FPlatform     = dcuplWin32;
+TDCUPlatform FPlatform2    = TDCUPlatform::Win32; // todo
+
+int    FEmbedDepth    = 0;
+int    FMaxEmbedDepth = 0;
+int    FEmbedLimit    = 0;
+TList *FEmbeddedTypes = nullptr; // contains embedding depths // contains PEmbeddedTypeInf, it is indexed by TD.hDef, not by FEmbedDepth
 
 bool        IsMSIL;
 int         NDXHi;
@@ -285,7 +290,8 @@ TNDX __fastcall AddTypeDef(TTypeDef* TD) {
             OutLog2("[Error]: Type def #%lX override\n", FTypeDefCnt + 1); // DCUErrorFmt
         if (Def->hUnit != TD->hUnit)
             OutLog2("[Error]: Type def #%lX unit mismatch\n", FTypeDefCnt + 1); // DCUErrorFmt
-        TD->FName  = Def->GetName(); // Def.Name;
+
+        TD->FName  = Def->Name;
         TD->hDecl = Def->hDecl;
         Def->FName = nullptr;
         delete Def;
@@ -370,7 +376,7 @@ int OFFSET = 0;
 Byte __fastcall ReadByte() {
     // !!!
     OFFSET = CurPos - FMemPtr;
-    if (OFFSET >= 0x26CE) OFFSET = OFFSET;
+    if (OFFSET >= 0x26CE) OFFSET = OFFSET; // 9934
     Byte Result = *CurPos;
     CurPos++;
     return Result;
@@ -383,6 +389,7 @@ void __fastcall ReadByteIfEQ(Byte V) {
 }
 //------------------------------------------------------------------------------
 /**
+ * From DCU_In.pas
  *
  * const
  *  cS12 = [0,2,4,8,$10,$18,$20,$80,$84,Ord(' '),Ord('!'),Ord('a')];
@@ -414,7 +421,6 @@ int __fastcall ReadByteFrom(bool V) {
 //------------------------------------------------------------------------------
 int __fastcall ReadByteFrom (TByteSet S) {
     int Result = *reinterpret_cast<const Byte*>(CurPos);
-    // Set membership test (Pascal's 'in' operator maps to Contains in C++Builder)
     if (!S.Contains(Result)) {
         return -1;
     }
@@ -422,7 +428,7 @@ int __fastcall ReadByteFrom (TByteSet S) {
     return Result;
 }
 //------------------------------------------------------------------------------
-Byte __fastcall ReadTag() {
+TDCURecTag __fastcall ReadTag() {
     DefStart = CurPos;
     return ReadByte();
 }
@@ -457,10 +463,11 @@ PName __fastcall ReadName() {
     PName Result = reinterpret_cast<PName>(CurPos);
     int L = ReadByte();
 
-    // todo:
     // new: needs TNameRec for chars > 255
-    // if (L == 0xFF && FVer >= verD2009 && FVer < verK1)
-    //     L = ReadULong();
+    if (L == 0xFF && FVer >= verD2009 && FVer < verK1) {
+        printf("Debug: ReadName: 0xFF\n");
+        L = ReadULong();
+    }
 
     SkipBlock(L);
 
@@ -474,7 +481,6 @@ PName __fastcall ReadName() {
 //------------------------------------------------------------------------------
 // Was observed only in drConstAddInfo records of MSIL
 AnsiString __fastcall ReadNDXStr() { // was String
-    printf("Debug: ReadNDXStr start\n");
     int    L   = ReadUIndex();
     String Res = String(reinterpret_cast<char *>(CurPos), L);
     CurPos += L;
@@ -840,34 +846,34 @@ int __fastcall ReadClassInterfaces(PPNDXTbl PITbl) {
             X1 = ReadUIndex();
             MatchCnt = ReadUIndex();
         }
-        printf("Debug: ReadClassInterfaces: 2\n");
         int MCnt = ReadUIndex();
         if (ITbl) {
             *ITbl[2 * i]     = hIntf;
             *ITbl[2 * i + 1] = MCnt;
         }
-        printf("Debug: ReadClassInterfaces: 3\n");
         if (IsMSIL) {
-            printf("Debug: ReadClassInterfaces: 4a\n");
             // for j:=1 to MCnt do begin
             for (int j = 1; j <= MCnt; j++) {
                 ReadUIndex(); // N
                 ReadUIndex(); // hMember
             }
         } else if (FVer >= verD2006 && FVer < verK1) {
-            // printf("Debug: ReadClassInterfaces: i=%d, 4b\n", i);
             X1 = ReadUIndex();
             MatchCnt = ReadUIndex();
             if (FVer >= verD2010) {
-                ReadUIndex(); // X3
-                ReadUIndex(); // X4
+                TNDX X3 = ReadUIndex(); // X3
+                TNDX X4 = ReadUIndex(); // X4
                 for (int j = 1; j <= MatchCnt; j++) {
-                    printf("Debug: ReadClassInterfaces: 5: MatchCnt=%d, %d\n", MatchCnt, j);
+                    printf("Debug: ReadClassInterfaces: loop=%d, MatchCnt=%d, j=%d\n", i, MatchCnt, j);
                     ReadByte(); // B
+                    printf("Debug: ReadClassInterfaces: B=%d\n", ReadByte());
                     PName MName = ReadName(); // MName
-                    ReadUIndex(); // N
-                    ReadUIndex(); // hMember
-                    // ReadUIndex(); // +4
+                    printf("Debug: ReadClassInterfaces: Name: %s\n", MName->Name);
+                    int N = ReadUIndex(); // N
+                    printf("Debug: ReadClassInterfaces: N=%d\n", ReadUIndex());
+                    int hMember = ReadUIndex(); // hMember
+                    printf("Debug: ReadClassInterfaces: hMember=%d\n", hMember);
+                                        // ReadUIndex(); // +4
                     // ReadUIndex(); // +8
                     // ReadByte();   // =1
                     // ReadName();
@@ -880,40 +886,80 @@ int __fastcall ReadClassInterfaces(PPNDXTbl PITbl) {
             }
         }
     }
+    printf("Debug: ReadClassInterfaces: end\n");
     return Result;
 }
 //------------------------------------------------------------------------------
-TList *FSrcFiles = nullptr;
+
+String __fastcall GetVersionStr() {
+    static const String verStrDelphi[MaxDelphiVer + 1] = {
+        L"Error", L"Error 1", L"2", L"3", L"4", L"5", L"6", L"7", L"8", L"2005",
+        L"2006", L"?2007", L"2009", L"Error 13", L"2010", L"XE", L"XE2", L"XE3",
+        L"XE4", L"XE5", L"XE6", L"XE7", L"XE8", L"10 Seattle", L"10.1 Berlin",
+        L"10.2 Tokyo", L"10.3 Rio", L"10.4 Sydney", L"11 Alexandria", L"12 Athens",
+        L"13 Florence"
+    };
+
+    static const String platfStr[static_cast<int>(TDCUPlatform::Linux64) + 1] = {
+        L"Win32", L"Win64", L"Osx32", L"Osx64", L"OsxArm64",
+        L"iOSEmulator", L"iOSSimArm64", L"iOSDevice", L"iOSDevice64",
+        L"Android", L"Android64", L"Linux64"
+    };
+
+    String Result;
+    if (FVer < verK1) {
+        Result = "Delphi " + verStrDelphi[FVer];
+        if (FVer >= verDXE2) {
+            Result = Format("%s (%s)",ARRAYOFCONST((Result, platfStr[static_cast<int>(FPlatform)])));
+        }
+    } else {
+        Result = Format("Kylix %d", ARRAYOFCONST((FVer - verK1 + 1)));
+    }
+
+    return Result;
+}
+//------------------------------------------------------------------------------
 
 /**
  * TUnit.ShowSourceFiles();
  */
 static void __fastcall ShowSourceFiles() {
-    PSrcFileRec SFR;
-
     ModuleInfo->Name = UnitName;
 #ifdef SHOW
     OutLog2("Unit %s\n", UnitName.c_str());
-    // OutLog2("Unit %s\n", AnsiString(UnitName).c_str());
     if (FVer > verD2) {
         OutLog2("Flags: %lX\n", Flags);
         if (FVer > verD3) OutLog2("Priority %lX\n", UnitPrior);
     }
+
+    OutLog2("Compiled by %s\n", AnsiString(GetVersionStr()).c_str());
+
     OutLog1("Source files:\n");
     for (int n = 0; n < FSrcFiles->Count; n++) {
-        SFR    = (PSrcFileRec) FSrcFiles->Items[n];
+        PSrcFileRec SFR = static_cast<PSrcFileRec>(FSrcFiles->Items[n]);
+        if (!SFR) break;
         Byte T = SFR->Def->Tag;
+        printf("Debug: ShowSourceFiles: Tag = %d\n", T);
         switch (T) {
             case drSrc: OutLog1("src"); break;
-            case drRes: OutLog1("res"); break;
-            case drObj: OutLog1("obj"); break;
+            case drRes: OutLog1("res"); break; // $R
+            case drObj: OutLog1("obj"); break; // $L
             case drAsm: OutLog1("asm"); break;
             case drAssemblyInfo: OutLog1("$Assembly"); break;
             case drAssemblySrc: OutLog1("$Assembly8"); break;
             default: break;
         }
+        if (T == drAssemblyInfo) {
+            OutLog2("%s\n", ReadNDXStr().c_str());
+        } else {
+            OutLog2("%s\n", AnsiString(SFR->Def->Name.Name, SFR->Def->Name.Len).c_str()); // new: SFR->Def->Name->GetStr().c_str()
+        }
+
+        // if (integer(SFR^.FT)<>-1)and(integer(SFR^.FT)<>0) then
+       //     PutSFmt(' (%s)',[FileDateToStr(SFR^.FT)]);
+
         // new: OutLog2(" %s\n", SFR->Def->Name->GetStr().c_str());
-        OutLog2(" %s\n", AnsiString(SFR->Def->Name.Name, SFR->Def->Name.Len).c_str());
+        // OutLog2(" %s\n", AnsiString(SFR->Def->Name.Name, SFR->Def->Name.Len).c_str());
     }
 #endif
 }
@@ -969,7 +1015,7 @@ static void __fastcall ReadSourceFiles() {
     printf("Debug: ReadSourceFiles: end\n");
 }
 //------------------------------------------------------------------------------
-static void __fastcall ReadUses(Byte TagRq) {
+static void __fastcall ReadUses(TDCURecTag TagRq) {
     int       ndx;
     DWord     RTTISz;
     int       L;
@@ -981,7 +1027,7 @@ static void __fastcall ReadUses(Byte TagRq) {
 
     while (Tag == TagRq) {
         PName       UseName = ReadName();
-        PUnitImpRec pUnit   = new TUnitImpRec;
+        PUnitImpRec pUnit   = new TUnitImpRec; // U
         memset(static_cast<void *>(pUnit), 0, sizeof(TUnitImpRec));
         pUnit->Name = UseName;
         char Ch = '?';
@@ -1019,13 +1065,8 @@ static void __fastcall ReadUses(Byte TagRq) {
         if (FVer >= verD2009 && FVer < verK1)
             int L2 = ReadUIndex();
 
+        TBaseDef *DeclEnd = pUnit->Decls;
         int hImp = 0;
-
-        // TImpDef *IR  = new TImpDef(Ch, UseName, L, NULL, hUnit);
-        // pUnit->Ref   = IR;
-        // int ImpBase0 = ImpBase;
-        // ImpBase      = AddAddrDef(IR);
-
         TUnitImpDef *UIR = new TUnitImpDef(Ch, UseName, L, nullptr, hUnit); // Unit reference
         pUnit->Ref      = UIR;
         int ImpBase0    = ImpBase;
@@ -1046,6 +1087,7 @@ static void __fastcall ReadUses(Byte TagRq) {
                         TR = new TImpTypeDefRec(ImpN, L, RTTISz, NULL, hUnit);
                     else
                         TR = new TImpDef('T', ImpN, L, NULL, hUnit);
+
                     FTypes->Add(static_cast<void *>(TR));
                     TR->hDecl   = AddAddrDef(TR);
                     ndx         = FTypes->Count;
@@ -1064,21 +1106,26 @@ static void __fastcall ReadUses(Byte TagRq) {
             } else if (Tag == drStop2) {
                 // Imports drConstAddInfo may be for the prev. drImpVal always
                 L = -1;
-                if (FVer >= verD8 && FVer < verK1) L = ReadULong();
+                if (FVer >= verD8 && FVer < verK1) L = ReadULong(); // ==IP for the imported drConstAddInfo
                 continue;
             } else if (Tag == drConstAddInfo) {
                 if (!(FVer >= verD11 && FVer < verK1)) { // It may be used now with Tag:08 to store defines
                     if (!IsMSIL) break;
-                    if (hImp) printf("Warning: ConstAddInfo encountered for %s in subrecord #%d\n", UseName, hImp);
+                    if (hImp) printf("[Error] ConstAddInfo encountered for %s in subrecord #%d\n", UseName, hImp); // DCUErrorFmt
                 }
                 int ImpReBase = ReadConstAddInfo(nullptr); // Just skip it by now
                 continue;
-            } else
+            } else {
                 break;
+            }
+            DeclEnd = TR;
+            DeclEnd = static_cast<TBaseDef *>(TR->Next);
+
             hImp++;
         }
 
-        if (Tag != drStop1) printf("Error: Unexpected tag: %lX\n", Tag); // 0x63
+        if (Tag != drStop1) printf("[Error] Unexpected tag: %lX\n", Tag); // DCUErrorFmt
+
         hUses++;
         Tag = ReadTag();
         // 0x9E
@@ -1098,7 +1145,7 @@ static void __fastcall ReadUses(Byte TagRq) {
  * @param PfxS
  * @param FRq
  */
-void __fastcall ShowUses(String PfxS, Byte FRq) {
+void __fastcall ShowUses(AnsiString PfxS, Byte FRq) {
     // if (FUnitImp->Count == 0) return;
     int Cnt = 0;
     for (int i = 0; i < FUnitImp->Count; i++) {
@@ -1111,7 +1158,7 @@ void __fastcall ShowUses(String PfxS, Byte FRq) {
         if (Cnt > 0) {
             OutLog1(",");
         } else {
-            OutLog2("%s ", AnsiString(PfxS).c_str());
+            OutLog2("%s ", PfxS.c_str());
         }
         OutLog2("%s", AnsiString(name).c_str());
         Cnt++;
@@ -1488,8 +1535,7 @@ int __fastcall AddAddrDef(TDCURec *ND) {
     if (FhNextAddr > 0) {
         int Result = FhNextAddr;
         if (Result > FAddrs->Count) {
-            printf("[Error] ProcAddInfo Value $%x>FAddrs.Count=$%x\n", Result, FAddrs->Count);
-            // DCUErrorFmt('ProcAddInfo Value $%x>FAddrs.Count=$%x',[Result,FAddrs.Count]);
+            printf("[Error] ProcAddInfo Value $%x>FAddrs.Count=$%x\n", Result, FAddrs->Count); // DCUErrorFmt
         }
 
         if (FAddrs->Items[Result - 1]) {
@@ -1591,7 +1637,7 @@ TTypeDef *__fastcall GetGlobalTypeDef(int hDef) {
             N     = static_cast<TImpTypeDefRec *>(D)->ImpName;
         } else {
             hUnit = ((TImpDef *) D)->hUnit;
-            N     = ((TImpDef *) D)->GetName();
+            N     = ((TImpDef *) D)->Name;
         }
         // GetUnitImp(hUnit);
         return nullptr;
@@ -2964,7 +3010,7 @@ void __fastcall ReadDeclList(Byte LK, TDCURec *Owner, TDCURec **Result) {
                 if (!(FVer >= verDXE2 && FVer < verK1))
                     brk = true;
                 // todo: review:
-                if (FSegKindTbl) printf("2nd Segment table"); // DCUError
+                if (FSegKindTbl) printf("[Error] 2nd Segment table"); // DCUError
                 V = ReadUIndex();
                 FSegCnt = V;
                 FSegKindTbl = static_cast<PSegKindTbl>(AllocMem(V * sizeof(TSegKind)));
@@ -3019,6 +3065,17 @@ void __fastcall ReadDeclList(Byte LK, TDCURec *Owner, TDCURec **Result) {
     }*/
 }
 //------------------------------------------------------------------------------
+
+enum class TDeclSepFlags : int {
+    Comma         = 0,
+    Last          = 1,
+    NoFirst       = 2,
+    NL            = 3,
+    SoftNL        = 4,
+    SmallSameNL   = 5,
+    OfsProc       = 6
+};
+
 // TDeclSepFlags
 #define dsComma         0
 #define dsLast          1
@@ -3028,21 +3085,21 @@ void __fastcall ReadDeclList(Byte LK, TDCURec *Owner, TDCURec **Result) {
 #define dsSmallSameNL   5
 #define dsOfsProc       6
 
-// aka DeclSecNames
+// aka DeclSecNames / TDeclSecKind
 String SecNames[] = {
-    "",
-    "label",
-    "const",
-    "type",
-    "var",
-    "threadvar",
-    "resourcestring",
-    "exports",
-    "",
-    "private",
-    "protected",
-    "public",
-    "published"
+        "",               // 0
+        "label",          // 1
+        "const",          // 2
+        "type",           // 3
+        "var",            // 4
+        "threadvar",      // 5
+        "resourcestring", // 6
+        "exports",        // 7
+        "",               // 8
+        "private",        // 9
+        "protected",      // 10
+        "public",         // 11
+        "published"       // 12
 };
 
 void __fastcall ShowDeclList(Byte LK, TDCURec* Decl, String& OutS) {
@@ -3177,7 +3234,7 @@ void VisitDeclList(TDCURecVisitor *Visitor, Byte LK, TDCURec *MainRec, TDCURec *
 
 
     try {
-        while (Decl != NULL) {
+        while (Decl) {
             bool Visible = Decl->IsVisible(LK);
             if (Visible)
                 Visitor->doVisit(Decl);
@@ -4399,6 +4456,23 @@ void VisitTypes(TDCURecVisitor *Visitor) {
 // int main(int argc, char* argv[])
 
 int _tmain(int argc, _TCHAR *argv[]) {
+    printf("Knowledge Base Builder for IDR by crypto and Alexei Hmelnov\n\n");
+
+    InputParser input(argc, argv);
+
+    if (input.cmdOptionExists("-h") || argc == 1) {
+        // Show usage
+        printf("Usage:\n\tBuildKB.exe KBName <DCUList>\n");
+        // todo: proposed flags/options:
+        // -f = single file
+        // -d = directory of files
+        // -x = pattern match files
+        // -o = kb output file
+        // -l = logfile output path
+        // -v = version
+        return -1;
+    }
+
     int   num         = 0;
     FILE *fList       = 0;
     // int   iAttributes = faReadOnly | faArchive;
@@ -4410,22 +4484,32 @@ int _tmain(int argc, _TCHAR *argv[]) {
     String dirPath;
     String searchPattern;
 
-    printf("Knowledge Base Builder for IDR by crypto and Alexei Hmelnov\n\n");
-
-    printf("Received %d arguments\n\n", argc);
-
-    if (argc != 2 && argc != 3) {
+    /*if (argc != 2 && argc != 3) {
         printf("Usage:\n BuildKB.exe KBName <DCUList>\n");
         return -1;
-    }
+    }*/
 
-    fOut = fopen(argv[1], "wb+");
+    /*fOut = fopen(argv[1], "wb+");
     if (!fOut) {
         printf("[Error] Cannot open KB file %s\n", argv[1]);
         return -1;
-    }
+    }*/
+
+    // todo:
+    /*const String &logFile = input.getCmdOption("-l");
+    if (!logFile.IsEmpty()) {
+        fLog = fopen(AnsuStrung*logFile).c_str(), "wt+");
+        if (!fLog) {
+            printf("[Error] Cannot open log file %s\n", logFile.c_str());
+            return -1;
+        }
+    } else {
+        // default path
+    }*/
 
     fLog = fopen("BuildKB.log", "wt+");
+
+    // todo: check presence of all arguments (-o, -f/-d) before proceeding
 
     ModuleList = new TList;
     ConstList  = new TList;
@@ -4439,16 +4523,46 @@ int _tmain(int argc, _TCHAR *argv[]) {
     FAddrs         = new TList;
     FTypeShowStack = new TList;
 
-    if (argc == 3) {
-        dirPath = IncludeTrailingPathDelimiter(argv[2]);
-        searchPattern = dirPath + L"*.dcu";
+    // KB Output File
+    // todo: append flag
+    const String &output = input.getCmdOption("-o");
+    if (!output.IsEmpty()) {
+        fOut = fopen(AnsiString(output).c_str(), "wb+");
+        if (!fOut) {
+            printf("[Error] Cannot open KB file %s\n", output.c_str());
+            return -1;
+        }
+    }
 
-        /*fList = fopen(AnsiString(argv[2]).c_str(), "rt");
+    // Process a single file
+    const String &filename = input.getCmdOption("-f");
+    if (!filename.IsEmpty()) {
+        // Single DCU
+        fList = fopen(AnsiString(filename).c_str(), "rt");
         if (!fList) {
             printf("[Error] Cannot open DCU list file: %s\n", argv[2]);
             fclose(fOut);
             return -1;
-        }*/
+        }
+        while (true) {
+            if (!fgets(dcuFilename, 256, fList)) break;
+            char *q = strrchr(dcuFilename, '\n');
+            if (q) *q = 0;
+            printf("Unit %s\n", dcuFilename);
+            ScanOneDCU(String(dcuFilename));
+            num++;
+            printf("Done\n");
+        }
+        fclose(fList);
+    }
+
+    // Batch process directory
+    const String &directory = input.getCmdOption("-d");
+    if (!directory.IsEmpty()) {
+        dirPath       = IncludeTrailingPathDelimiter(directory);
+        searchPattern = dirPath + L"*.dcu";
+
+        printf("Debug: Searching for DCU files in directory: %s\n", AnsiString(dirPath).c_str());
 
         if (FindFirst(searchPattern, iAttributes, sr) == 0) {
             try {
@@ -4470,8 +4584,39 @@ int _tmain(int argc, _TCHAR *argv[]) {
         }
     }
 
+    /*if (argc == 3) {
+        dirPath = IncludeTrailingPathDelimiter(argv[2]);
+        searchPattern = dirPath + L"*.dcu";
+
+        // fList = fopen(AnsiString(argv[2]).c_str(), "rt");
+        // if (!fList) {
+        //     printf("[Error] Cannot open DCU list file: %s\n", argv[2]);
+        //     fclose(fOut);
+        //     return -1;
+        // }
+
+        if (FindFirst(searchPattern, iAttributes, sr) == 0) {
+            try {
+                do {
+                    // Ignore directory attributes just in case
+                    if ((sr.Attr & faDirectory) == 0) {
+                        printf("File %s\n", AnsiString(sr.Name).c_str());
+                        String fullPath = dirPath + sr.Name;
+                        if (!ScanOneDCU(fullPath)) {
+                            printf("[Error] Unable to process file: %s\n", AnsiString(fullPath).c_str());
+                        }
+                        num++;
+                        printf("Done\n");
+                    }
+                } while (FindNext(sr) == 0);
+            } __finally {
+                FindClose(sr);
+            }
+        }
+    }*/
+
     // -sg: Is this correct?
-    if (argc == 2) {
+    /*if (argc == 2) {
         // Several DCUs
         /*if (FindFirst("*.dcu", iAttributes, sr) == 0) {
             do {
@@ -4482,7 +4627,7 @@ int _tmain(int argc, _TCHAR *argv[]) {
             } while (FindNext(sr) == 0);
 
             FindClose(sr);
-        }*/
+        }#1#
     } else {
         // Single DCU
         while (true) {
@@ -4495,7 +4640,7 @@ int _tmain(int argc, _TCHAR *argv[]) {
             printf("Done\n");
         }
         fclose(fList);
-    }
+    }*/
 
     delete FUnitImp;
     delete FTypes;
@@ -5110,12 +5255,14 @@ int _tmain(int argc, _TCHAR *argv[]) {
     delete[] ModuleOffsets;
 
     //-----------------------------------------------------------------
-    // Const Section
+    // Const Section (KB_CONST_SECTION = 1)
     fwrite(&ConstCount, sizeof(ConstCount), 1, fOut);
     fwrite(&MaxConstDataSize, sizeof(MaxConstDataSize), 1, fOut);
 
     POFFSETSINFO ConstOffsets = new OFFSETSINFO[ConstCount];
-    int          cn           = 0;
+
+    int cn = 0;
+
     for (int n = 0; n < ConstList->Count; n++) {
         PCONSTINFO constInfo = (PCONSTINFO) ConstList->Items[n];
         if (constInfo->Skip) continue;
@@ -5146,7 +5293,7 @@ int _tmain(int argc, _TCHAR *argv[]) {
     delete[] ConstOffsets;
 
     //------------------------------------------------------------------
-    // Type Section
+    // Type Section (KB_TYPE_SECTION = 2)
     fwrite(&TypeCount, sizeof(TypeCount), 1, fOut);
     fwrite(&MaxTypeDataSize, sizeof(MaxTypeDataSize), 1, fOut);
 
@@ -5170,7 +5317,7 @@ int _tmain(int argc, _TCHAR *argv[]) {
     delete[] TypeOffsets;
 
     //-------------------------------------------------------------------
-    // Var Section
+    // Var Section (KB_VAR_SECTION = 4)
     fwrite(&VarCount, sizeof(VarCount), 1, fOut);
     fwrite(&MaxVarDataSize, sizeof(MaxVarDataSize), 1, fOut);
 
@@ -5194,7 +5341,7 @@ int _tmain(int argc, _TCHAR *argv[]) {
     delete[] VarOffsets;
 
     //----------------------------------------------------------------
-    // ResStr Section
+    // ResStr Section (KB_RESSTR_SECTION = 8)
     fwrite(&ResStrCount, sizeof(ResStrCount), 1, fOut);
     fwrite(&MaxResStrDataSize, sizeof(MaxResStrDataSize), 1, fOut);
 
@@ -5218,7 +5365,7 @@ int _tmain(int argc, _TCHAR *argv[]) {
     delete[] ResStrOffsets;
 
     //------------------------------------------------------------------
-    // Proc Section
+    // Proc Section (KB_PROC_SECTION = 16)
     fwrite(&ProcCount, sizeof(ProcCount), 1, fOut);
     fwrite(&MaxProcDataSize, sizeof(MaxProcDataSize), 1, fOut);
 
@@ -5255,6 +5402,9 @@ int _tmain(int argc, _TCHAR *argv[]) {
     delete VarList;
     delete ResStrList;
     delete ProcList;
+    
+    printf("Debug: Finished writing KB file: %s\n", AnsiString(output).c_str());
+    
     return 0;
 }
 //------------------------------------------------------------------------------
