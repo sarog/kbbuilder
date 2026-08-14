@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <filesystem>
 #pragma hdrstop
-#include <unordered_map>
+#include <map>
 #include <string>
 #include <algorithm>
 #include <cctype>
@@ -39,13 +39,11 @@ TList      *TypeList   = nullptr; // List of Types
 TList      *VarList    = nullptr; // List of Vars
 TList      *ResStrList = nullptr; // List of ResourceStrings
 TList      *ProcList   = nullptr; // List of Procedures
-long        CurOffset  = 0L;
+// long        CurOffset  = 0L;    // Unused
 int         CaseN      = -1; // Number of current cases
 
-TList *FSrcFiles = nullptr; // List of Source files
+TList *FSrcFiles = nullptr; // List of Source files (re: PSrcFileRec)
 
-// new:
-static String NoName[1] = {"?"};
 // was: TShortString NoName = {1, "?"};
 
 bool         GenVarCAsVars = false;
@@ -69,17 +67,17 @@ Byte        fxJmpAddr = fxJmpAddr0;
 
 // for the two phase loading mode
 Byte        *FMemPtr  = nullptr; // DCUData
-Byte        *CurPos   = nullptr; // Pointer to DCUData
+TIncPtr      CurPos   = nullptr; // Pointer (TIncPtr/PAnsiChar) to DCUData (Current Scan State Position)
 Byte        *DefStart = nullptr; // Start of definition (DCU_In.pas, Pointer)
-Byte        Tag;
-DWord       Magic;
-DWord       FMemSize;
-DWord       FileSizeH;
-DWord       FT;             // FileTime (TDCUFileTime)
-DWord       Stamp;
-AnsiString  UnitName;       // FUnitName // was String
-DWord       Flags;          // UnitFlags (FFlags)
-DWord       UnitPrior;      // UnitPriority
+Byte         Tag;
+DWord        Magic;     // LongInt
+DWord        FMemSize;  // Cardinal
+DWord        FileSizeH; // ulong
+TDCUFileTime FT;        // FileTime (int)
+DWord        Stamp;
+AnsiString   UnitName;  // FUnitName // was String
+DWord        Flags;     // UnitFlags (FFlags)
+DWord        UnitPrior; // UnitPriority
 
 TList       *FUnitImp = nullptr; // List of Unit imports
 TList       *FTypes   = nullptr; // List of Types
@@ -88,7 +86,7 @@ int          FhNextAddr;         // Required for ProcAddInfo in FVer>verD8
 TStringList *FExportNames   = nullptr;
 TDCURec     *FDecls         = nullptr; // DeclList
 TDCURec     *FOtherRecords  = nullptr;
-int          FTypeDefCnt    = 0;
+int          FTypeDefCnt    = 0;    //  FTypes definition count
 TList       *FTypeShowStack = nullptr;
 Byte        *FDataBlPtr     = nullptr; // TIncPtr
 DWord        FDataBlSize;
@@ -99,8 +97,6 @@ int        FFixupCnt;
 TFixupRec *FFixupTbl = nullptr;
 int        FCodeLineCnt;
 typedef Byte TByte4[4];
-
-typedef Byte *TIncPtr; // PAnsiChar
 
 typedef struct {
     int ofs;
@@ -133,39 +129,52 @@ PLocVarRec  FLocVarTbl = nullptr;
 // TDCPLoadState = (dcplNotLoaded, dcplHeaderLoaded, dcplAllLoaded);
 bool        FLoaded; // TDCPLoadState
 String      FFName ; // for the two phase loading mode (DCP.pas)
+String      FFExt ;
 
 typedef struct {
     TDCURec *List;
     PDCURec ListEnd;
 } TEmbeddedListInf, *PEmbeddedListInf;
 
-typedef TEmbeddedListInf    TEmbeddedListInfTbl[256]; // array[Byte] = 256 elements
-typedef TEmbeddedListInfTbl *PEmbeddedListInfTbl;
+using TEmbeddedListInfTbl = TEmbeddedListInf[256]; // array[Byte] = 256 elements
+using PEmbeddedListInfTbl = TEmbeddedListInfTbl *;
 PEmbeddedListInfTbl FEmbeddedLists; // contains the lists which were not consumed
 
 TDCURec *CurMainRec = nullptr;
 TDCURec *CurDecList = nullptr;
 
+int FSegCnt;
 PSegKindTbl FSegKindTbl = nullptr;
 
 //------------------------------------------------------------------------------
-String __fastcall PName2String(PName Name) {
-    // new: return Name->GetStr();
-    return String(Name->Name, Name->Len);
-}
+
+const System::SmallString<1> NoNameStr = "?";
+TNameRec NoName = *reinterpret_cast<const TNameRec*>(&NoNameStr);
+
 //------------------------------------------------------------------------------
-/*PName __fastcall GetNoName() {
-    static bool Initialized = false;
-    alignas(TNameRec) static unsigned char Storage[sizeof(TNameRec)] = {};
 
-    if (!Initialized) {
-        Storage[0] = 1;
-        Storage[1] = '?';
-        Initialized = true;
-    }
+const TFxSizeTbl fxSizeXE64 = {
+    /* 0:  */  0,  0, -1, -1,  4,  4,  4, -1,
+    /* 8:  */  4, -1, -1, -1, -1, -1,  8, -1,
+    /* 10: */ -1,  8, -1 /*4 for 32-bit*/, 8, 0, 4, -1, 4
+};
 
-    return reinterpret_cast<PName>(Storage);
-}*/
+const TFxSizeTbl fxSizeXE32 = {
+    /* 0:  */  0,  0, -1, -1,  4,  4,  4, -1,
+    /* 8:  */  4, -1, -1, -1, -1, -1,  8, -1,
+    /* 10: */ -1, -1,  4, -1, -1, -1, -1, -1
+};
+
+System::Set<std::uint8_t, 0, fxMax> fxValid = System::Set<std::uint8_t, 0, fxMax>()
+    << 0 << (fxStart30 - 1); // Range operator << for Set
+
+TFxSizeTbl fxSize;
+bool fx8Byte = false;
+
+//------------------------------------------------------------------------------
+AnsiString __fastcall PName2String(PName Name) {
+    return Name->GetStr();
+}
 //------------------------------------------------------------------------------
 bool __fastcall TypeIsVoid(int hDef) {
     if (hDef <= 0 || hDef > FTypes->Count) return true;
@@ -178,7 +187,26 @@ PUnitImpRec __fastcall GetUnitImpRec(int hUnit) {
     return (PUnitImpRec) (FUnitImp->Items[hUnit]);
 }
 //------------------------------------------------------------------------------
-void __fastcall GetUnitImp(int hUnit) { PUnitImpRec UI = GetUnitImpRec(hUnit); }
+// todo:
+void __fastcall GetUnitImp(int hUnit) {
+    PUnitImpRec UI = GetUnitImpRec(hUnit);
+
+    /*// auto Result;
+
+    if (!UI) return nullptr;
+
+    Result = UI->U;
+    if (!Result) {
+        if (Integer(Result) =- 1) {
+            return nullptr;
+        }
+    }
+    Result = GetDCUByName(UI->Name->GetStr(),FFExt,FVer,IsMSIL,FPlatform,UI->Ref->Inf);
+    if (!Result) then
+      PtrInt(UI->U) = -1;
+    else
+        UI->U = Result;*/
+}
 //------------------------------------------------------------------------------
 
 /**
@@ -187,7 +215,6 @@ void __fastcall GetUnitImp(int hUnit) { PUnitImpRec UI = GetUnitImpRec(hUnit); }
  * @param hDef
  * @return
  */
-// String __fastcall GetDCURecStr(TDCURec* D, int hDef) {
 AnsiString __fastcall GetDCURecStr(TDCURec* D, int hDef) {
     // todo: review:
     PName  N;
@@ -195,21 +222,20 @@ AnsiString __fastcall GetDCURecStr(TDCURec* D, int hDef) {
     String Result;
 
     // new:
-    /*if (!D)
-        N = GetNoName();
-    else
-        N = D->Name;*/
-    if (!D)
-        N = &NoName;
-    else
-        N = D->Name;
+    // if (!D) N = GetNoName();
+    // else N = D->Name;
 
-    // new: if (N->IsEmpty()) {
-    if (!N->Len) {
+    // was:
+    if (!D) N = &NoName;
+    else N = D->Name;
+
+    if (N->IsEmpty()) {
+    // was: if (!N->Len) {
         strcpy(Pfx, "_N%_");
         Result = Sysutils::Format("_%x", ARRAYOFCONST((hDef)));
-    } else if (N->Name[0] == '.') {
-    // new: } else if (N->Get1stChar() == '.') { // } else if (N->Name[0] == '.') {
+    // was: } else if (N->Name[0] == '.') {
+    // new:
+    } else if (N->Get1stChar() == '.') { // } else if (N->Name[0] == '.') {
         strcpy(Pfx, "_D%_");
         Result = PName2String(N).SubString(2, 255);
     } else {
@@ -284,17 +310,17 @@ void __fastcall UnRegTypeShow(TBaseDef *T) {
  */
 TNDX __fastcall AddTypeDef(TTypeDef* TD) {
     ChkListSize(FTypes, FTypeDefCnt + 1);
-    TBaseDef *Def = (TBaseDef*)FTypes->Items[FTypeDefCnt];
-    if (Def) {
-        if (Def->Def)
+    TBaseDef *BD = (TBaseDef*)FTypes->Items[FTypeDefCnt];
+    if (BD) {
+        if (BD->Def)
             OutLog2("[Error]: Type def #%lX override\n", FTypeDefCnt + 1); // DCUErrorFmt
-        if (Def->hUnit != TD->hUnit)
+        if (BD->hUnit != TD->hUnit)
             OutLog2("[Error]: Type def #%lX unit mismatch\n", FTypeDefCnt + 1); // DCUErrorFmt
 
-        TD->FName  = Def->Name;
-        TD->hDecl = Def->hDecl;
-        Def->FName = nullptr;
-        delete Def;
+        TD->FName  = BD->Name;
+        TD->hDecl = BD->hDecl;
+        BD->FName = nullptr;
+        delete BD;
     }
     FTypes->Items[FTypeDefCnt] = TD;
     auto Result = FTypeDefCnt; // for TUnit.*
@@ -317,13 +343,21 @@ void __fastcall SetListDefName(TList* L, int hDef, int hDecl, PName Name) {
     hDef--;
     TBaseDef *Def = (TBaseDef *) (L->Items[hDef]);
     if (!Def) {
-        Def = new TBaseDef(Name, 0, -1);
+        Def = new TBaseDef(Name, nullptr, -1);
         L->Items[hDef] = static_cast<void *>(Def);
         Def->hDecl = hDecl;
         return;
     }
-    if (!Def->FName) Def->FName = Name;
-    if (!Def->hDecl) Def->hDecl = hDecl;
+    if (!Def->FName) {
+        Def->FName = Name;
+    } else if (!Name->IsAuxName()) {
+        if (Def->FName->IsAuxName()) {
+            Def->FName = Name;
+        }
+    }
+
+    if (!Def->hDecl)
+        Def->hDecl = hDecl;
 }
 //------------------------------------------------------------------------------
 void __fastcall AddTypeName(int hDef, int hDecl, PName Name) {
@@ -337,19 +371,17 @@ void __fastcall AddTypeName(int hDef, int hDecl, PName Name) {
  * @param S
  * @return
  */
-/*PName __fastcall AllocName(const AnsiString S) {
+PName __fastcall AllocName(const AnsiString S) {
     PName Result = nullptr;
     int L = S.Length();
 
     if (L >= 255) {
         if (FVer >= verDXE2 && FVer < verK1) {
             // GetMem(Result,L*SizeOf(AnsiChar)+SizeOf(Byte)+SizeOf(LongInt));
-            std::size_t allocSize = (static_cast<std::size_t>(L) * sizeof(AnsiChar)) + sizeof(std::uint8_t) + sizeof(std::int32_t);
-            Result = static_cast<PName>(GetMemory(allocSize));
-
-            Result->D->bLen = 0xFF;
-            Result->D->dwLen = L;
-            System::Move(S.c_str(), Result->D->lS, L * sizeof(AnsiChar));
+            Result = static_cast<PName>(GetMemory(L * sizeof(AnsiChar) + sizeof(Byte) + sizeof(DWord)));
+            Result->D.bLen = 0xFF;
+            Result->D.dwLen = L;
+            System::Move(S.c_str(), Result->D.lS, L * sizeof(AnsiChar));
 
             return Result;
         }
@@ -357,10 +389,16 @@ void __fastcall AddTypeName(int hDef, int hDecl, PName Name) {
     }
 
     Result = static_cast<PName>(GetMemory((L + 1) * sizeof(AnsiChar)));
-    Result->D->S = System::ShortString(S);
+    Result->D.S = System::ShortString(S);
 
     return Result;
-}*/
+}
+//------------------------------------------------------------------------------
+void __fastcall FreeName(PName NP) {
+    if (!NP)
+        return;
+    FreeMemory(NP);
+}
 //------------------------------------------------------------------------------
 void __fastcall SkipBlock(int Sz) {
     CurPos += Sz;
@@ -372,11 +410,14 @@ Byte *__fastcall ReadMem(DWord Sz) {
     return Result;
 }
 //------------------------------------------------------------------------------
-int OFFSET = 0;
+// int OFFSET = 0;
 Byte __fastcall ReadByte() {
     // !!!
-    OFFSET = CurPos - FMemPtr;
-    if (OFFSET >= 0x26CE) OFFSET = OFFSET; // 9934
+    /*OFFSET = CurPos - FMemPtr;
+    if (OFFSET >= 0x26CE) { // 9934
+        OFFSET = OFFSET;
+        printf("Debug: ReadByte offset = %d\n", OFFSET);
+    }*/
     Byte Result = *CurPos;
     CurPos++;
     return Result;
@@ -419,8 +460,8 @@ int __fastcall ReadByteFrom(bool V) {
     return b;
 }
 //------------------------------------------------------------------------------
-int __fastcall ReadByteFrom (TByteSet S) {
-    int Result = *reinterpret_cast<const Byte*>(CurPos);
+int __fastcall ReadByteFrom(TByteSet S) {
+    int Result = *reinterpret_cast<const Byte *>(CurPos);
     if (!S.Contains(Result)) {
         return -1;
     }
@@ -431,6 +472,7 @@ int __fastcall ReadByteFrom (TByteSet S) {
 TDCURecTag __fastcall ReadTag() {
     DefStart = CurPos;
     return ReadByte();
+    // Result := TDCURecTag(ReadByte);
 }
 //------------------------------------------------------------------------------
 Word __fastcall ReadWord() {
@@ -439,17 +481,21 @@ Word __fastcall ReadWord() {
     return Result;
 }
 //------------------------------------------------------------------------------
-DWord __fastcall ReadULong() {
+// From DCU_In.pas
+DWord __fastcall ReadULong() { // ulong
     DWord Result = *reinterpret_cast<DWord *>(CurPos);
     CurPos += 4;
     return Result;
 }
 //------------------------------------------------------------------------------
-String __fastcall ReadStr() { // ShortString
+ShortString __fastcall ReadStr() { // was String
     Byte Len = ReadByte();
-    String Res = String(reinterpret_cast<char *>(CurPos), Len);
+    ShortString Res = AnsiString(reinterpret_cast<char *>(CurPos), Len);
     CurPos += Len;
     return Res;
+
+    // Result[0] := AnsiChar(ReadByte);
+    // ReadBlock(Result[1],Length(Result));
 }
 //------------------------------------------------------------------------------
 PShortName __fastcall ReadShortName() {
@@ -458,25 +504,15 @@ PShortName __fastcall ReadShortName() {
     return Result;
 }
 //------------------------------------------------------------------------------
-// Return pointer to ShortString (Pascal)
 PName __fastcall ReadName() {
     PName Result = reinterpret_cast<PName>(CurPos);
     int L = ReadByte();
-
-    // new: needs TNameRec for chars > 255
     if (L == 0xFF && FVer >= verD2009 && FVer < verK1) {
-        printf("Debug: ReadName: 0xFF\n");
         L = ReadULong();
+        printf("Debug: ReadName: 0xFF: L=%d\n", L);
     }
-
     SkipBlock(L);
-
     return Result;
-
-    // was:
-    // PName Result = reinterpret_cast<PName>(CurPos);
-    // SkipBlock(ReadByte());
-    // return Result;
 }
 //------------------------------------------------------------------------------
 // Was observed only in drConstAddInfo records of MSIL
@@ -521,12 +557,10 @@ AnsiString __fastcall ReadNDXStrX() { // was String
  * @return
  */
 TMemStrRef *__fastcall ReadNDXStrRef() {
-    // printf("Debug: ReadNDXStrRef: Start\n");
     int L = ReadUIndex();
     // 1048576
     if (L < 0 && L > 0x100000) printf("[Error] ReadNDXStrRef: DCUError: Too long NDX String\n");
     TMemStrRef *Result = new TMemStrRef(reinterpret_cast<const char *>(ReadMem(L)), L);
-    printf("Debug: ReadNDXStrRef: End\n");
     return Result;
 }
 //------------------------------------------------------------------------------
@@ -535,6 +569,7 @@ typedef struct {
     int  L;
 } TR4;
 
+// LongInt
 int __fastcall ReadUIndex() {
     int    Result;
     Byte   B[5];
@@ -658,15 +693,15 @@ const char AlterSep = '\\';
 const char AlterSep = '/';
 #endif
 String __fastcall ExtractFileNameAnySep(String FN) {
-    printf("Debug: ExtractFileNameAnySep: start\n");
     String Result = ExtractFileName(FN);
-    char* CP = StrRScan(AnsiString(Result).c_str(), AlterSep);
+    char  *CP     = StrRScan(AnsiString(Result).c_str(), AlterSep);
     if (!CP)
         return Result;
     else
         return StrPas(CP + 1);
 }
 //------------------------------------------------------------------------------
+
 /**
  * Extract file name for packaged or normal files
  *
@@ -682,13 +717,10 @@ String ExtractFileNamePkg(const String FN) {
     return Result;
 }
 //------------------------------------------------------------------------------
-// In D10 some codes were changed, we'll try to move them back
-Byte __fastcall FixTag(Byte Tag) {
-    Byte Result = Tag;
-
-    // printf("Debug: FixTag\n");
-
+TDCURecTag __fastcall FixTag(TDCURecTag recTag) {
+    TDCURecTag Result = recTag;
     if (FVer >= verD2006 && FVer < verK1) {
+        // In D10 some codes were changed, we'll try to move them back
         if (Result >= 0x2D && Result <= 0x36) {
             Result--;
             if (Result < 0x2D)
@@ -716,8 +748,6 @@ void __fastcall RegisterEmbeddedTypes(TDCURec *Embedded, int Depth) {
     while (true) {
         TDCURec *D = *DP;
         if (D == nullptr) return;
-        printf("Debug: RegisterEmbeddedTypes: start: 5\n");
-
         // The effect was noticed only for types
         if (D->InheritsFrom(__classid(TTypeDecl))) {
             PTypeDecl TD = static_cast<PTypeDecl>(D);
@@ -852,41 +882,34 @@ int __fastcall ReadClassInterfaces(PPNDXTbl PITbl) {
             *ITbl[2 * i + 1] = MCnt;
         }
         if (IsMSIL) {
-            // for j:=1 to MCnt do begin
             for (int j = 1; j <= MCnt; j++) {
-                ReadUIndex(); // N
-                ReadUIndex(); // hMember
+                int N = ReadUIndex();
+                int hMember = ReadUIndex();
             }
         } else if (FVer >= verD2006 && FVer < verK1) {
             X1 = ReadUIndex();
             MatchCnt = ReadUIndex();
             if (FVer >= verD2010) {
-                TNDX X3 = ReadUIndex(); // X3
-                TNDX X4 = ReadUIndex(); // X4
+                TNDX X3 = ReadUIndex();
+                TNDX X4 = ReadUIndex();
                 for (int j = 1; j <= MatchCnt; j++) {
-                    printf("Debug: ReadClassInterfaces: loop=%d, MatchCnt=%d, j=%d\n", i, MatchCnt, j);
-                    ReadByte(); // B
-                    printf("Debug: ReadClassInterfaces: B=%d\n", ReadByte());
-                    PName MName = ReadName(); // MName
-                    printf("Debug: ReadClassInterfaces: Name: %s\n", MName->Name);
-                    int N = ReadUIndex(); // N
-                    printf("Debug: ReadClassInterfaces: N=%d\n", ReadUIndex());
-                    int hMember = ReadUIndex(); // hMember
-                    printf("Debug: ReadClassInterfaces: hMember=%d\n", hMember);
-                                        // ReadUIndex(); // +4
+                    printf("Debug: ReadClassInterfaces: i=%d, MatchCnt=%d, j=%d\n", i, MatchCnt, j);
+                    Byte B = ReadByte();
+                    PName MName = ReadName();
+                    int N = ReadUIndex();
+                    int hMember = ReadUIndex();
+                    printf("Debug: ReadClassInterfaces: B=%d, N=%d, hMember=%d, Name: %s\n", B, N, hMember, MName->GetStr().c_str());
+                    // ReadUIndex(); // +4
                     // ReadUIndex(); // +8
                     // ReadByte();   // =1
                     // ReadName();
-                    // printf("Debug: ReadClassInterfaces: Name: %s\n", MName->Name);
                 }
                 if (FVer >= verD12) {
-                    printf("Debug: ReadClassInterfaces: 6\n");
                     AnsiString AName = ReadNDXStrX();
                 }
             }
         }
     }
-    printf("Debug: ReadClassInterfaces: end\n");
     return Result;
 }
 //------------------------------------------------------------------------------
@@ -952,7 +975,9 @@ static void __fastcall ShowSourceFiles() {
         if (T == drAssemblyInfo) {
             OutLog2("%s\n", ReadNDXStr().c_str());
         } else {
-            OutLog2("%s\n", AnsiString(SFR->Def->Name.Name, SFR->Def->Name.Len).c_str()); // new: SFR->Def->Name->GetStr().c_str()
+            // was: OutLog2("%s\n", AnsiString(SFR->Def->Name.Name, SFR->Def->Name.Len).c_str());
+            // new:
+            OutLog2("%s\n", SFR->Def->Name.GetStr().c_str());
         }
 
         // if (integer(SFR^.FT)<>-1)and(integer(SFR^.FT)<>0) then
@@ -974,6 +999,7 @@ static void __fastcall ReadSourceFiles() {
            (IsMSIL && Tag == drAssemblySrc)) {
         PSrcFileRec SFR = new TSrcFileRec;
         SFR->Def = reinterpret_cast<PNameDef>(DefStart);
+        // SFR->Lines = nullptr;
 
         if (Tag == drAssemblyInfo) {
             ReadNDXStr();
@@ -986,9 +1012,9 @@ static void __fastcall ReadSourceFiles() {
             if (!F) SFRMain = SFR;
             SFR->Ndx = F;
             if (IsMSIL && Tag != drRes && Tag != drAssemblySrc)
-                String SrcFName = ReadStr(); // Ignored by now, because it's always empty
+                ShortString SrcFName = ReadStr(); // Ignored by now, because it's always empty
 
-            FSrcFiles->Add(static_cast<void *>(SFR));
+            FSrcFiles->Add(static_cast<void *>(SFR)); // SFR->Next
         }
         Tag = ReadTag();
     }
@@ -997,22 +1023,17 @@ static void __fastcall ReadSourceFiles() {
         if (!FromPackage) printf("[Error] ReadSourceFiles: No source files found\n"); // DCUError('No source files');
         return;
     }
-    if (!SFRMain) SFRMain = (PSrcFileRec)FSrcFiles->Items[0];
+
+    if (!SFRMain)
+        SFRMain = (PSrcFileRec)FSrcFiles->Items[0];
 
     if (!SFRMain || (SFRMain->Def->Tag == drAssemblyInfo || SFRMain->Def->Tag == drAssemblySrc)) {
-        printf("Debug: ReadSourceFiles: 3\n");
         UnitName = ChangeFileExt(ExtractFileNamePkg(FFName),"");
     } else {
-        // new:
-        // UnitName = ExtractFileNameAnySep(SFRMain->Def->Name->GetStr());
-        // char *CP = StrRScan(UnitName.c_str(), '.');
-        // UnitName.SetLength(CP - UnitName.c_str());
-
-        UnitName = ExtractFileNameAnySep(String(SFRMain->Def->Name.Name, SFRMain->Def->Name.Len));
-        char *CP = StrRScan(AnsiString(UnitName).c_str(), '.');
-        UnitName.SetLength(CP - AnsiString(UnitName).c_str());
+        UnitName = ExtractFileNameAnySep(SFRMain->Def->Name.GetStr());
+        char *CP = StrRScan(UnitName.c_str(), '.');
+        UnitName.SetLength(CP - UnitName.c_str());
     }
-    printf("Debug: ReadSourceFiles: end\n");
 }
 //------------------------------------------------------------------------------
 static void __fastcall ReadUses(TDCURecTag TagRq) {
@@ -1028,22 +1049,22 @@ static void __fastcall ReadUses(TDCURecTag TagRq) {
     while (Tag == TagRq) {
         PName       UseName = ReadName();
         PUnitImpRec pUnit   = new TUnitImpRec; // U
-        memset(static_cast<void *>(pUnit), 0, sizeof(TUnitImpRec));
+        memset(pUnit, 0, sizeof(TUnitImpRec));
         pUnit->Name = UseName;
         char Ch = '?';
 
         switch (TagRq) {
             case drUnit1: // 0x65
                 Ch       = 'U';
-                pUnit->Flags = ufImpl;
+                pUnit->Flags = TUnitImpFlags::Impl; // ufImpl;
                 break;
             case drDLL: // 0x68
                 Ch       = 'D';
-                pUnit->Flags = ufDLL;
+                pUnit->Flags = TUnitImpFlags::DLL; // ufDLL;
                 break;
             case drDLL1: // 0xB3
                 Ch       = 'E';
-                pUnit->Flags = ufDLL1;
+                pUnit->Flags = TUnitImpFlags::DLL1;// ufDLL1;
                 break;
         }
 
@@ -1072,7 +1093,7 @@ static void __fastcall ReadUses(TDCURecTag TagRq) {
         int ImpBase0    = ImpBase;
         ImpBase         = AddAddrDef(UIR);
 
-        if (hPack > 0 && FVer < verD2009)
+        if (hPack > 0 && FVer < verD2009) // or may be MSIL only
             RefAddrDef(hPack); // Reserve index for unit package number
 
         while (true) {
@@ -1139,20 +1160,22 @@ static void __fastcall ReadUses(TDCURecTag TagRq) {
     }
 }
 //------------------------------------------------------------------------------
+
 /**
  * TUnit.ShowUses(const PfxS: AnsiString; FRq: TUnitImpFlags)
  *
  * @param PfxS
  * @param FRq
  */
-void __fastcall ShowUses(AnsiString PfxS, Byte FRq) {
+void __fastcall ShowUses(AnsiString PfxS, TUnitImpFlags FRq) {
     // if (FUnitImp->Count == 0) return;
     int Cnt = 0;
     for (int i = 0; i < FUnitImp->Count; i++) {
         PUnitImpRec U = (PUnitImpRec) FUnitImp->Items[i];
         if (FRq != U->Flags) continue;
-        // new: String name = U->Name->GetStr();
-        String name = String(U->Name->Name, U->Name->Len);
+        // new:
+        String name = U->Name->GetStr();
+        // was: String name = String(U->Name->Name, U->Name->Len);
         if (ModuleInfo->UsesList->IndexOf(name) == -1)
             ModuleInfo->UsesList->Add(name);
         if (Cnt > 0) {
@@ -1188,16 +1211,11 @@ int AppendAddrDef(TDCURec *ND) {
  */
 void __fastcall SetDeclMem(int hDef, DWord Ofs, DWord Sz) {
     if (hDef <= 0 || hDef > FAddrs->Count) {
-        printf("[Error] DCUError: Undefined Fixup Declaration: #%x\n", hDef);
-        // DCUErrorFmt('Undefined Fixup Declaration: #%x',[hDef]);
-        return; // todo: raise error
+        printf("[Error] DCUError: Undefined Fixup Declaration: #%x\n", hDef); // DCUErrorFmt
+        return;
     }
-    printf("Debug: SetDeclMem: 2\n");
-
     TDCURec *D    = static_cast<TDCURec *>(FAddrs->Items[hDef - 1]);
     DWord    Base = 0;
-
-    printf("Debug: SetDeclMem: 3\n");
 
     while (D) {
         /*if (D->InheritsFrom(__classid(TProcDecl))) {
@@ -1211,7 +1229,6 @@ void __fastcall SetDeclMem(int hDef, DWord Ofs, DWord Sz) {
         Base = Sz - Rest;
         D    = D->Next; // Next declaration - should be procedure
     }
-    printf("Debug: SetDeclMem: end\n");
 }
 //------------------------------------------------------------------------------
 /**
@@ -1228,8 +1245,6 @@ void LoadFixups() {
 
     memset(FFixupTbl, 0, FFixupCnt * sizeof(TFixupRec));
 
-    // printf("Debug: LoadFixups: 2: FFixupCnt: %d:\n", FFixupCnt);
-
     // TFixupRec *FP = FFixupTbl;
     PFixupRec FP = FFixupTbl;
     DWord CurOfs = 0;
@@ -1239,16 +1254,13 @@ void LoadFixups() {
         DWord dOfs = ReadUIndex();
         CurOfs += dOfs;
         if (NDXHi != 0 || CurOfs > FDataBlSize) {
-            printf("[Error] LoadFixups: DCUError: Fixup offset $%x Block size = $%x\n", CurOfs, FDataBlSize);
-            // DCUErrorFmt('Fixup offset $%x>Block size = $%x',[CurOfs,FDataBlSize]);
+            printf("[Error] LoadFixups: DCUError: Fixup offset $%x Block size = $%x\n", CurOfs, FDataBlSize); // DCUErrorFmt
         }
         B1       = ReadByte();
         FP->OfsF = (CurOfs & FixOfsMask) | (B1 << 24);
         FP->Ndx  = ReadUIndex();
         FP++;
     }
-
-    // printf("Debug: LoadFixups: 3: FFixupCnt: %d:\n", FFixupCnt);
 
     // After loading fixups set the memory sizes of CBlock parts
     CurOfs = 0;
@@ -1258,18 +1270,13 @@ void LoadFixups() {
 
     for (int i = 0; i < FFixupCnt; i++) {
         CurOfs = (FP->OfsF & FixOfsMask);
-        // printf("Debug: LoadFixups: loop #2a: i: %d, CurOfs: %lX, B1: %d:\n", i, CurOfs, B1);
-
         // B1 = (*reinterpret_cast<const TByte4*>(&FP->OfsF))[3];
         // B1 = reinterpret_cast<const Byte *>(&FP->OfsF)[3];
         B1 = (&FP->OfsF)[3];
-        // printf("Debug: LoadFixups: loop #2b: i: %d, CurOfs: %lX, B1: %d:\n", i, CurOfs, B1);
-
         // !!!
         // if (B1 != 12 && B1 != 1 && B1 != 2 && B1 != 3 && B1 != 5 && B1 != 13)
         // B1 = B1;
         if (B1 == fxStart || B1 == fxEnd) {
-            // printf("Debug: LoadFixups: loop #2: B1: %d:\n", B1);
             if (hPrevDecl > 0) {
                 SetDeclMem(hPrevDecl, PrevDeclOfs, CurOfs - PrevDeclOfs);
             }
@@ -1278,10 +1285,7 @@ void LoadFixups() {
             FDataBlOfs  = CurOfs;
         }
         FP++;
-        // printf("Debug: LoadFixups: loop #2 end: i: %d, CurOfs: %lX, B1: %d:\n", i, CurOfs, B1);
-
     }
-    printf("Debug: LoadFixups: end\n");
 }
 //------------------------------------------------------------------------------
 
@@ -1289,10 +1293,8 @@ void LoadFixups() {
  * TUnit.LoadCodeLines
  */
 void LoadCodeLines() {
-    printf("Debug: LoadCodeLines: start\n");
     if (FCodeLineTbl) {
-        printf("[Error] 2nd Code Lines table\n");
-        // DCUError('2nd Code Lines table');
+        printf("[Error] 2nd Code Lines table\n"); // DCUError
     }
 
     FCodeLineCnt = ReadUIndex();
@@ -1336,7 +1338,6 @@ void LoadCodeLines() {
     // Some aux records could be skipped
     FCodeLineCnt = (reinterpret_cast<TIncPtr>(CR) - reinterpret_cast<TIncPtr>(FCodeLineTbl)) / sizeof(TCodeLineRec);
     // FCodeLineCnt = (TIncPtr(CR)-TIncPtr(FCodeLineTbl)) div SizeOf(TCodeLineRec);
-    printf("Debug: LoadCodeLines: end\n");
 }
 
 /*
@@ -1434,7 +1435,6 @@ void LoadSymbolInfo() {
         int hDef    = ReadUIndex(); // index of symbol definition in the L array
         for (int j = 0; j < Sz; j++) ReadUIndex();
     }
-    printf("Debug: LoadSymbolInfo: end\n");
 }
 //------------------------------------------------------------------------------
 /**
@@ -1495,7 +1495,7 @@ void LoadLocVarTbl() {
             }
         }
 
-        int Sz = (TIncPtr(LR) - TIncPtr(FLocVarTbl)) / sizeof(TLocVarRec);
+        int Sz = (reinterpret_cast<TIncPtr>(LR) - reinterpret_cast<TIncPtr>(FLocVarTbl)) / sizeof(TLocVarRec);
         if (FLocVarSize != Sz) {
             ReallocMemory(FLocVarTbl, FLocVarSize * sizeof(TLocVarRec));
             FLocVarSize = Sz;
@@ -1542,12 +1542,14 @@ int __fastcall AddAddrDef(TDCURec *ND) {
             TDCURec *Rec = static_cast<TDCURec *>(FAddrs->Items[Result - 1]);
             PName NP = Rec->Name;
 
-            if (!NP)
+            if (!NP) {
                 NP = &NoName;
-                // new: NP = GetNoName();
+                // NP = GetNoName();
+            }
 
-            printf("[Error] FAddrs[$%x] already used by %s\n", Result, AnsiString(PName2String(NP)).c_str()); // DCUErrorFmt
-            /// new: printf("[Error] FAddrs[$%x] already used by %s\n", Result, NP->GetStr().c_str()); // DCUErrorFmt
+            // was: printf("[Error] FAddrs[$%x] already used by %s\n", Result, AnsiString(PName2String(NP)).c_str()); // DCUErrorFmt
+            // new:
+            printf("[Error] FAddrs[$%x] already used by %s\n", Result, NP->GetStr().c_str()); // DCUErrorFmt
         }
 
         FAddrs->Items[Result - 1] = static_cast<void *>(ND);
@@ -1583,7 +1585,6 @@ void __fastcall RefAddrDef(int V) {
  * @return TDCURec*
  */
 TDCURec *__fastcall GetAddrDef(int hDef) {
-    printf("Debug: GetAddrDef: hDef: %d, FAddrs->Count: %d\n", hDef, FAddrs->Count);
     if (hDef <= 0 || hDef > FAddrs->Count) return nullptr;
     return reinterpret_cast<TDCURec *>(FAddrs->Items[hDef - 1]);
 }
@@ -1630,7 +1631,7 @@ TTypeDef *__fastcall GetGlobalTypeDef(int hDef) {
         PName N;
         int hUnit;
         if (!D) return nullptr;
-        if (D->InheritsFrom(__classid(TTypeDef))) break;
+        if (D->InheritsFrom(__classid(TTypeDef))) break; // Found - OK
         if (!D->InheritsFrom(__classid(TImpDef))) return nullptr;
         if (D->InheritsFrom(__classid(TImpTypeDefRec))) {
             hUnit = static_cast<TImpTypeDefRec *>(D)->hImpUnit;
@@ -1639,7 +1640,9 @@ TTypeDef *__fastcall GetGlobalTypeDef(int hDef) {
             hUnit = ((TImpDef *) D)->hUnit;
             N     = ((TImpDef *) D)->Name;
         }
-        // GetUnitImp(hUnit);
+        // imported value
+        GetUnitImp(hUnit);
+
         return nullptr;
     }
     return static_cast<TTypeDef *>(D);
@@ -1652,8 +1655,7 @@ TTypeValKind GetGlobalTypeValKind(int hDT) {
 }
 //------------------------------------------------------------------------------
 TSegKind GetSegKindByName(PName Name) {
-    int L = Name->Len;
-    // new: int L = Name->GetStr().Length();
+    int L = Name->GetStr().Length();
 
     if (L < 4 || L > 6) return TSegKind::None;
 
@@ -1664,21 +1666,20 @@ TSegKind GetSegKindByName(PName Name) {
     // PTypeInfo typeInfo = __typeinfo(TSegKind);
     // int idx = GetEnumValue(TSegKind, S);
     // if (idx < 0) idx = 0;
-
     // String S = Name->Name->SubString(2, L - 1);
-    String key = String(Name->Name, Name->Len);
-    // new: String key = Name->GetStr();
 
-    std::unordered_map<String, TSegKind> SegMap = {
-        { L"text",  TSegKind::Text },
-        { L"itext", TSegKind::IText },
-        { L"idata", TSegKind::IData },
-        { L"bss",   TSegKind::BSS },
-        { L"tls",   TSegKind::TLS },
-        { L"pdata", TSegKind::PData },
-        { L"xdata", TSegKind::XData },
-        { L"tbss",  TSegKind::TBSS },
-        { L"rdata", TSegKind::RDATA }
+   AnsiString key = Name->GetStr();
+
+    std::map<AnsiString, TSegKind> SegMap = {
+        { "text",  TSegKind::Text },
+        { "itext", TSegKind::IText },
+        { "idata", TSegKind::IData },
+        { "bss",   TSegKind::BSS },
+        { "tls",   TSegKind::TLS },
+        { "pdata", TSegKind::PData },
+        { "xdata", TSegKind::XData },
+        { "tbss",  TSegKind::TBSS },
+        { "rdata", TSegKind::RDATA }
     };
 
     auto it = SegMap.find(key);
@@ -1720,10 +1721,13 @@ void __fastcall SetExportNames(TDCURec *Decl) {
     FExportNames->Duplicates = System::Types::TDuplicates::dupAccept; // For overloaded functions
 
     while (Decl) {
-        if (Decl->InheritsFrom(__classid(TNameFDecl)) && ((static_cast<TNameFDecl *>(Decl)->F & 0x40) != 0)) { // Decl->IsVisible(dlMain) it`s wrong, cause hides some names
-            // Name - we should export the original unmodified name
-            FExportNames->AddObject(PName2String(Decl->Name), Decl);
-            // was: FExportNames->AddObject(PName2String(Decl->GetName()), Decl);
+        // if (Decl->InheritsFrom(__classid(TNameFDecl)) && ((static_cast<TNameFDecl *>(Decl)->F & 0x40) != 0)) { // Decl->IsVisible(dlMain) it`s wrong, cause hides some names
+        if (TNameFDecl *TND = dynamic_cast<TNameFDecl *>(Decl)) {
+            if ((TND->F & 0x40) != 0) {
+                // Name - we should export the original unmodified name
+                FExportNames->AddObject(TND->GetExpName()->GetStr(), Decl);
+                // was: FExportNames->AddObject(PName2String(Decl->GetName()), Decl);
+            }
         }
         Decl = Decl->Next;
         // Decl = static_cast<TNameDecl *>(Decl->Next);
@@ -1932,10 +1936,7 @@ void __fastcall ReadSomeNameInfo28() {
 TDCURec *__fastcall ConsumeEmbedded() {
     TDCURec *Result = nullptr;
 
-    printf("Debug: ConsumeEmbedded: start: FMaxEmbedDepth: %d, FEmbedDepth: %d\n", FMaxEmbedDepth, FEmbedDepth);
-
     if ((FMaxEmbedDepth > FEmbedLimit) || (FMaxEmbedDepth <= 0) || (FEmbedDepth >= FMaxEmbedDepth)) {
-        printf("Debug: ConsumeEmbedded: FEmbedDepth:%d, FMaxEmbedDepth: %d, FEmbedLimit %d => return nullptr\n", FEmbedDepth, FMaxEmbedDepth, FEmbedLimit);
         return nullptr;
     }
 
@@ -1945,9 +1946,7 @@ TDCURec *__fastcall ConsumeEmbedded() {
 
     FMaxEmbedDepth--;
 
-    printf("Debug: ConsumeEmbedded: FMaxEmbedDepth: %d, FEmbedDepth: %d\n", FMaxEmbedDepth, FEmbedDepth);
-
-    // todo: issue here
+    // -sg: todo: verify:
     if (FEmbeddedLists) {
         Result = (*FEmbeddedLists)[FMaxEmbedDepth].List;
         (*FEmbeddedLists)[FMaxEmbedDepth].List = nullptr;
@@ -1955,8 +1954,6 @@ TDCURec *__fastcall ConsumeEmbedded() {
     } else {
         printf("Debug: ConsumeEmbedded: FEmbeddedLists is null\n");
     }
-
-    printf("Debug: ConsumeEmbedded: end\n");
 
     return Result;
 }
@@ -1978,6 +1975,7 @@ TDCURec *__fastcall ConsumeEmbedded() {
     }
 }*/
 //------------------------------------------------------------------------------
+
 /**
  * TUnit.ReadConstAddInfo
  * @param LastProcDecl
@@ -2004,11 +2002,9 @@ int __fastcall ReadConstAddInfo(TNameDecl *LastProcDecl) {
         // The compiler emits information about declaration attributes starting from XE6
         // (previous versions from D2010 just emitted links to attribute classes)
         int N = ReadUIndex();
-        printf("Debug: ReadAttributes: N = %d\n", N);
         for (int i = 1; i <= N; ++i) {
             AddDefModifier(Def, new TAttributeDeclModifier);
         }
-        printf("Debug: ReadAttributes: after for loop\n");
     };
 
     bool    brk = false;
@@ -2115,8 +2111,6 @@ int __fastcall ReadConstAddInfo(TNameDecl *LastProcDecl) {
                         }
                         if (FVer >= verDXE6 && (F & 0x80000000) != 0)
                             ReadAttributes(Def);
-
-                        printf("Debug: After ReadAttributes(Def)\n");
 
                         cafInline = 0x40000;
                         cafBigVal = 0x80000;
@@ -2274,9 +2268,7 @@ int __fastcall ReadConstAddInfo(TNameDecl *LastProcDecl) {
                 if (FVer >= verD11 && FVer < verK1) {
                     Result = ReadUIndex();
                     Def    = GetAddrDef(Result);
-                    printf("Debug: ReadConstAddInfo: TXMLDoc Start\n");
                     AddDefModifier(Def, new TXMLDocDeclModifier(ReadNDXStrRef()));
-                    printf("Debug: ReadConstAddInfo: TXMLDoc End\n");
                 }
                 break;
             case 0x9:
@@ -2307,7 +2299,6 @@ int __fastcall ReadConstAddInfo(TNameDecl *LastProcDecl) {
                 if (F & 0x20)
                     hDef5 = ReadUIndex();
                 if (F & 0x40) {
-                    // printf("Debug: ReadConstAddInfo: F & 0x40\n");
                     AddDefModifier(Def, new TExtraArgsDeclModifier); // TExtraArgsDeclModifier.Read
                     /*Len = ReadUIndex();
                     for (int i = 1; i <= Len; i++) {
@@ -2439,12 +2430,10 @@ int __fastcall ReadConstAddInfo(TNameDecl *LastProcDecl) {
     }
 
     if (Tag != caiStop) {
-        // DCUErrorFmt('Unexpected Tag=$%x in TConstAddInfoRec',[Tag]);
-        printf("Debug: ReadConstInfo: Unexpected Tag=$%x in TConstAddInfoRec\n", Tag);
+        printf("Debug: ReadConstInfo: Unexpected Tag=$%x in TConstAddInfoRec\n", Tag); // DCUErrorFmt
         return Result;
     }
 
-    printf("Debug: ReadConstAddInfo End\n");
     return Result;
 }
 //------------------------------------------------------------------------------
@@ -2504,7 +2493,6 @@ PDCURec IncEmbedDepth(TDCURec *&HeadBuf) {
                 (*FEmbeddedLists)[i].List    = nullptr;
                 (*FEmbeddedLists)[i].ListEnd = (*FEmbeddedLists)[i].List;
             }
-            printf("Debug: IncEmbedDepth: 4: FEmbedDepth=%d, Lim=%d, FEmbedLimit=%d\n", FEmbedDepth, Lim, FEmbedLimit);
             FEmbedLimit = Lim;
         }
     } catch (Exception &e) {
@@ -2541,7 +2529,6 @@ PDCURec IncEmbedDepth(TDCURec *&HeadBuf) {
                 FEmbeddedLists[i]->List    = nullptr;
                 FEmbeddedLists[i]->ListEnd = FEmbeddedLists[i]->List;
             }
-            // printf("Debug: IncEmbedDepth: 4: FEmbedDepth=%d, Lim=%d, FEmbedLimit=%d\n", FEmbedDepth, Lim, FEmbedLimit);
             FEmbedLimit = Lim;
         }
     } catch (Exception &e) {
@@ -2587,7 +2574,6 @@ void __fastcall ReadDeclList(Byte LK, TDCURec *Owner, TDCURec **Result) {
 
     while (true) {
         Byte Tag1 = FixTag(Tag);
-        printf("Debug: ReadDeclList: Tag1: %lX\n", Tag1);
         TDCURec *Decl = nullptr;
         TDCURec *Rec = nullptr;
         switch (Tag1) {
@@ -3250,7 +3236,7 @@ String __fastcall ShowRefOfsQualifier(int hDef, int Ofs) {
     TTypeDef *TD = GetGlobalTypeDef(hDef);
     if (!TD) {
         if (Ofs > 0) return Sysutils::Format("^+%d", ARRAYOFCONST((Ofs)));
-        if (Ofs < 0) return Sysutils::Format('^%d', ARRAYOFCONST((Ofs)));
+        if (Ofs < 0) return Sysutils::Format("^%d", ARRAYOFCONST((Ofs)));
         return "";
     }
     return TD->GetRefOfsQualifier(Ofs);
@@ -3277,8 +3263,9 @@ String __fastcall ShowTypeName(int hDef) {
     TBaseDef *D = (TBaseDef *) FTypes->Items[hDef - 1];
     if (!D) return S;
     PName N = D->FName;
-    if (!N || !N->Len) return S;
-    // new: if (!N || N->IsEmpty()) return S;
+    // was: if (!N || !N->Len) return S;
+    // new:
+    if (!N || N->IsEmpty()) return S;
     D->ShowName(S);
     return S;
 }
@@ -3592,15 +3579,15 @@ bool __fastcall MemToUInt(Byte *DP, DWord Sz, DWord *Res) {
         case 1: *Res = *((Byte *) DP); break;
         case 2: *Res = *reinterpret_cast<Word *>(DP); break;
         case 4: *Res = *reinterpret_cast<DWord *>(DP); break;
-        default: Res = 0; return false;
+        default: Res = nullptr; return false;
     }
     return true;
 }
 //------------------------------------------------------------------------------
-String __fastcall CharStr(char Ch) {
+AnsiString __fastcall CharStr(char Ch) {
     char buf[256];
     if (Ch < ' ')
-        sprintf(buf, "#%d", (Byte) Ch);
+        sprintf(buf, "#%d", static_cast<Byte>(Ch));
     else
         sprintf(buf, "'%c'", Ch);
     return String(buf);
@@ -3610,7 +3597,7 @@ AnsiString __fastcall StrConstStr(char *CP, int L) { // was String
     bool WasCode;
     char Ch;
 
-    String Result;
+    AnsiString Result;
     Result.SetLength(3 * L + 2);
     int  LRes = 0;
     bool Code = true;
@@ -3625,7 +3612,7 @@ AnsiString __fastcall StrConstStr(char *CP, int L) { // was String
             Result[LRes] = '\'';
         }
         if (Code) {
-            String S = CharStr(Ch);
+            AnsiString S = CharStr(Ch);
             Move(&S[1], &Result[LRes + 1], S.Length());
             LRes += S.Length();
         } else {
@@ -3672,15 +3659,16 @@ int __fastcall ShowStrConst(Byte *DP, DWord DS, String &OutS) {
 //  -10:2 - string item size
 //  -8:4 - reference count
 //  -4:4 - Length in terms of the string item size
-int __fastcall ShowUnicodeStrConst(Byte *DP, DWord DS, String &OutS) { // Ver >=verD12
+// Ver >=verD12
+int __fastcall ShowUnicodeStrConst(Byte *DP, DWord DS, String &OutS) {
     int Result = -1;
 
     OutS = "";
     if (DS < 13) return Result;
     Byte *VP   = DP + sizeof(Word);
     int   ElSz = *reinterpret_cast<Word *>(VP);
-    if (ElSz == sizeof(AnsiChar)) // Try to show it as an AnsiString (!!!the code page is ignored by now)
-    {
+    if (ElSz == sizeof(AnsiChar)) {
+        // Try to show it as an AnsiString (!!!the code page is ignored by now)
         Result = ShowStrConst(DP + 2 * sizeof(Word), DS - 2 * sizeof(Word), OutS);
         if (Result > 0) Result += 2 * sizeof(Word);
         return Result;
@@ -3695,7 +3683,8 @@ int __fastcall ShowUnicodeStrConst(Byte *DP, DWord DS, String &OutS) { // Ver >=
     return Result;
 }
 //------------------------------------------------------------------------------
-int __fastcall ShowUnicodeResStrConst(Byte *DP, DWord DS, String &OutS) {  // Ver >=verD12
+// Ver >=verD12
+int __fastcall ShowUnicodeResStrConst(Byte *DP, DWord DS, String &OutS) {
     int Result = -1;
 
     OutS  = "";
@@ -3839,6 +3828,7 @@ bool __fastcall ScanOneDCU(String Filename) {
     String S;
 
     FFName = Filename;
+    FFExt  = ExtractFileExt(FFName);
 
     FILE *fIn = fopen(AnsiString(Filename).c_str(), "rb");
     if (!fIn) return false;
@@ -4106,21 +4096,42 @@ bool __fastcall ScanOneDCU(String Filename) {
 
     printf("Magic: %lX\n", Magic);
 
-    /*
-    if (fxStart > 0)
-      fxValid = [0..fxStart-1];
-    else if (FVer < verDXE2 || FPlatform <> dcuplWin64)
-      fxValid = [fxEnd+1..fxMaxXE];
-    else
-      fxValid = [fxEnd+1..fxMax];
-    */
+    // TUnit.SetupFixups
+    fx8Byte = false;
+    int i;
+    if (fxStart > 0) {
+        fxValid = System::Set<std::uint8_t, 0, fxMax>();
+        if (fxStart - 1 >= 0) {
+            fxValid << 0 << (fxStart - 1);
+        }
+        for (i = 0; i < fxStart; ++i) {
+            fxSize[i] = 4;
+        }
+        for (i = fxStart; i <= fxMax; ++i) {
+            fxSize[i] = -1;
+        }
+    } else if (FVer < verDXE2 || FPlatform != dcuplWin64) {
+        fxValid = System::Set<std::uint8_t, 0, fxMax>();
+        if (fxEnd + 1 <= fxMaxXE) {
+            fxValid << (fxEnd + 1) << fxMaxXE;
+        }
+        std::memcpy(fxSize, fxSizeXE32, sizeof(TFxSizeTbl));
+    } else {
+        // Build set [fxEnd+1..fxMax]
+        fxValid = System::Set<std::uint8_t, 0, fxMax>();
+        if (fxEnd + 1 <= fxMax) {
+            fxValid << (fxEnd + 1) << fxMax;
+        }
+        std::memcpy(fxSize, fxSizeXE64, sizeof(TFxSizeTbl));
+        fx8Byte = true;
+    }
 
     // From TUnit.ReadUnitHeader:
 
     // Read File Header
     FileSizeH = ReadULong();
     if (FileSizeH != FMemSize) {
-        printf("Error: Wrong size: %lX != %lX\n", FileSizeH, FMemSize);
+        printf("[Error] Wrong size: %lX != %lX\n", FileSizeH, FMemSize);
         delete[] FMemPtr;
         return false;
     }
@@ -4138,7 +4149,8 @@ bool __fastcall ScanOneDCU(String Filename) {
             AddAddrDef(nullptr); // Self-reference added
         }
         if (FVer >= verD2005 && FVer < verK1) {
-            String sName = ReadStr();
+            AnsiString sName = ReadStr();
+            printf("Debug: Unit name: %s\n", sName.c_str());
         }
         if (FVer >= verD2009 && FVer < verK1) {
             DWord L1 = ReadUIndex();
@@ -4158,12 +4170,14 @@ bool __fastcall ScanOneDCU(String Filename) {
         }
         if (Tag == drUnitFlags) {
             Flags = ReadUIndex();
-            if (FVer > verD2005 && FVer < verK1) DWord Flags1 = ReadUIndex();
-            if (FVer > verD3) UnitPrior = ReadUIndex();
+            if (FVer > verD2005 && FVer < verK1)
+                DWord Flags1 = ReadUIndex();
+            if (FVer > verD3)
+                UnitPrior = ReadUIndex();
             Tag = ReadTag();
         }
         if (Tag == drInDcpWin64Info) {
-            if ((FVer >= verD11) && (FVer < verK1) && FromPackage) {
+            if (FVer >= verD11 && FVer < verK1 && FromPackage) {
                 ReadInDcpWin64Info();
                 Tag = ReadTag();
             }
@@ -4176,12 +4190,11 @@ bool __fastcall ScanOneDCU(String Filename) {
     ReadUses(drUnit1);
     ReadUses(drDLL);
 
-    if ((FVer >= verD12) && (FPlatform == dcuplIOSSimArm64 || FPlatform == dcuplIOSDevice64))
+    if (FVer >= verD12 && (FPlatform == dcuplIOSSimArm64 || FPlatform == dcuplIOSDevice64))
         ReadUses(drDLL1);
 
     try {
         ReadDeclList(dlMain, nullptr, &FDecls);
-        // printf("Debug: After ReadDeclList\n");
 
         // Let's ignore unknown tags after drCBlock and drFixUp, but not before
         if (!(FPlatform == dcuplOsx64 && FPlatform == dcuplIOSDevice && FPlatform == dcuplIOSDevice64 &&
@@ -4192,34 +4205,28 @@ bool __fastcall ScanOneDCU(String Filename) {
         }
     } __finally {
         SetExportNames(FDecls); // Moved before BindEmbeddedTypes, because some embedded types (like TList<T>.TEnumerator) should be exported
-        // printf("Debug: After SetExportNames\n");
 
         if (FVer >= verDXE1 && FVer < verK1)
             BindEmbeddedTypes(); // try to fix the local types relocation problem of XE
 
-        // printf("Debug: After BindEmbeddedTypes\n");
-
         SetEnumConsts(&FDecls);
-        // printf("Debug: After SetEnumConsts\n");
         FillProcLocVarTbls();
     }
 
     // From TUnit.Show:
+    // SetShowAuxValues();
     ShowSourceFiles();
     // interface
-    ShowUses("uses", 0);
-    printf("Debug: After ShowUses(uses, 0)\n");
+    ShowUses("uses", TUnitImpFlags::None);
     ShowDeclList(dlMain, FDecls, S);
     // implementation
-    ShowUses("uses", ufImpl);
-    printf("Debug: After ShowUses(uses, ufImpl)\n");
-    ShowUses("imports", ufDLL);
-    printf("Debug: After ShowUses(imports, ufDLL)\n");
+    ShowUses("uses", TUnitImpFlags::Impl);
+    ShowUses("imports", TUnitImpFlags::DLL);
     ModuleInfo->UsesList->Sort();
     ShowDeclList(dlMainImpl, FDecls, S);
 
     // From TUnit.Destroy:
-    FreeDCURecList((TDCURec*)FDecls);
+    FreeDCURecList(FDecls);
     delete[] FMemPtr;
     return true;
 }
@@ -4618,7 +4625,7 @@ int _tmain(int argc, _TCHAR *argv[]) {
     // -sg: Is this correct?
     /*if (argc == 2) {
         // Several DCUs
-        /*if (FindFirst("*.dcu", iAttributes, sr) == 0) {
+        if (FindFirst("*.dcu", iAttributes, sr) == 0) {
             do {
                 printf("Unit %s\n", sr.Name.c_str());
                 ScanOneDCU(sr.Name);
@@ -4627,7 +4634,7 @@ int _tmain(int argc, _TCHAR *argv[]) {
             } while (FindNext(sr) == 0);
 
             FindClose(sr);
-        }#1#
+        }
     } else {
         // Single DCU
         while (true) {

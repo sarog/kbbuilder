@@ -17,10 +17,11 @@
 int __fastcall          AddAddrDef(TDCURec* ND);
 TNDX __fastcall         AddTypeDef(TTypeDef* TD);
 void __fastcall         AddTypeName(int hDef, int hDecl, PName Name);
-// PName __fastcall        AllocName(const AnsiString S);
-String __fastcall       CharStr(char Ch);
+PName __fastcall        AllocName(const AnsiString S); // unused
+void __fastcall         FreeName(PName name);
+AnsiString __fastcall   CharStr(char Ch);
 void __fastcall         ClearAddrDef(TNameDecl *ND);
-Byte __fastcall         FixTag(Byte Tag);
+TDCURecTag __fastcall   FixTag(TDCURecTag recTag);
 void __fastcall         RegisterEmbeddedTypes(TDCURec* Embedded, int Depth);
 void __fastcall         BindEmbeddedType(PDCURec UseRec, int hDT, DWord* IP);
 void __fastcall         BindEmbeddedTypes();
@@ -37,7 +38,6 @@ TTypeDef * __fastcall   GetLastAddedTypeDef();
 TTypeDef* __fastcall    GetLocalTypeDef(int hDef);
 TTypeDef* __fastcall    GetGlobalTypeDef(int hDef);
 TTypeValKind __fastcall GetGlobalTypeValKind(int hDT);
-// new: PName __fastcall        GetNoName();
 TSegKind __fastcall     GetSegKindByName(PName Name);
 int __fastcall          GetStartFixup(DWord Ofs);
 PName __fastcall        GetTypeName(int hDef);
@@ -48,7 +48,7 @@ PDCURec __fastcall      IncEmbedDepth(TDCURec *&HeadBuf);
 void __fastcall         LoadAddrToSegInfo();
 bool __fastcall         MemToUInt(Byte *DP, DWord Sz, DWord* Res);
 AnsiString __fastcall   NDXToStr(int NDXLo); // was String
-String __fastcall       PName2String(PName Name);
+AnsiString __fastcall   PName2String(PName Name); // was String
 Byte __fastcall         ReadByte();
 void __fastcall         ReadByteIfEQ(Byte V);
 int __fastcall          ReadByteFrom(bool b);
@@ -68,6 +68,7 @@ void __fastcall         ReadInDcpWin64Info();
 void __fastcall         ReadSomeNameInfo28();
 TDCURecTag __fastcall   ReadTag();
 int __fastcall          ReadUIndex();
+void __fastcall         ReadUIndex64(PInt64Rec Res);
 DWord __fastcall        ReadULong();
 int __fastcall          AppendAddrDef(TDCURec *ND);
 void __fastcall         RefAddrDef(int V);
@@ -230,23 +231,28 @@ typedef struct {
 } METHODDECLINFO, *PMETHODDECLINFO; // IDR
 
 //------------------------------------------------------------------------------
+// From FixUp.pas
+using TFxSizeTbl = SmallInt[fxMax + 1];
 
+//------------------------------------------------------------------------------
+
+// todo?
 class TPDataIterator;
 
 // From Win64SEH.pas
 class TWin64UnwindInfo : public TObject {
 protected:
-    void* PDataDP;
-    unsigned long PDataDS;
-    void* DP;
-    unsigned long DS;
-    unsigned long UnwindNdx, ProcNdx;
+    Byte* PDataDP; // Pointer
+    DWord PDataDS; // Cardinal
+    Byte* DP; // Pointer
+    DWord DS; // Cardinal
+    TNDX UnwindNdx, ProcNdx; // TNDX
     TObject* UnwindDR, *ProcDR;
-    // PFixupTbl FPDataFixTbl;
+    PFixupTbl FPDataFixTbl;
 
 public:
     void Clear();
-    bool Init0(void* APDataDP, unsigned long APDataDS, void* ADP, unsigned long ADS);
+    bool Init0(Byte* APDataDP, DWord APDataDS, Byte* ADP, DWord ADS);
     bool InitXData(unsigned long hPData, void* ADP, unsigned long ADS);
     bool InitPData(unsigned long hPData) { return true; } // todo
     bool Show();
