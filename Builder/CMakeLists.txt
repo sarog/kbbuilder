@@ -3,8 +3,9 @@ cmake_minimum_required(VERSION 3.21)
 set(APP "BuildKB")
 project(${APP} VERSION 1.0.0.0 LANGUAGES CXX)
 
-include(FetchContent)
+set(CMAKE_CXX_STANDARD 17)
 
+#include(FetchContent)
 #FetchContent_Declare(
 #        trace
 #        GIT_REPOSITORY https://github.com/GPMueller/trace
