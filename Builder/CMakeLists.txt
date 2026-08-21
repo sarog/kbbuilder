@@ -47,7 +47,7 @@ __embarcadero_language(CXX)
 set_embt_target(RTL VCL DynamicRuntime) # Unicode
 
 # add_link_options(-tV -tW -lr -lGl -lGpr -laa -lTpe) #-lL.\\Win32\\Debug\\Obj
-add_link_options(-g) #-lL.\\Win32\\Debug\\Obj
+add_link_options(-g -GF:LARGEADDRESSAWARE) #-lL.\\Win32\\Debug\\Obj
 
 add_executable(${APP} WIN32 ${SOURCES})
 
