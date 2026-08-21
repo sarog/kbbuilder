@@ -988,7 +988,7 @@ static void __fastcall ShowSourceFiles() {
         PSrcFileRec SFR = static_cast<PSrcFileRec>(FSrcFiles->Items[n]);
         if (!SFR) break;
         Byte T = SFR->Def->Tag;
-        printf("Debug: ShowSourceFiles: Tag = %d\n", T);
+
         switch (T) {
             case drSrc: OutLog1("src"); break;
             case drRes: OutLog1("res"); break; // $R
@@ -1986,7 +1986,6 @@ TDCURec *__fastcall ConsumeEmbedded() {
 
     FMaxEmbedDepth--;
 
-    // -sg: todo: verify:
     if (FEmbeddedLists) {
         Result = (*FEmbeddedLists)[FMaxEmbedDepth].List;
         (*FEmbeddedLists)[FMaxEmbedDepth].List = nullptr;
@@ -4241,7 +4240,6 @@ bool __fastcall ScanOneDCU(String Filename) {
             if (!(FPlatform == dcuplOsx64 && FPlatform == dcuplIOSDevice && FPlatform == dcuplIOSDevice64 &&
                 FPlatform == dcuplIOSSimArm64 && FPlatform == dcuplOsxArm64 && FPlatform == dcuplAndroid &&
                 FPlatform == dcuplAndroid64 && FPlatform == dcuplLinux64) && (FDataBlPtr == nullptr || FFixupTbl == nullptr)) {
-                // todo: review this
                 printf("[Error] ScanOneDCU: stop tag\n"); // DCUError('stop tag');
             }
         } __finally {

@@ -306,13 +306,9 @@ TDeclModifier *__fastcall TDeclModifier::GetNextOfClass(TDeclModifierClass *Cl) 
     return GetDeclModifierOfClass(Next, Cl);
 }
 //------------------------------------------------------------------------------
-// TStrDeclModifier::TStrDeclModifier() : TDeclModifier() {}
-//------------------------------------------------------------------------------
 TStrDeclModifier::TStrDeclModifier(TMemStrRef *AMsg) : TDeclModifier() {
     FMsg = AMsg;
 }
-//------------------------------------------------------------------------------
-// TDeprecatedDeclModifier::TDeprecatedDeclModifier(TMemStrRef *AMsg) : TStrDeclModifier(AMsg) {}
 //------------------------------------------------------------------------------
 void TDeprecatedDeclModifier::Show(String &OutS) {
     OutS = " deprecated";
@@ -328,12 +324,7 @@ void TDeprecatedDeclModifier::Show(String &OutS) {
     // end ;
 }
 //------------------------------------------------------------------------------
-TXMLDocDeclModifier::TXMLDocDeclModifier(TMemStrRef *AMsg) : TStrDeclModifier(AMsg) {
-    // printf("Debug: TXMLDocDeclModifier: init\n");
-    // printf("Debug: TXMLDocDeclModifier: AMsg: %s\n", AnsiString(AMsg->S()).c_str());
-}
-//------------------------------------------------------------------------------
-// TXMLDocDeclModifier::TXMLDocDeclModifier() : TStrDeclModifier() {}
+TXMLDocDeclModifier::TXMLDocDeclModifier(TMemStrRef *AMsg) : TStrDeclModifier(AMsg) {}
 //------------------------------------------------------------------------------
 void TXMLDocDeclModifier::Show(String &OutS) {
     OutS = "///";
@@ -346,14 +337,11 @@ bool TXMLDocDeclModifier::ShowBefore() { return true; }
 //------------------------------------------------------------------------------
 // TAttributeDeclModifier.Read:
 TAttributeDeclModifier::TAttributeDeclModifier() : TDeclModifier() {
-    printf("Debug: TAttributeDeclModifier: init\n");
-
     hAttrCtor = ReadUIndex();
     RefAddrDef(hAttrCtor);
     hMember = ReadUIndex();
     hAttrDT = ReadUIndex();
     ArgCnt  = ReadUIndex();
-    // todo: review:
     Args = static_cast<PAttributeDeclArgs>(AllocMem(ArgCnt * sizeof(TAttributeDeclArg)));
 
     for (int j = 0; j < ArgCnt; j++) {
@@ -374,7 +362,6 @@ TAttributeDeclModifier::TAttributeDeclModifier() : TDeclModifier() {
                 break;
         }
     }
-    printf("Debug: TAttributeDeclModifier: init end\n");
 }
 //------------------------------------------------------------------------------
 TAttributeDeclModifier::~TAttributeDeclModifier() {
@@ -4343,7 +4330,6 @@ TClassDef::TClassDef() : TOOTypeDef() {
 
     ReadFields(dlClass);
     // MarkAuxFields();
-    printf("Debug: TClassDef: end\n");
 }
 //------------------------------------------------------------------------------
 TClassDef::~TClassDef() {
@@ -5106,8 +5092,6 @@ void __fastcall TNameRec::GetStrInfo(TAnsiStrRec& SR) {
     }
 
     DWord L = D.bLen;
-
-    // printf("Debug: TNameRec::GetStrInfo: Length = %d\n", L);
 
     if (L == 0xFF && FVer >= verDXE2 && FVer < verK1) {
         printf("Debug: TNameRec::GetStrInfo: over 255\n");
