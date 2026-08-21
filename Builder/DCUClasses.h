@@ -103,7 +103,7 @@ enum class TDCUPlatform : int {
 // Internal unit types
 #define drStop              0x0
 #define drStop_a            0x61    //'a' - Last Tag in all files
-#define drAssemblyData      0x62    //'b' - The data structure was found in .<PackageName> units of D8 packages
+#define drAssemblyData      0x62    //'b' - (Packaged && MSIL) The data structure was found in .<PackageName> units of D8 packages
 #define drStop1             0x63    //'c'
 #define drUnit              0x64    //'d'
 #define drUnit1             0x65    //'e' - in implementation
@@ -120,7 +120,7 @@ enum class TDCUPlatform : int {
 #define drObj               0x71    //'q'
 #define drRes               0x72    //'r'
 #define drAsm               0x73    //'s' - Found in D5 Debug versions
-#define drAssemblySrc       0x74    //'t'
+#define drAssemblySrc       0x74    //'t' (Packaged && MSIL)
 #define drStop2             0x9F    //'Ÿ'
 #define drConst             0x25    //'%'
 #define drResStr            0x32    //'2'
@@ -164,11 +164,13 @@ enum class TDCUPlatform : int {
 #define drUnitFlags         0x96
 
 // ver70 or higher tags (all of unknown purpose)
-#define drUnitAddInfo       0x34    //'4'
+#define drUnitAddInfo       0x34    //'4' if Ver < 10
+// #define drUnitAddInfo       0x35    //'5' if Ver >= 10
 #define drCPPFlags          0x98    // was drInfo98
-#define drConstAddInfo      0x9C
+#define drConstAddInfo      0x9C    // D7 - caused by the "platform" keyword
+
 #define drProcAddInfo       0x9E
-#define drAssemblyInfo      0x9D    // Ver 2005,2006 .Net
+#define drAssemblyInfo      0x9D    // (2005/2006 .NET) The unit is from package generated for assemmbly
 
 // ver80 or higher tags (all of unknown purpose)
 #define drORec              0x6F    //'o' - goes before drCBlock in MSIL
@@ -176,7 +178,7 @@ enum class TDCUPlatform : int {
 #define drMetaClassDef      0x57    //'W'
 
 // Kylix-specific flags
-#define drUnit4             0x0F    //5-bytes record was observed in QOpenBanner.dcu only
+#define drUnit4             0x0F    // 5-bytes record was observed in QOpenBanner.dcu only
 
 // ver10 and higher tags
 #define drSpecVar           0x37    //'7'
@@ -229,7 +231,7 @@ enum class TDCUPlatform : int {
 #define drInDcpWin64Info    0xB7
 
 // Delphi 12 Athens and higher tags
-#define drDLL1              0xB3
+#define drDLLInfo1              0xB3    // iosSimArm64, iosDevice64
 
 // Fields
 #define arFld               0x2C    //','
@@ -237,7 +239,7 @@ enum class TDCUPlatform : int {
 #define arConstr            0x2E    //'.'
 #define arDestr             0x2F    //'/'
 #define arProperty          0x30    //'0'
-#define arSetDeft           0x9A
+#define arSetDeft           0x9A    // Set Default parameter value
 #define arCDecl             0x81
 #define arPascal            0x82
 #define arStdCall           0x83
@@ -581,6 +583,12 @@ using TDCUFileTime = int;
 using TIncPtr = Byte*; // PAnsiChar
 // PtrInt = {$IFDEF CPUX64}NativeInt{$ELSE}Integer{$ENDIF};
 
+struct TScanState {
+    TIncPtr StartPos;
+    TIncPtr CurPos;
+    TIncPtr EndPos;
+};
+
 //------------------------------------------------------------------------------
 class TDCURec;
 using PDCURec = TDCURec*; // PTDCURec
@@ -630,8 +638,7 @@ public:
     DWord __fastcall SetMem(DWord MOfs, DWord MSz) override;
 
     PName    FName;
-    PDef    Def;
-    // was: PNameDef Def;
+    PDef     Def;
     int      hUnit;
     int      hDecl;
 };
@@ -836,7 +843,7 @@ class TTemplateParmsDeclModifier : public TDeclModifier {
 public:
     TTemplateParmsDeclModifier();
     ~TTemplateParmsDeclModifier() override;
-    void __fastcall Read(TDCURec *Owner);
+    static void __fastcall Read(TDCURec *Owner);
     void __fastcall Show(String &OutS) override;
     static bool __fastcall ShowBefore();
 

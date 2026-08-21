@@ -357,21 +357,20 @@ TAttributeDeclModifier::TAttributeDeclModifier() : TDeclModifier() {
     Args = static_cast<PAttributeDeclArgs>(AllocMem(ArgCnt * sizeof(TAttributeDeclArg)));
 
     for (int j = 0; j < ArgCnt; j++) {
-        Args[j]->Kind = ReadUIndex();
+        (*Args)[j].Kind = ReadUIndex();
 
-        switch (Args[j]->Kind) {
+        switch ((*Args)[j].Kind) {
             case 0: // const
-                Args[j]->C.hDT = ReadUIndex();
-                Args[j]->C.Read();
+                (*Args)[j].C.hDT = ReadUIndex();
+                (*Args)[j].C.Read();
                 break;
             case 1: // TypeInfo(DT)
-                Args[j]->A.hDT = ReadUIndex(); // DT index in the type table
-                Args[j]->A.hDTAddr = ReadUIndex(); // DT index in the addr table
-                RefAddrDef(Args[j]->A.hDTAddr);
+                (*Args)[j].A.hDT = ReadUIndex(); // DT index in the type table
+                (*Args)[j].A.hDTAddr = ReadUIndex(); // DT index in the addr table
+                RefAddrDef((*Args)[j].A.hDTAddr);
                 break;
             default:
-                printf("[Error] Unexpected argument kind: %d in attribute argument table", Args[j]->Kind);
-                // DCUErrorFmt('Unexpected argument kind: %d in attribute argument table',[Kind]);
+                printf("[Error] Unexpected argument kind: %d in attribute argument table", (*Args)[j].Kind); // DCUErrorFmt
                 break;
         }
     }
@@ -539,7 +538,7 @@ TTemplateParmsDeclModifier::TTemplateParmsDeclModifier() : TDeclModifier() {
     Cnt = ReadUIndex();
     Tbl = static_cast<PNDXTbl>(AllocMem(Cnt * sizeof(TNDX)));
     for (int i = 0; i < Cnt; ++i) {
-        *Tbl[i] = ReadUIndex();
+        (*Tbl)[i] = ReadUIndex();
 
         if (FVer >= verD12 && FVer < verK1) {
             ReadSomeNameInfo28();
@@ -570,8 +569,7 @@ void TTemplateParmsDeclModifier::Read(TDCURec *Owner) {
     } else if (TNameDecl *NameDeclOwner = dynamic_cast<TNameDecl *>(Owner)) {
         NameDeclOwner->AddModifier(ParmInf);
     } else {
-        printf("The type #%x is a %s and not a TTypeDef", hDT, AnsiString(Owner->ClassName()).c_str());
-        // DCUWarningFmt('The type #%x is a %s and not a TTypeDef',[hDT,Owner.ClassName]);
+        printf("[Warning] TTemplateParmsDeclModifier::Read: The type #%x is a %s and not a TTypeDef", hDT, AnsiString(Owner->ClassName()).c_str()); // DCUWarningFmt
         delete ParmInf;
     }
 }
@@ -2213,11 +2211,11 @@ TProcDecl::TProcDecl(TDCURec *AnEmbedded, bool NoInf) : TMemBlockRef(NoInf) {
 
     switch (FVer) {
         case verD6: DataF = 0x8000; break; // The flag 1st appears here
-        case verD7: DataF = 0x800; break; // Then it changes
-        default: DataF = 0; break; // And then the StrConstDecl had been introduced
+        case verD7: DataF = 0x800;  break; // Then it changes
+        default:    DataF = 0;      break; // And then the StrConstDecl had been introduced
     }
 
-    JustData = (F & DataF) != 0;
+    JustData    = (F & DataF) != 0;
     MethodKind  = mkProc;
     Locals      = nullptr;
     B0          = ReadUIndex();
@@ -2247,18 +2245,18 @@ TProcDecl::TProcDecl(TDCURec *AnEmbedded, bool NoInf) : TMemBlockRef(NoInf) {
         ReadDeclList(dlArgs, this, &Args);
         // } catch {
         // todo: catch exception
+        // E.Message := SysUtils.Format('%s in proc %s',[E.Message,Name^.GetStr]);
         // }
 
         if (Tag != drStop1) printf("[Error] TProcDecl: Stop Tag\n"); // TagError
 
-        TDCURec **ArgP = &Args;
+        PDCURec *ArgP = &Args;
 
         while (*ArgP) {
             TDCURec *Loc = *ArgP;
             TDCURecTag tg  = Loc->GetTag();
             if (tg != arVal && tg != arVar) break;
             ArgP = &Loc->Next;
-            // ArgP = &(TNameDecl*)Loc->Next;
         }
         Locals = *ArgP;
         *ArgP  = nullptr;
@@ -2266,9 +2264,9 @@ TProcDecl::TProcDecl(TDCURec *AnEmbedded, bool NoInf) : TMemBlockRef(NoInf) {
 }
 //------------------------------------------------------------------------------
 TProcDecl::~TProcDecl() {
-    FreeDCURecList((TDCURec*)Locals);
-    FreeDCURecList((TDCURec*)Args);
-    FreeDCURecList((TDCURec*)Embedded);
+    FreeDCURecList(Locals);
+    FreeDCURecList(Args);
+    FreeDCURecList(Embedded);
 }
 //------------------------------------------------------------------------------
 // In Kylix are used the names of the kind '.<X>.'
@@ -2570,7 +2568,8 @@ TTypeDef::TTypeDef() : TBaseDef(nullptr, reinterpret_cast<PDef>(DefStart), -1) {
 }
 //------------------------------------------------------------------------------
 TTypeDef::~TTypeDef() {
-    // ???
+    ClearLastTypeDef(this);
+    delete FModifiers;
 }
 //------------------------------------------------------------------------------
 void TTypeDef::Visit(TDCURecVisitor *Visitor) { Visitor->visitTypeDef(this); }
@@ -2623,11 +2622,11 @@ TDeclModifier *TTypeDef::GetModifierOfClass(TDeclModifierClass *Cl) {
 TRangeBaseDef::TRangeBaseDef() : TTypeDef() {}
 //------------------------------------------------------------------------------
 void __fastcall TRangeBaseDef::GetRange(PInt64Rec Lo, PInt64Rec Hi) {
-    Byte *Tmp = CurPos;
+    Byte *Tmp = CurPos; // ChangeScanState(CP0,LH,18);
     CurPos = LH;
     ReadIndex64(Lo);
     ReadIndex64(Hi);
-    CurPos = Tmp;
+    CurPos = Tmp; // ChangeScanState(CP0,Enum.LH,18);
 }
 //------------------------------------------------------------------------------
 void TRangeBaseDef::Visit(TDCURecVisitor *Visitor) { Visitor->visitRangeBaseDef(this); }
@@ -3178,7 +3177,7 @@ bool __fastcall ReportFixup(PFixupRec Fix, int Ofs, bool UseHAl) {
 
     if (!Fix) return false;
 
-    Byte K = reinterpret_cast<Byte *>(&Fix->OfsF)[3]
+    Byte K = reinterpret_cast<Byte *>(&Fix->OfsF)[3];
     OutLog2("K%d ", K);
 
     TDCURec *D   = GetGlobalAddrDef(Fix->Ndx);
@@ -3202,6 +3201,8 @@ bool __fastcall ReportFixup(PFixupRec Fix, int Ofs, bool UseHAl) {
     // todo:
     // if TUnit(FixUnit).IsMSIL and(K=fxVirtMethodMSIL) then begin
 
+    String S;
+
     if (IsMSIL && K == fxVirtMethodMSIL) {
         Member = nullptr;
         if (D) {
@@ -3215,10 +3216,10 @@ bool __fastcall ReportFixup(PFixupRec Fix, int Ofs, bool UseHAl) {
 
                 if (TD) {
                     if (TRecBaseDef *TBD = dynamic_cast<TRecBaseDef *>(TD)) {
-                        Member = (TRecBaseDef*)TD->GetMemberByNum(Ofs-1);
+                        Member = static_cast<TRecBaseDef *>(TBD->GetMemberByNum(Ofs - 1));
 
                         if (Member)
-                            Member->ShowName();
+                            Member->ShowName(S);
                     }
                 }
 
@@ -3811,9 +3812,9 @@ String __fastcall TRecBaseDef::GetFldOfsQualifier(int Ofs, int TotSize, bool Sor
                         if (FldName == "") {
                             Decl = GetFldProperty(static_cast<TNameDecl *>(Decl), static_cast<TLocalDecl *>(Decl)->hDT);
                             if (Decl) FldName = Decl->Name->GetStr();
-                            if (FldName == "") FldName = Sysutils::Format("(:%s)", FldTD->Name->GetStr());
+                            if (FldName == "") FldName = Sysutils::Format("(:%s)", ARRAYOFCONST((FldTD->Name->GetStr())));
                         }
-                        return Sysutils::Format(".%s%s", (FldName, ShowOfsQualifier(((TLocalDecl *) Decl)->hDT, Ofs - FldOfs)));
+                        return Sysutils::Format(".%s%s%s", ARRAYOFCONST((FldName, ShowOfsQualifier(((TLocalDecl *) Decl)->hDT, Ofs - FldOfs))));
                     }
                 } else {
                     if (Sorted) break;
@@ -4120,8 +4121,7 @@ TProcTypeDef::TProcTypeDef() : TRecBaseDef() {
                         //Data.Bind.Components DXE3 Win64
                         break;
                     case drA7Info:
-                        // todo:
-                        // TTemplateParmsDeclModifier::Read(this);
+                        TTemplateParmsDeclModifier::Read(this);
                         break;
                     case drA8Info:
                         ReadUIndex();  //!!!M.b. some DCU record to be created
@@ -4342,7 +4342,7 @@ TClassDef::TClassDef() : TOOTypeDef() {
     }
 
     ReadFields(dlClass);
-    MarkAuxFields();
+    // MarkAuxFields();
     printf("Debug: TClassDef: end\n");
 }
 //------------------------------------------------------------------------------
@@ -5107,7 +5107,7 @@ void __fastcall TNameRec::GetStrInfo(TAnsiStrRec& SR) {
 
     DWord L = D.bLen;
 
-    printf("Debug: TNameRec::GetStrInfo: Length = %d\n", L);
+    // printf("Debug: TNameRec::GetStrInfo: Length = %d\n", L);
 
     if (L == 0xFF && FVer >= verDXE2 && FVer < verK1) {
         printf("Debug: TNameRec::GetStrInfo: over 255\n");

@@ -59,6 +59,8 @@ int    FEmbedLimit    = 0;
 TList *FEmbeddedTypes = nullptr; // contains embedding depths // contains PEmbeddedTypeInf, it is indexed by TD.hDef, not by FEmbedDepth
 
 bool        IsMSIL;
+bool        IsDelphi = false;
+bool        IsKylix  = false;
 int         NDXHi;
 
 Byte        fxStart   = fxStart30;
@@ -69,7 +71,8 @@ Byte        fxJmpAddr = fxJmpAddr0;
 Byte        *FMemPtr  = nullptr; // DCUData
 TIncPtr      CurPos   = nullptr; // Pointer (TIncPtr/PAnsiChar) to DCUData (Current Scan State Position)
 Byte        *DefStart = nullptr; // Start of definition (DCU_In.pas, Pointer)
-Byte         Tag;
+TScanState   ScSt;
+Byte         Tag;       // TDCURecTag
 DWord        Magic;     // LongInt
 DWord        FMemSize;  // Cardinal
 DWord        FileSizeH; // ulong
@@ -400,7 +403,8 @@ void __fastcall FreeName(PName NP) {
     FreeMemory(NP);
 }
 //------------------------------------------------------------------------------
-void __fastcall SkipBlock(int Sz) {
+// Cardinal
+void __fastcall SkipBlock(Cardinal Sz) {
     CurPos += Sz;
 }
 //------------------------------------------------------------------------------
@@ -410,6 +414,17 @@ Byte *__fastcall ReadMem(DWord Sz) {
     return Result;
 }
 //------------------------------------------------------------------------------
+// Cardinal
+void __fastcall ChkSize(Cardinal Sz) {
+    if (static_cast<int>(Sz) < 0) {
+        printf("[Error] ChkSize: Negative block size %d\n", static_cast<int>(Sz)); // DCUErrorFmt
+    }
+
+    if (ScSt.CurPos + Sz > ScSt.EndPos) {
+        printf("[Error] ChkSize: Wrong block size %x\n", Sz); // DCUErrorFmt
+    }
+}
+
 // int OFFSET = 0;
 Byte __fastcall ReadByte() {
     // !!!
@@ -418,9 +433,14 @@ Byte __fastcall ReadByte() {
         OFFSET = OFFSET;
         printf("Debug: ReadByte offset = %d\n", OFFSET);
     }*/
+    ChkSize(1);
     Byte Result = *CurPos;
     CurPos++;
     return Result;
+
+    /*ChkSize(1);
+    Result := Byte(Pointer(ScSt.CurPos)^);
+    Inc(ScSt.CurPos,1);*/
 }
 //------------------------------------------------------------------------------
 void __fastcall ReadByteIfEQ(Byte V) {
@@ -483,6 +503,7 @@ Word __fastcall ReadWord() {
 //------------------------------------------------------------------------------
 // From DCU_In.pas
 DWord __fastcall ReadULong() { // ulong
+    ChkSize(4);
     DWord Result = *reinterpret_cast<DWord *>(CurPos);
     CurPos += 4;
     return Result;
@@ -506,7 +527,7 @@ PShortName __fastcall ReadShortName() {
 //------------------------------------------------------------------------------
 PName __fastcall ReadName() {
     PName Result = reinterpret_cast<PName>(CurPos);
-    int L = ReadByte();
+    DWord L = ReadByte();
     if (L == 0xFF && FVer >= verD2009 && FVer < verK1) {
         L = ReadULong();
         printf("Debug: ReadName: 0xFF: L=%d\n", L);
@@ -566,16 +587,18 @@ TMemStrRef *__fastcall ReadNDXStrRef() {
 //------------------------------------------------------------------------------
 typedef struct {
     Byte B;
-    int  L;
+    int  L; // LongInt
 } TR4;
 
 // LongInt
 int __fastcall ReadUIndex() {
     int    Result;
-    Byte   B[5];
+    Byte   B[4]; // array[0..4] of byte;
     Word  *W  = reinterpret_cast<Word *>(B);
     DWord *L  = reinterpret_cast<DWord *>(B);
     TR4   *R4 = reinterpret_cast<TR4 *>(B);
+
+    // printf("Debug: ReadUIndex: CurPos=%x\n", CurPos);
 
     NDXHi = 0;
     B[0] = ReadByte();
@@ -598,7 +621,7 @@ int __fastcall ReadUIndex() {
                 else {
                     B[4] = ReadByte();
                     Result = static_cast<DWord>(R4->L);
-                    if (FVer > 3 && ((B[0] & 0xF0) != 0))
+                    if (FVer > verD3 && ((B[0] & 0xF0) != 0))
                         NDXHi = ReadULong();
                 }
             }
@@ -860,6 +883,7 @@ Byte __fastcall ReadCallKind() {
  * @return
  */
 int __fastcall ReadClassInterfaces(PPNDXTbl PITbl) {
+    // printf("Debug: ReadClassInterfaces: CurPos = %x, FMemSize = %x\n", CurPos, FMemSize);
     int Result = ReadIndex();
     if (Result <= 0) return Result;
     PNDXTbl ITbl = nullptr;
@@ -867,7 +891,7 @@ int __fastcall ReadClassInterfaces(PPNDXTbl PITbl) {
         ITbl   = new TNDXTbl[Result * 2 * sizeof(TNDX)];
         *PITbl = ITbl;
     }
-    printf("Debug: ReadClassInterfaces: Result = %d\n", Result);
+    // printf("Debug: ReadClassInterfaces: Result = %d\n", Result);
     for (int i = 0; i < Result; i++) {
         TNDX MatchCnt;
         int X1;
@@ -893,12 +917,14 @@ int __fastcall ReadClassInterfaces(PPNDXTbl PITbl) {
                 TNDX X3 = ReadUIndex();
                 TNDX X4 = ReadUIndex();
                 for (int j = 1; j <= MatchCnt; j++) {
-                    printf("Debug: ReadClassInterfaces: i=%d, MatchCnt=%d, j=%d\n", i, MatchCnt, j);
+                    // printf("Debug: ReadClassInterfaces: i=%d, Max=%d, MatchCnt=%d, j=%d\n",i, Result, MatchCnt, j);
+                    // printf("Debug: ReadClassInterfaces: MatchCnt=%d, j=%d CurPos=%x\n", MatchCnt, j, CurPos);
                     Byte B = ReadByte();
                     PName MName = ReadName();
+                    // printf("Debug: ReadClassInterfaces: MatchCnt=%d, j=%d CurPos=%x, Name: %s\n", MatchCnt, j, CurPos, MName->GetStr().c_str());
                     int N = ReadUIndex();
                     int hMember = ReadUIndex();
-                    printf("Debug: ReadClassInterfaces: B=%d, N=%d, hMember=%d, Name: %s\n", B, N, hMember, MName->GetStr().c_str());
+                    // printf("Debug: ReadClassInterfaces: MatchCnt=%d, j=%d, B=%d, N=%d, hMember=%d, CurPos=%x, Name: %s\n", MatchCnt, j, B, N, hMember, CurPos, MName->GetStr().c_str());
                     // ReadUIndex(); // +4
                     // ReadUIndex(); // +8
                     // ReadByte();   // =1
@@ -1062,7 +1088,7 @@ static void __fastcall ReadUses(TDCURecTag TagRq) {
                 Ch       = 'D';
                 pUnit->Flags = TUnitImpFlags::DLL; // ufDLL;
                 break;
-            case drDLL1: // 0xB3
+            case drDLLInfo1: // 0xB3
                 Ch       = 'E';
                 pUnit->Flags = TUnitImpFlags::DLL1;// ufDLL1;
                 break;
@@ -1072,7 +1098,7 @@ static void __fastcall ReadUses(TDCURecTag TagRq) {
         FUnitImp->Add(static_cast<void *>(pUnit));
         int hPack = 0;
 
-        if (TagRq != drDLL && TagRq != drDLL1 && FVer >= verD8 && FVer < verK1)
+        if (TagRq != drDLL && TagRq != drDLLInfo1 && FVer >= verD8 && FVer < verK1)
             hPack = ReadUIndex();
             
         if (FVer >= verD2006 && FVer < verK1)
@@ -1080,7 +1106,7 @@ static void __fastcall ReadUses(TDCURecTag TagRq) {
         else
             L = ReadULong();
 
-        if ((FVer == verD7 && FVer < verK1) || (FVer >= verD8 && FVer < verK1 && TagRq == drDLL) || (TagRq == drDLL1))
+        if ((FVer == verD7 && FVer < verK1) || (FVer >= verD8 && FVer < verK1 && TagRq == drDLL) || (TagRq == drDLLInfo1))
             int L1 = ReadULong();
 
         if (FVer >= verD2009 && FVer < verK1)
@@ -1099,7 +1125,7 @@ static void __fastcall ReadUses(TDCURecTag TagRq) {
         while (true) {
             Tag = ReadTag();
             if (Tag == drImpType || Tag == drImpTypeDef) {
-                if (TagRq != drDLL && TagRq != drDLL1) { // 0x68 && 0xB3
+                if (TagRq != drDLL && TagRq != drDLLInfo1) { // 0x68 && 0xB3
                     Ch   = 'T';
                     ImpN = ReadName();
                     if (Tag == drImpTypeDef) RTTISz = ReadUIndex();
@@ -1118,7 +1144,7 @@ static void __fastcall ReadUses(TDCURecTag TagRq) {
                 Ch   = 'A';
                 ImpN = ReadName();
                 L    = ReadULong();
-                if (TagRq != drDLL && TagRq != drDLL1)
+                if (TagRq != drDLL && TagRq != drDLLInfo1)
                     AR = new TImpDef('A', ImpN, L, NULL, hUnit);
                 else
                     AR = new TDLLImpRec(ImpN, L, NULL, hUnit);
@@ -1526,6 +1552,20 @@ void ClearAddrDef(TNameDecl *ND) {
     }
 }
 //------------------------------------------------------------------------------
+
+/**
+ * This procedure is called from TTypeDef.Destroy, and required when
+ * Destroy is called due to errors in Create
+ * @param TD
+ */
+void ClearLastTypeDef(TTypeDef *TD) {
+    if (FLoaded || (FTypeDefCnt <= 0)) return;
+
+    if ((TTypeDef *)FTypes->Items[TD->hDT] == TD)
+        delete FTypes->Items[TD->hDT];
+        // FTypes->Items[TD->hDT] = nullptr;
+}
+//------------------------------------------------------------------------------
 /**
  * TUnit.AddAddrDef
  * @param ND
@@ -1769,11 +1809,11 @@ void __fastcall SetEnumConsts(TDCURec** Decl) {
         if (TD && Enum && Enum->NameTbl == nullptr &&
             TD->hDecl >= LastConst->hDecl + ConstCnt) {
             // Some paranoic tests:
-            // TScanState CP0;
-            // ChangeScanState(CP0, Enum->LH, 18);
+            TScanState CP0;
+            ChangeScanState(CP0, Enum->LH, 18);
             int Lo = ReadIndex();
             int Hi = ReadIndex();
-            // RestoreScanState(CP0);
+            RestoreScanState(CP0);
 
             if ((Lo == CMin) && (Hi == CMax)) {
                 *LastConstP = D;
@@ -2036,15 +2076,38 @@ int __fastcall ReadConstAddInfo(TNameDecl *LastProcDecl) {
         // ReadByte();
         // ReadByte();
         return Result;
-    } else {
-        caiStop = 0x0D;
-        if (FVer >= verD2005) {
-            caiStop = 0x0F;
-            if (FVer >= verD2009) {
-                caiStop = 0xFF;
-            }
+    }
+
+    caiStop = 0x0D;
+    if (FVer >= verD2005) {
+        caiStop = 0x0F;
+        if (FVer >= verD2009) {
+            caiStop = 0xFF;
         }
     }
+
+    // -sg: test:
+    /*if (FVer <= verD7 || FVer >= verK1) {
+        caiStop = 0x06;
+        // ReadByte();
+        // ReadUIndex();
+        // ReadByte();
+        // ReadByte();
+        return Result;
+    }
+    if (FVer >= verD11) {
+        caiStop = 0x18;
+    } else if (FVer >= verD10_4) {
+        caiStop = 0x17;
+    } else if (FVer >= verDXE1) {
+        caiStop = 0x16;
+    } else if (FVer >= verD2009) {
+        caiStop = 0x15;
+    } else if (FVer >= verD2005) {
+        caiStop = 0x0F;
+    } else {
+        caiStop = 0xD;
+    }*/
 
     /*caiStop = 0xD;
     if (FVer >= verD2005) {
@@ -2054,7 +2117,7 @@ int __fastcall ReadConstAddInfo(TNameDecl *LastProcDecl) {
 
     while (true) {
         Tag = ReadByte();
-        printf("Debug: ReadConstAddInfo: Tag: %lX\n", Tag);
+        // printf("Debug: ReadConstAddInfo: Tag: %lX\n", Tag);
         // check it before case to skip the tags for the higher versions
         if (Tag >= caiStop) break;
         switch (Tag) {
@@ -2430,7 +2493,7 @@ int __fastcall ReadConstAddInfo(TNameDecl *LastProcDecl) {
     }
 
     if (Tag != caiStop) {
-        printf("Debug: ReadConstInfo: Unexpected Tag=$%x in TConstAddInfoRec\n", Tag); // DCUErrorFmt
+        printf("Debug: ReadConstAddInfo: Unexpected Tag=$%x in TConstAddInfoRec\n", Tag); // DCUErrorFmt
         return Result;
     }
 
@@ -3867,350 +3930,333 @@ bool __fastcall ScanOneDCU(String Filename) {
 
     CurPos = FMemPtr;
     IsMSIL = false;
-    // Read Magic
-    Magic = ReadULong();
-    FPtrSize = 4;
-    fxJmpAddr = fxJmpAddr0;
 
-    switch (Magic) {
-        case 0x50505348:
-            FVer    = verD2;
-            fxStart = fxStart20;
-            fxEnd   = fxEnd20;
-            break;
-        case 0x44518641:
-            FVer    = verD3;
-            fxStart = fxStart30;
-            fxEnd   = fxEnd30;
-            break;
-        case 0x4768A6D8:
-            FVer    = verD4;
-            fxStart = fxStart30;
-            fxEnd   = fxEnd30;
-            break;
-        case 0xF21F148B:
-            FVer    = verD5;
-            fxStart = fxStart30;
-            fxEnd   = fxEnd30;
-            break;
-        case 0x0E0000DD:
-        case 0x0E8000DD:
-            FVer    = verD6;
-            fxStart = fxStart30;
-            fxEnd   = fxEnd30;
-            break;
-        case 0xFF0000DF:
-        case 0x0F0000DF:
-        case 0x0F8000DF:
-            FVer    = verD7;
-            fxStart = fxStart70;
-            fxEnd   = fxEnd70;
-            break;
-        case 0x10000229:
-            FVer    = verD8;
-            IsMSIL  = true;
-            fxStart = fxStartMSIL;
-            fxEnd   = fxEndMSIL;
-            break;
-        case 0x11000239:
-            FVer    = verD2005;
-            IsMSIL  = true;
-            fxStart = fxStartMSIL;
-            fxEnd   = fxEndMSIL;
-            break;
-        case 0x1100000D:
-        case 0x11800009:
-            FVer    = verD2005;
-            fxStart = fxStart70;
-            fxEnd   = fxEnd70;
-            break;
-        case 0x12000023:
-            FVer    = verD2006; // Delphi 2006, 2007
-            fxStart = fxStart100;
-            fxEnd   = fxEnd100;
-            break;
-        case 0x1200024D:
-            FVer    = verD2006;
-            IsMSIL  = true;
-            fxStart = fxStartMSIL;
-            fxEnd   = fxEndMSIL;
-            break;
-        case 0x14000039:
-            FVer    = verD2009; // Delphi 2009
-            fxStart = fxStart100;
-            fxEnd   = fxEnd100;
-            break;
-        case 0x15000045:
-            FVer      = verD2010; // Delphi 2010
-            fxStart   = fxStart2010;
-            fxEnd     = fxEnd2010;
-            fxJmpAddr = fxJmpAddrXE; // Was checked for XE only
-            break;
-        case 0x1600034B:
-            FVer      = verDXE1; // DelphiXE1
-            fxStart   = fxStart2010;
-            fxEnd     = fxEnd2010;
-            fxJmpAddr = fxJmpAddrXE; // Was checked for XE only
-            break;
-        /*case 0x1700034B:
-            FVer      = verDXE2; // DelphiXE2
-            fxStart   = fxStart2010;
-            fxEnd     = fxEnd2010;
-            fxJmpAddr = fxJmpAddrXE; // Was checked for XE only
-            break;
-        case 0x1700234B:
-            FVer      = verDXE2; // DelphiXE2 (Win64)
-            FPlatform = dcuplWin64;
-            FPtrSize  = 8;
-            fxJmpAddr = fxJmpAddrXE; // Was checked for XE only
-            break;
-        case 0x1700044B:
-            FVer      = verDXE2; // DelphiXE2 (OSX)
-            FPlatform = dcuplOsx32;
-            fxJmpAddr = fxJmpAddrXE; // Was checked for XE only
-            break;
-        case 0x1800034B:
-            FVer      = verDXE3; // DelphiXE3
-            fxStart   = fxStart2010;
-            fxEnd     = fxEnd2010;
-            fxJmpAddr = fxJmpAddrXE; // Was checked for XE only
-            break;
-        case 0x1800234B:
-            FVer      = verDXE3; // DelphiXE3 (Win64)
-            FPlatform = dcuplWin64;
-            FPtrSize  = 8;
-            fxJmpAddr = fxJmpAddrXE; // Was checked for XE only
-            break;
-        case 0x1800044B:
-            FVer      = verDXE3; // DelphiXE3 (OSX)
-            FPlatform = dcuplOsx32;
-            fxJmpAddr = fxJmpAddrXE; // Was checked for XE only
-            break;*/
-        case 0xF21F148C:
-            FVer    = verK1; // Kylix 1.0
-            fxStart = fxStart30;
-            fxEnd   = fxEnd30;
-            break;
-        case 0x0E1011DD:
-        case 0x0E0001DD:
-            FVer    = verK2; // Kylix 2.0
-            fxStart = fxStart30;
-            fxEnd   = fxEnd30;
-            break;
-        case 0x0F1001DD:
-        case 0x0F0001DD:
-            FVer = verK3; // Kylix 3.0
-            break;
-        default:
-            // All the other versions follow the common scheme of magic values assignment,
-            // which we describe here:
-            if ((Magic & 0x00FF00F9) == 0x49) {
-                DWord BVer    = Magic >> 24;
-                DWord PlMagic = Magic & 0xFF;
-                if ((BVer <= 0x24 && BVer >= 0x1B && PlMagic == 0x4D) ||
-                    (BVer <= 0x1A && BVer >= 0x17 && PlMagic == 0x4B)) {
-                    PlMagic   = (Magic >> 8) & 0xFF;
-                    FVer      = BVer + (verDXE2 - 0x17);
-                    fxJmpAddr = fxJmpAddrXE;
-
-                    printf("Delphi version: %d\n", FVer);
-
-                    switch (PlMagic) {
-                        case 0x03:
-                            FPlatform = dcuplWin32;
-                            fxStart   = fxStart2010;
-                            fxEnd     = fxEnd2010;
-                            break;
-                        case 0x23:
-                            FPlatform = dcuplWin64;
-                            FPtrSize  = 8;
-                            break;
-                        case 0x04: FPlatform = dcuplOsx32; break;
-                        case 0x24: // OSX 64 support was added in 10.4 Sydney
-                            if (FVer >= verD10_4) {
-                                FPlatform = dcuplOsx64;
-                                FPtrSize  = 8;
-                            }
-                            break;
-                        case 0x84: // OSX Arm 64 support was added in 12 Athens
-                            if (FVer >= verD12) {
-                                FPlatform = dcuplOsxArm64;
-                                FPtrSize  = 8;
-                            }
-                            break;
-                        case 0x14: // iOS support was added in XE4
-                            if (FVer >= verDXE4) FPlatform = dcuplIOSEmulator;
-                            break;
-                        case 0x88: // iOS Arm 64 Simulator support was added in 12 Athens
-                            if (FVer >= verD12) {
-                                FPlatform = dcuplIOSSimArm64;
-                                FPtrSize  = 8;
-                            }
-                            break;
-                        case 0x76: // iOS support was added in XE4
-                            if (FVer >= verDXE4) FPlatform = dcuplIOSDevice;
-                            break;
-                        case 0x86: // iOS64 code was changed in Delphi 11
-                            if (FVer >= verD11) {
-                                FPlatform = dcuplIOSDevice64;
-                                FPtrSize  = 8;
-                            }
-                            break;
-                        case 0x94: // iOS64 support was added in XE8, and the code was changed in Delphi 11
-                            if (!(FVer < verDXE8 || FVer >= verD11)) {
-                                FPlatform = dcuplIOSDevice64;
-                                FPtrSize  = 8;
-                            }
-                            break;
-                        case 0x67: // Android code was changed in Delphi 10.4
-                            if (FVer >= verD10_4) FPlatform = dcuplAndroid;
-                            break;
-                        case 0x77: // Android support was added in XE4 and the code was changed in Delphi 10.4
-                            if (!(FVer < verDXE5 || FVer >= verD10_4)) FPlatform = dcuplAndroid;
-                            break;
-                        case 0x87: // Android 64 support was added in 10.4 Sydney
-                            if (FVer >= verD10_4) {
-                                FPlatform = dcuplAndroid64;
-                                FPtrSize  = 8;
-                            }
-                            break;
-                        case 0x21: // Linux support was added in XE 10.2
-                            if (FVer >= verD10_2) {
-                                FPlatform = dcuplLinux64;
-                                FPtrSize  = 8;
-                            }
-                            break;
-                        default:
-                            printf("[Error] Unable to decode magic value %lX\n", Magic);
-                            return false;
-                            break;
-                    }
-                }
-            } else {
-                printf("Error: Wrong magic %lX\n", Magic);
-                delete[] FMemPtr;
-                return false;
-            }
-            break;
-    }
-
-    printf("Magic: %lX\n", Magic);
-
-    // TUnit.SetupFixups
-    fx8Byte = false;
-    int i;
-    if (fxStart > 0) {
-        fxValid = System::Set<std::uint8_t, 0, fxMax>();
-        if (fxStart - 1 >= 0) {
-            fxValid << 0 << (fxStart - 1);
-        }
-        for (i = 0; i < fxStart; ++i) {
-            fxSize[i] = 4;
-        }
-        for (i = fxStart; i <= fxMax; ++i) {
-            fxSize[i] = -1;
-        }
-    } else if (FVer < verDXE2 || FPlatform != dcuplWin64) {
-        fxValid = System::Set<std::uint8_t, 0, fxMax>();
-        if (fxEnd + 1 <= fxMaxXE) {
-            fxValid << (fxEnd + 1) << fxMaxXE;
-        }
-        std::memcpy(fxSize, fxSizeXE32, sizeof(TFxSizeTbl));
-    } else {
-        // Build set [fxEnd+1..fxMax]
-        fxValid = System::Set<std::uint8_t, 0, fxMax>();
-        if (fxEnd + 1 <= fxMax) {
-            fxValid << (fxEnd + 1) << fxMax;
-        }
-        std::memcpy(fxSize, fxSizeXE64, sizeof(TFxSizeTbl));
-        fx8Byte = true;
-    }
-
-    // From TUnit.ReadUnitHeader:
-
-    // Read File Header
-    FileSizeH = ReadULong();
-    if (FileSizeH != FMemSize) {
-        printf("[Error] Wrong size: %lX != %lX\n", FileSizeH, FMemSize);
-        delete[] FMemPtr;
-        return false;
-    }
-
-    // Read FileTime
-    FT = ReadULong();
-    if (FVer == verD2) {
-        B = ReadByte();
-        Tag = ReadTag();
-    } else {
-        Stamp = ReadULong();
-        B = ReadByte();
-        if (FVer >= verD7 && FVer < verK1) {
-            B = ReadByte(); // It has another header byte (or index)
-            AddAddrDef(nullptr); // Self-reference added
-        }
-        if (FVer >= verD2005 && FVer < verK1) {
-            AnsiString sName = ReadStr();
-            printf("Debug: Unit name: %s\n", sName.c_str());
-        }
-        if (FVer >= verD2009 && FVer < verK1) {
-            DWord L1 = ReadUIndex();
-            DWord L2 = ReadUIndex();
-        }
-        Tag = ReadTag();
-        if (FVer >= verK1) {
-            if (Tag == drUnit4) {
-                do {
-                    DWord L = ReadULong();
-                    Tag = ReadTag();
-                } while (Tag != drUnit4);
-            } else if (Tag != drUnitFlags) {
-                SkipBlock(3);
-                Tag = ReadTag();
-            }
-        }
-        if (Tag == drUnitFlags) {
-            Flags = ReadUIndex();
-            if (FVer > verD2005 && FVer < verK1)
-                DWord Flags1 = ReadUIndex();
-            if (FVer > verD3)
-                UnitPrior = ReadUIndex();
-            Tag = ReadTag();
-        }
-        if (Tag == drInDcpWin64Info) {
-            if (FVer >= verD11 && FVer < verK1 && FromPackage) {
-                ReadInDcpWin64Info();
-                Tag = ReadTag();
-            }
-        }
-    }
-
-    // From TUnit.Load:
-    ReadSourceFiles();
-    ReadUses(drUnit);
-    ReadUses(drUnit1);
-    ReadUses(drDLL);
-
-    if (FVer >= verD12 && (FPlatform == dcuplIOSSimArm64 || FPlatform == dcuplIOSDevice64))
-        ReadUses(drDLL1);
+    TScanState CP0;
+    ChangeScanState(CP0, FMemPtr, FMemSize);
 
     try {
-        ReadDeclList(dlMain, nullptr, &FDecls);
+        // Read Magic
+        Magic = ReadULong();
+        FPtrSize = 4;
+        fxJmpAddr = fxJmpAddr0;
 
-        // Let's ignore unknown tags after drCBlock and drFixUp, but not before
-        if (!(FPlatform == dcuplOsx64 && FPlatform == dcuplIOSDevice && FPlatform == dcuplIOSDevice64 &&
-            FPlatform == dcuplIOSSimArm64 && FPlatform == dcuplOsxArm64 && FPlatform == dcuplAndroid &&
-            FPlatform == dcuplAndroid64 && FPlatform == dcuplLinux64) && (FDataBlPtr == nullptr || FFixupTbl == nullptr)) {
-            // todo: review this
-            printf("[Error] ScanOneDCU: stop tag\n"); // DCUError('stop tag');
+        switch (Magic) {
+            case 0x50505348:
+                FVer    = verD2;
+                fxStart = fxStart20;
+                fxEnd   = fxEnd20;
+                break;
+            case 0x44518641:
+                FVer    = verD3;
+                fxStart = fxStart30;
+                fxEnd   = fxEnd30;
+                break;
+            case 0x4768A6D8:
+                FVer    = verD4;
+                fxStart = fxStart30;
+                fxEnd   = fxEnd30;
+                break;
+            case 0xF21F148B:
+                FVer    = verD5;
+                fxStart = fxStart30;
+                fxEnd   = fxEnd30;
+                break;
+            case 0x0E0000DD:
+            case 0x0E8000DD:
+                FVer    = verD6;
+                fxStart = fxStart30;
+                fxEnd   = fxEnd30;
+                break;
+            case 0xFF0000DF:
+            case 0x0F0000DF:
+            case 0x0F8000DF:
+                FVer    = verD7;
+                fxStart = fxStart70;
+                fxEnd   = fxEnd70;
+                break;
+            case 0x10000229:
+                FVer    = verD8;
+                IsMSIL  = true;
+                fxStart = fxStartMSIL;
+                fxEnd   = fxEndMSIL;
+                break;
+            case 0x11000239:
+                FVer    = verD2005;
+                IsMSIL  = true;
+                fxStart = fxStartMSIL;
+                fxEnd   = fxEndMSIL;
+                break;
+            case 0x1100000D:
+            case 0x11800009:
+                FVer    = verD2005;
+                fxStart = fxStart70;
+                fxEnd   = fxEnd70;
+                break;
+            case 0x12000023:
+                FVer    = verD2006; // Delphi 2006, 2007
+                fxStart = fxStart100;
+                fxEnd   = fxEnd100;
+                break;
+            case 0x1200024D:
+                FVer    = verD2006;
+                IsMSIL  = true;
+                fxStart = fxStartMSIL;
+                fxEnd   = fxEndMSIL;
+                break;
+            case 0x14000039:
+                FVer    = verD2009; // Delphi 2009
+                fxStart = fxStart100;
+                fxEnd   = fxEnd100;
+                break;
+            case 0x15000045:
+                FVer      = verD2010; // Delphi 2010
+                fxStart   = fxStart2010;
+                fxEnd     = fxEnd2010;
+                fxJmpAddr = fxJmpAddrXE; // Was checked for XE only
+                break;
+            case 0x1600034B:
+                FVer      = verDXE1; // DelphiXE1
+                fxStart   = fxStart2010;
+                fxEnd     = fxEnd2010;
+                fxJmpAddr = fxJmpAddrXE; // Was checked for XE only
+                break;
+            case 0xF21F148C:
+                FVer    = verK1; // Kylix 1.0
+                fxStart = fxStart30;
+                fxEnd   = fxEnd30;
+                break;
+            case 0x0E1011DD:
+            case 0x0E0001DD:
+                FVer    = verK2; // Kylix 2.0
+                fxStart = fxStart30;
+                fxEnd   = fxEnd30;
+                break;
+            case 0x0F1001DD:
+            case 0x0F0001DD:
+                FVer = verK3; // Kylix 3.0
+                break;
+            default:
+                // All the other versions follow the common scheme of magic values assignment,
+                // which we describe here:
+                if ((Magic & 0x00FF00F9) == 0x49) {
+                    DWord BVer    = Magic >> 24;
+                    DWord PlMagic = Magic & 0xFF;
+                    if ((BVer <= 0x24 && BVer >= 0x1B && PlMagic == 0x4D) ||
+                        (BVer <= 0x1A && BVer >= 0x17 && PlMagic == 0x4B)) {
+                        PlMagic   = (Magic >> 8) & 0xFF;
+                        FVer      = BVer + (verDXE2 - 0x17);
+                        fxJmpAddr = fxJmpAddrXE;
+
+                        printf("Delphi version: %d\n", FVer);
+
+                        switch (PlMagic) {
+                            case 0x03:
+                                FPlatform = dcuplWin32;
+                                fxStart   = fxStart2010;
+                                fxEnd     = fxEnd2010;
+                                break;
+                            case 0x23:
+                                FPlatform = dcuplWin64;
+                                FPtrSize  = 8;
+                                break;
+                            case 0x04: FPlatform = dcuplOsx32; break;
+                            case 0x24: // OSX 64 support was added in 10.4 Sydney
+                                if (FVer >= verD10_4) {
+                                    FPlatform = dcuplOsx64;
+                                    FPtrSize  = 8;
+                                }
+                                break;
+                            case 0x84: // OSX Arm 64 support was added in 12 Athens
+                                if (FVer >= verD12) {
+                                    FPlatform = dcuplOsxArm64;
+                                    FPtrSize  = 8;
+                                }
+                                break;
+                            case 0x14: // iOS support was added in XE4
+                                if (FVer >= verDXE4) FPlatform = dcuplIOSEmulator;
+                                break;
+                            case 0x88: // iOS Arm 64 Simulator support was added in 12 Athens
+                                if (FVer >= verD12) {
+                                    FPlatform = dcuplIOSSimArm64;
+                                    FPtrSize  = 8;
+                                }
+                                break;
+                            case 0x76: // iOS support was added in XE4
+                                if (FVer >= verDXE4) FPlatform = dcuplIOSDevice;
+                                break;
+                            case 0x86: // iOS64 code was changed in Delphi 11
+                                if (FVer >= verD11) {
+                                    FPlatform = dcuplIOSDevice64;
+                                    FPtrSize  = 8;
+                                }
+                                break;
+                            case 0x94: // iOS64 support was added in XE8, and the code was changed in Delphi 11
+                                if (!(FVer < verDXE8 || FVer >= verD11)) {
+                                    FPlatform = dcuplIOSDevice64;
+                                    FPtrSize  = 8;
+                                }
+                                break;
+                            case 0x67: // Android code was changed in Delphi 10.4
+                                if (FVer >= verD10_4) FPlatform = dcuplAndroid;
+                                break;
+                            case 0x77: // Android support was added in XE4 and the code was changed in Delphi 10.4
+                                if (!(FVer < verDXE5 || FVer >= verD10_4)) FPlatform = dcuplAndroid;
+                                break;
+                            case 0x87: // Android 64 support was added in 10.4 Sydney
+                                if (FVer >= verD10_4) {
+                                    FPlatform = dcuplAndroid64;
+                                    FPtrSize  = 8;
+                                }
+                                break;
+                            case 0x21: // Linux support was added in XE 10.2
+                                if (FVer >= verD10_2) {
+                                    FPlatform = dcuplLinux64;
+                                    FPtrSize  = 8;
+                                }
+                                break;
+                            default:
+                                printf("[Error] Unable to decode magic value %lX\n", Magic);
+                                return false;
+                                break;
+                        }
+                        }
+                } else {
+                    printf("Error: Wrong magic %lX\n", Magic);
+                    delete[] FMemPtr;
+                    return false;
+                }
+                break;
+        }
+
+        if (FVer >= 100) {
+            IsKylix = true;
+        } else {
+            IsDelphi = true;
+        }
+
+        printf("Magic: %lX\n", Magic);
+
+        // TUnit.SetupFixups
+        fx8Byte = false;
+        int i;
+        if (fxStart > 0) {
+            fxValid = System::Set<std::uint8_t, 0, fxMax>();
+            if (fxStart - 1 >= 0) {
+                fxValid << 0 << (fxStart - 1);
+            }
+            for (i = 0; i < fxStart; ++i) {
+                fxSize[i] = 4;
+            }
+            for (i = fxStart; i <= fxMax; ++i) {
+                fxSize[i] = -1;
+            }
+        } else if (FVer < verDXE2 || FPlatform != dcuplWin64) {
+            fxValid = System::Set<std::uint8_t, 0, fxMax>();
+            if (fxEnd + 1 <= fxMaxXE) {
+                fxValid << (fxEnd + 1) << fxMaxXE;
+            }
+            std::memcpy(fxSize, fxSizeXE32, sizeof(TFxSizeTbl));
+        } else {
+            // Build set [fxEnd+1..fxMax]
+            fxValid = System::Set<std::uint8_t, 0, fxMax>();
+            if (fxEnd + 1 <= fxMax) {
+                fxValid << (fxEnd + 1) << fxMax;
+            }
+            std::memcpy(fxSize, fxSizeXE64, sizeof(TFxSizeTbl));
+            fx8Byte = true;
+        }
+
+        // From TUnit.ReadUnitHeader:
+
+        // Read File Header
+        FileSizeH = ReadULong();
+        if (FileSizeH != FMemSize) {
+            printf("[Error] Wrong size: %lX != %lX\n", FileSizeH, FMemSize);
+            delete[] FMemPtr;
+            return false;
+        }
+
+        // Read FileTime
+        FT = ReadULong();
+
+        if (FVer == verD2) {
+            B = ReadByte();
+            Tag = ReadTag();
+        } else {
+            Stamp = ReadULong();
+            B = ReadByte();
+            if (FVer >= verD7 && FVer < verK1) {
+                B = ReadByte(); // It has another header byte (or index)
+                AddAddrDef(nullptr); // Self-reference added
+            }
+            if (FVer >= verD2005 && FVer < verK1) {
+                AnsiString sName = ReadStr();
+                printf("Debug: Unit name: %s\n", sName.c_str());
+            }
+            if (FVer >= verD2009 && FVer < verK1) {
+                DWord L1 = ReadUIndex();
+                DWord L2 = ReadUIndex();
+            }
+            Tag = ReadTag();
+            if (FVer >= verK1) {
+                if (Tag == drUnit4) {
+                    do {
+                        DWord L = ReadULong();
+                        Tag = ReadTag();
+                    } while (Tag != drUnit4);
+                } else if (Tag != drUnitFlags) {
+                    SkipBlock(3);
+                    Tag = ReadTag();
+                }
+            }
+            if (Tag == drUnitFlags) {
+                Flags = ReadUIndex();
+                if (FVer > verD2005 && FVer < verK1)
+                    DWord Flags1 = ReadUIndex();
+                if (FVer > verD3)
+                    UnitPrior = ReadUIndex();
+                Tag = ReadTag();
+            }
+            if (Tag == drInDcpWin64Info) {
+                if (FVer >= verD11 && FVer < verK1 && FromPackage) {
+                    ReadInDcpWin64Info();
+                    Tag = ReadTag();
+                }
+            }
+        }
+
+        // From TUnit.Load:
+        ReadSourceFiles();
+        ReadUses(drUnit);
+        ReadUses(drUnit1);
+        ReadUses(drDLL);
+
+        if (FVer >= verD12 && (FPlatform == dcuplIOSSimArm64 || FPlatform == dcuplIOSDevice64))
+            ReadUses(drDLLInfo1);
+
+        try {
+            ReadDeclList(dlMain, nullptr, &FDecls);
+
+            // Let's ignore unknown tags after drCBlock and drFixUp, but not before
+            if (!(FPlatform == dcuplOsx64 && FPlatform == dcuplIOSDevice && FPlatform == dcuplIOSDevice64 &&
+                FPlatform == dcuplIOSSimArm64 && FPlatform == dcuplOsxArm64 && FPlatform == dcuplAndroid &&
+                FPlatform == dcuplAndroid64 && FPlatform == dcuplLinux64) && (FDataBlPtr == nullptr || FFixupTbl == nullptr)) {
+                // todo: review this
+                printf("[Error] ScanOneDCU: stop tag\n"); // DCUError('stop tag');
+            }
+        } __finally {
+            SetExportNames(FDecls); // Moved before BindEmbeddedTypes, because some embedded types (like TList<T>.TEnumerator) should be exported
+
+            if (FVer >= verDXE1 && FVer < verK1)
+                BindEmbeddedTypes(); // try to fix the local types relocation problem of XE
+
+            SetEnumConsts(&FDecls);
+            FillProcLocVarTbls();
         }
     } __finally {
-        SetExportNames(FDecls); // Moved before BindEmbeddedTypes, because some embedded types (like TList<T>.TEnumerator) should be exported
+        FLoaded = true;
+        RestoreScanState(CP0);
 
-        if (FVer >= verDXE1 && FVer < verK1)
-            BindEmbeddedTypes(); // try to fix the local types relocation problem of XE
-
-        SetEnumConsts(&FDecls);
-        FillProcLocVarTbls();
     }
 
     // From TUnit.Show:
@@ -4458,6 +4504,20 @@ void VisitTypes(TDCURecVisitor *Visitor) {
         if (D) Visitor->doVisit(D);
     }
 }
+
+//------------------------------------------------------------------------------
+
+void __fastcall ChangeScanState(TScanState State, Byte *DP, DWord MaxSz) {
+    State         = ScSt;
+    ScSt.StartPos = DP;
+    ScSt.CurPos   = DP;
+    ScSt.EndPos   = DP + MaxSz;
+}
+
+void RestoreScanState(TScanState State) {
+    ScSt = State;
+}
+
 //------------------------------------------------------------------------------
 #pragma argsused
 // int main(int argc, char* argv[])
@@ -4576,6 +4636,9 @@ int _tmain(int argc, _TCHAR *argv[]) {
                 do {
                     // Ignore directory attributes just in case
                     if ((sr.Attr & faDirectory) == 0) {
+                        if (SameText(sr.Name.SubString(1,3), L"FMX")) {
+                            continue;
+                        }
                         printf("File %s\n", AnsiString(sr.Name).c_str());
                         String fullPath = dirPath + sr.Name;
                         if (!ScanOneDCU(fullPath)) {

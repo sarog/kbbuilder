@@ -21,10 +21,12 @@ PName __fastcall        AllocName(const AnsiString S); // unused
 void __fastcall         FreeName(PName name);
 AnsiString __fastcall   CharStr(char Ch);
 void __fastcall         ClearAddrDef(TNameDecl *ND);
+void __fastcall         ClearLastTypeDef(TTypeDef *TD);
 TDCURecTag __fastcall   FixTag(TDCURecTag recTag);
 void __fastcall         RegisterEmbeddedTypes(TDCURec* Embedded, int Depth);
 void __fastcall         BindEmbeddedType(PDCURec UseRec, int hDT, DWord* IP);
 void __fastcall         BindEmbeddedTypes();
+void __fastcall         ChkSize(Cardinal Sz);
 TDCURec* __fastcall     ConsumeEmbedded();
 void __fastcall         EnumUsedTypeList(PDCURec L, TTypeUseAction Action, DWord* IP);
 void __fastcall         FreeDCURecList(TDCURec* L);
@@ -94,7 +96,7 @@ String __fastcall       ShowRefOfsQualifier(int hDef, int Ofs);
 String __fastcall       ShowTypeDef(int hDef, PName N);
 String __fastcall       ShowTypeName(int hDef); // bool
 int __fastcall          ShowTypeValue(TTypeDef *T, Byte *DP, DWord DS, int ConstKind, bool IsNamed, String &OutS);
-void __fastcall         SkipBlock(int Sz);
+void __fastcall         SkipBlock(Cardinal Sz);
 AnsiString __fastcall   StrConstStr(char* CP, int L); // was String
 bool __fastcall         TypeIsVoid(int hDef);
 void __fastcall         UnRegTypeShow(TBaseDef* T);
@@ -102,6 +104,9 @@ void __fastcall         VisitDeclList(TDCURecVisitor *Visitor, Byte LK, TDCURec 
 
 void __fastcall VisitDecls(TDCURecVisitor *Visitor, bool InterfaceOnly);
 void __fastcall VisitTypes(TDCURecVisitor *Visitor);
+
+void __fastcall ChangeScanState(TScanState State, Byte *DP, DWord MaxSz);
+void __fastcall RestoreScanState(TScanState State);
 
 //------------------------------------------------------------------------------
 // OffsetsInfo
