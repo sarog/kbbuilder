@@ -1,7 +1,7 @@
 ﻿#include <vcl.h>
 #include <System.hpp>
+#include <System.AnsiStrings.hpp>
 #include <typeinfo.h>
-#include <values.h>
 
 #include "DCUClasses.h"
 #include "Main.h"
@@ -30,24 +30,32 @@ extern int          FVer;
 extern bool         IsMSIL;
 extern int          NDXHi;
 extern Byte         *DefStart;
-extern Byte         *CurPos;
+extern TIncPtr      CurPos;
 extern Byte         Tag;
 extern int          FTypeDefCnt;
 extern Byte         *FDataBlPtr;
 extern int          FFixupCnt;
 extern TFixupRec    *FFixupTbl;
 extern Byte         fxStart; 
-extern TShortString NoName;
+extern TNameRec     NoName;
 extern FILE         *fLog;
+extern int          FPlatform;
+extern bool         FromPackage;
+extern int          FPtrSize;
+extern TFxSizeTbl   fxSize;
+extern bool         fx8Byte;
+extern System::Set<std::uint8_t, 0, fxMax> fxValid;
 
 //------------------------------------------------------------------------------
 TDCURec::TDCURec() : TObject() { Next = 0; }
 //------------------------------------------------------------------------------
-PName __fastcall TDCURec::GetName() { return NULL; }
+PName __fastcall TDCURec::GetName() { return nullptr; }
 //------------------------------------------------------------------------------
 DWord __fastcall TDCURec::SetMem(DWord MOfs, DWord MSz) { return 0; }
 //------------------------------------------------------------------------------
 bool __fastcall TDCURec::NameIsUnique() { return false; }
+//------------------------------------------------------------------------------
+void __fastcall TDCURec::Visit(TDCURecVisitor *Visitor) {}
 //------------------------------------------------------------------------------
 void __fastcall TDCURec::ShowName(String &OutS) { OutS = ""; }
 //------------------------------------------------------------------------------
@@ -58,61 +66,90 @@ void __fastcall TDCURec::EnumUsedTypes(TTypeUseAction Action, DWord *IP) {
     // no type used
 }
 //------------------------------------------------------------------------------
-TBaseDef::TBaseDef(PName AName, PNameDef ADef, int AUnit) : TDCURec() {
+TDCURecTag __fastcall TDCURec::GetTag() { return 0; }
+//------------------------------------------------------------------------------
+bool __fastcall TDCURec::IsVisible(Byte LK) { return false; }
+//------------------------------------------------------------------------------
+Byte __fastcall TDCURec::GetSecKind() {
+    // todo: return TDeclSecKind::None;
+    return skNone;
+}
+//------------------------------------------------------------------------------
+void __fastcall TDCURec::ShowDef(bool All, String &OutS) { Show(OutS); }
+//------------------------------------------------------------------------------
+void TDCURec::ListAppend(TDCURec *List) {
+    Next = List;
+    List = this;
+}
+//------------------------------------------------------------------------------
+void TDCURec::SetSegKind(TSegKind V) {}
+//------------------------------------------------------------------------------
+TBaseDef::TBaseDef(PName AName, PDef ADef, int AUnit) : TDCURec() {
     FName = AName;
     Def   = ADef;
     hUnit = AUnit;
 }
 //------------------------------------------------------------------------------
+void TBaseDef::Visit(TDCURecVisitor *Visitor) { Visitor->visitBaseDef(this); }
+//------------------------------------------------------------------------------
 void __fastcall TBaseDef::ShowName(String &OutS) {
     PName NP = FName;
-    if (!NP || !NP->Len) NP = &NoName;
+    if (!NP || NP->IsEmpty()) NP = &NoName;
     if (hUnit < 0) {
-        if (NP->Len) {
+        if (!NP->IsEmpty()) {
+            // DCU32: PutDCURecStr(Self,hDecl,false);
             OutS = GetDCURecStr(this, hDecl);
             OutLog2("%s", OutS.c_str());
         }
     } else if (NameIsUnique()) {
-        OutS = PName2String(NP);
+        // DCU32: PutAddrDefStr(NP^.GetStr,hDecl)
+        OutS = NP->GetStr();
         OutLog2("%s", OutS.c_str());
     } else {
         PUnitImpRec U = GetUnitImpRec(hUnit);
-        OutS = PName2String(U->Name) + "." + PName2String(NP);
-        OutLog3("%s.%s", PName2String(U->Name).c_str(), PName2String(NP).c_str());
+        OutS = U->Name->GetStr() + "." + NP->GetStr();
+        OutLog2("%s", OutS.c_str());
     }
 }
 //------------------------------------------------------------------------------
 void __fastcall TBaseDef::Show(String &OutS) {
     PName NP = FName;
-    if (!NP || !NP->Len) NP = &NoName;
-    OutS = PName2String(NP);
+    if (!NP || NP->IsEmpty()) NP = &NoName;
+    OutS = NP->GetStr();
     OutLog2("%s", OutS.c_str());
 }
 //------------------------------------------------------------------------------
 void __fastcall TBaseDef::ShowNamed(PName N, String &OutS) {
-    if ((N && N == FName || !FName || !FName->Len) && RegTypeShow(this)) {
+    // was: if ((N && N == FName || !FName || FName->Len) && RegTypeShow(this)) {
+    if (((N && N == FName) ||                     // Showing the definition of N
+         (!FName) || !FName->IsEmpty() ||               // No name
+         (FName->IsAuxName() && dynamic_cast<TTypeDef*>(this)))
+         && RegTypeShow(this)) { // if RegTypeShow fails the type name will be shown instead of its definition
         try {
             Show(OutS);
         } catch (...) {
             UnRegTypeShow(this);
         }
-    } else
+    } else {
         ShowName(OutS);
+    }
 }
 //------------------------------------------------------------------------------
 PName __fastcall TBaseDef::GetName() {
-    if (!FName)
+    if (!FName) {
         return &NoName;
-    else
-        return FName;
+    }
+    return FName;
 }
 //------------------------------------------------------------------------------
 DWord __fastcall TBaseDef::SetMem(DWord MOfs, DWord MSz) { return 0; }
 //------------------------------------------------------------------------------
-TImpDef::TImpDef(Byte AIK, PName AName, int AnInf, PNameDef ADef, int AUnit) : TBaseDef(AName, ADef, AUnit) {
+TImpDef::TImpDef(TImpKind AIK, PName AName, int AnInf, PDef ADef, int AUnit) : TBaseDef(AName, ADef, AUnit) {
     Inf = AnInf;
     ik  = AIK;
 }
+//------------------------------------------------------------------------------
+void TImpDef::Visit(TDCURecVisitor *Visitor) { Visitor->visitImpDef(this); }
 //------------------------------------------------------------------------------
 void __fastcall TImpDef::Show(String &OutS) {
     String S;
@@ -124,14 +161,27 @@ void __fastcall TImpDef::Show(String &OutS) {
 //------------------------------------------------------------------------------
 bool __fastcall TImpDef::NameIsUnique() { return FNameIsUnique; }
 //------------------------------------------------------------------------------
-TDLLImpRec::TDLLImpRec(PName AName, int ANdx, PNameDef ADef, int AUnit) : TBaseDef(AName, ADef, AUnit) { Ndx = ANdx; }
+TUnitImpDef::TUnitImpDef(TImpKind AIK, PName AName, int AnInf, PDef ADef, int AUnit) : TImpDef(AIK, AName, AnInf, ADef, AUnit) {}
+//------------------------------------------------------------------------------
+void TUnitImpDef::Show(String &OutS) {
+    TImpDef::Show(OutS);
+    if (sPackage != "") {
+        OutLog1(sPackage.c_str());
+    }
+}
+//------------------------------------------------------------------------------
+void TUnitImpDef::Visit(TDCURecVisitor *Visitor) { Visitor->visitUnitImpDef(this); }
+//------------------------------------------------------------------------------
+TDLLImpRec::TDLLImpRec(PName AName, int ANdx, PDef ADef, int AUnit) : TBaseDef(AName, ADef, AUnit) { Ndx = ANdx; }
+//------------------------------------------------------------------------------
+void TDLLImpRec::Visit(TDCURecVisitor *Visitor) { Visitor->visitDLLImpRec(this); }
 //------------------------------------------------------------------------------
 void __fastcall TDLLImpRec::Show(String &OutS) {
     OutS          = "";
-    bool   NoName = (!FName || !FName->Len);
-    String Name;
+    bool   NoName = (!FName || FName->IsEmpty());
+    AnsiString Name;
     if (!NoName) {
-        Name = PName2String(FName);
+        Name = FName->GetStr();
         OutS += "name '" + Name + "'";
         OutLog2("name '%s'", Name.c_str());
     }
@@ -141,18 +191,20 @@ void __fastcall TDLLImpRec::Show(String &OutS) {
     }
 }
 //------------------------------------------------------------------------------
-TImpTypeDefRec::TImpTypeDefRec(PName AName, int AnInf, DWord ARTTISz, PNameDef ADef, int AUnit) :
+TImpTypeDefRec::TImpTypeDefRec(PName AName, int AnInf, DWord ARTTISz, PDef ADef, int AUnit) :
     TImpDef('T', AName, AnInf, ADef, AUnit) {
     RTTISz   = ARTTISz;
     RTTIOfs  = -1;
     hImpUnit = hUnit;
     hUnit    = -1;
     ImpName  = FName;
-    FName    = NULL; // Will be named later in the corresponding TTypeDecl
+    FName    = nullptr; // Will be named later in the corresponding TTypeDecl
 }
 //------------------------------------------------------------------------------
+void TImpTypeDefRec::Visit(TDCURecVisitor *Visitor) { Visitor->visitImpTypeDefRec(this); }
+//------------------------------------------------------------------------------
 void __fastcall TImpTypeDefRec::Show(String &OutS) {
-    String Name;
+    AnsiString Name;
     OutS = "type ";
     OutLog1("type ");
     if (hImpUnit >= 0) {
@@ -175,67 +227,516 @@ DWord __fastcall TImpTypeDefRec::SetMem(DWord MOfs, DWord MSz) {
     return 0;
 }
 //------------------------------------------------------------------------------
-TNameDecl::TNameDecl() : TDCURec() {}
+void TConstValInfoBase::Show0(TDefNDX hDT, bool IsNamed) {
+    Byte *DP;
+    DWord DS;
+    TInt64Rec V;
+    String S;
+
+    if (!ValPtr) {
+        V.Hi = ValSz;
+        V.Lo = Val;
+        DP   = reinterpret_cast<Byte *>(&V);
+        DS   = 8;
+    } else {
+        DP = ValPtr;
+        DS = ValSz;
+    }
+
+    bool MemVal = ValPtr ? true : false;
+
+    if ((ShowGlobalTypeValue(hDT, DP, DS, MemVal, Kind, IsNamed, S) < 0) && !MemVal) {
+        ShowTypeName(hDT);
+        NDXHi = V.Hi;
+        OutLog2("(%s)", NDXToStr(V.Lo).c_str());
+    }
+}
 //------------------------------------------------------------------------------
+// todo: review:
+void TConstValInfo::Read() {
+    bool NeedVal = true;
+
+    if (FVer > verD4) {
+        Kind = ReadUIndex();
+
+        if ((Kind < 0 || Kind > 5 || Kind == 5) && !(FVer >= verD2009 && FVer < verK1)) {
+            printf("[Error] TConstValInfo::Read: Unknown const kind: #%d\n", Kind); // DCUErrorFmt
+        }
+        if (FVer >= verDXE2 && FVer < verK1) {
+            NeedVal = Kind != 4;
+        }
+    }
+
+    ValSz = ReadUIndex();
+    if (ValSz == 0) {
+        ValPtr = nullptr;
+        if (NeedVal) {
+            Val = ReadIndex();
+        }
+        ValSz = NDXHi;
+    } else {
+        ValPtr = ReadMem(ValSz);
+        Val    = 0;
+    }
+}
+//------------------------------------------------------------------------------
+void TConstValInfo::Show(bool IsNamed) {
+    Show0(hDT, IsNamed);
+}
+//------------------------------------------------------------------------------
+TDeclModifier::TDeclModifier() {}
+//------------------------------------------------------------------------------
+TDeclModifier::~TDeclModifier() { delete Next; }
+//------------------------------------------------------------------------------
+void __fastcall TDeclModifier::Show(String &OutS) {}
+//------------------------------------------------------------------------------
+bool __fastcall TDeclModifier::ShowBefore() { return false; }
+//------------------------------------------------------------------------------
+// Name Declaration Modifiers - store some important information from
+// drConstAddInfo records and other records like this if any
+TDeclModifier * __fastcall GetDeclModifierOfClass(TDeclModifier *L, TDeclModifierClass *cl) {
+    TDeclModifier *result = L;
+    while (result && !(result->InheritsFrom(__classid(TDeclModifierClass)))) {
+        result = result->Next;
+    }
+    return result;
+}
+//------------------------------------------------------------------------------
+TDeclModifier *__fastcall TDeclModifier::GetNextOfClass(TDeclModifierClass *Cl) {
+    return GetDeclModifierOfClass(Next, Cl);
+}
+//------------------------------------------------------------------------------
+TStrDeclModifier::TStrDeclModifier(TMemStrRef *AMsg) : TDeclModifier() {
+    FMsg = AMsg;
+}
+//------------------------------------------------------------------------------
+void TDeprecatedDeclModifier::Show(String &OutS) {
+    OutS = " deprecated";
+    if (FMsg && FMsg->Len() > 0) OutS += " ";
+    OutS += System::Ansistrings::AnsiQuotedStr(FMsg->S(), '\'');
+    OutLog2("%s", OutS.c_str());
+
+    // PutSpace;
+    // PutKW('deprecated');
+    // if FMsg.Len>0 then begin
+    //   PutSpace;
+    // PutStrConstQ(Msg);
+    // end ;
+}
+//------------------------------------------------------------------------------
+TXMLDocDeclModifier::TXMLDocDeclModifier(TMemStrRef *AMsg) : TStrDeclModifier(AMsg) {}
+//------------------------------------------------------------------------------
+void TXMLDocDeclModifier::Show(String &OutS) {
+    OutS = "///";
+    OutS += String(FMsg->S());
+    OutLog1("///");
+    OutLog2("%s\n", AnsiString(FMsg->S()).c_str());
+}
+//------------------------------------------------------------------------------
+bool TXMLDocDeclModifier::ShowBefore() { return true; }
+//------------------------------------------------------------------------------
+// TAttributeDeclModifier.Read:
+TAttributeDeclModifier::TAttributeDeclModifier() : TDeclModifier() {
+    hAttrCtor = ReadUIndex();
+    RefAddrDef(hAttrCtor);
+    hMember = ReadUIndex();
+    hAttrDT = ReadUIndex();
+    ArgCnt  = ReadUIndex();
+    Args = static_cast<PAttributeDeclArgs>(AllocMem(ArgCnt * sizeof(TAttributeDeclArg)));
+
+    for (int j = 0; j < ArgCnt; j++) {
+        (*Args)[j].Kind = ReadUIndex();
+
+        switch ((*Args)[j].Kind) {
+            case 0: // const
+                (*Args)[j].C.hDT = ReadUIndex();
+                (*Args)[j].C.Read();
+                break;
+            case 1: // TypeInfo(DT)
+                (*Args)[j].A.hDT = ReadUIndex(); // DT index in the type table
+                (*Args)[j].A.hDTAddr = ReadUIndex(); // DT index in the addr table
+                RefAddrDef((*Args)[j].A.hDTAddr);
+                break;
+            default:
+                printf("[Error] Unexpected argument kind: %d in attribute argument table", (*Args)[j].Kind); // DCUErrorFmt
+                break;
+        }
+    }
+}
+//------------------------------------------------------------------------------
+TAttributeDeclModifier::~TAttributeDeclModifier() {
+    if (Args) delete[] Args;
+}
+//------------------------------------------------------------------------------
+void TAttributeDeclModifier::Show(String &OutS) {
+    // todo: review
+    static const char sAttr[] = "Attribute";
+    static const int  lAttr   = sizeof(sAttr) - 1;
+
+    PName NP = GetTypeName(hAttrDT);
+    if (!NP)
+        return;
+
+    AnsiString S = NP->GetStr();
+    if (S.IsEmpty())
+        return;
+
+    int L = S.Length();
+
+    if (L > lAttr) {
+        const char *CP = S.c_str() + L - lAttr;
+
+        if (System::Ansistrings::StrLIComp(CP, sAttr, lAttr) == 0) {
+            S.SetLength(L - lAttr);
+        }
+    }
+
+    OutS += "[";
+    OutLog1("[");
+
+    if (hMember != 0) {
+        if (hMember == 0x0D) {
+            OutS += "Result";
+            OutLog1("Result");
+        } else {
+            String Member = Sysutils::Format("?#%x", ARRAYOFCONST((hMember)));
+            OutS += Member;
+            OutLog2("%s", Member.c_str());
+        }
+
+        OutS += ":";
+        OutLog1(":");
+    }
+
+    OutS += S;
+    OutLog2("%s", S.c_str());
+
+    if (ArgCnt > 0) {
+        AnsiChar Sep = '(';
+
+        for (int j = 0; j < ArgCnt; ++j) {
+            OutS += String(Sep);
+            OutLog2("%c", Sep);
+
+            switch (Args[j]->Kind) {
+                case 0: {
+                    Args[j]->C.Show(false);
+                    break;
+                }
+
+                case 1: {
+                    OutS += "TypeInfo(";
+                    OutLog1("TypeInfo(");
+
+                    NP = GetTypeName(Args[j]->A.hDT);
+                    if (NP) {
+                        AnsiString TypeName = NP->GetStr();
+                        OutS += TypeName;
+                        OutLog2("%s", TypeName.c_str());
+                    }
+
+                    OutS += ")";
+                    OutLog1(")");
+                    break;
+                }
+            }
+
+            Sep = ',';
+        }
+
+        OutS += ")";
+        OutLog1(")");
+    }
+
+    OutS += "]";
+    OutLog1("]\n");
+}
+
+//------------------------------------------------------------------------------
+bool TAttributeDeclModifier::ShowBefore() { return true; }
+//------------------------------------------------------------------------------
+TGeneratedNameDeclModifier::TGeneratedNameDeclModifier(TMemStrRef *AMsg) : TStrDeclModifier(AMsg) {}
+//------------------------------------------------------------------------------
+
+/**
+ * .Net information (was observed in DCUIL but may be used somewhere else)
+ *
+ * @param OutS
+ */
+void TGeneratedNameDeclModifier::Show(String &OutS) {
+    // todo: review
+    OutS = "generated_name ";
+    OutS += FMsg->S();
+    OutLog2("generated_name %s\n", AnsiString(FMsg->S()).c_str());
+}
+//------------------------------------------------------------------------------
+TExtraArgsDeclModifier::TExtraArgsDeclModifier() : TDeclModifier() {
+    ArgCnt = ReadUIndex();
+    Args   = new TExtraProcArgs[ArgCnt * sizeof(TExtraProcArg)];
+    for (int j = 0; j < ArgCnt; ++j) {
+        Args[j]->Name = ReadNDXStrRef();
+        Args[j]->V    = ReadUIndex();
+        Args[j]->V1   = ReadUIndex();
+        Args[j]->hDT  = ReadUIndex();
+    }
+}
+//------------------------------------------------------------------------------
+TExtraArgsDeclModifier::~TExtraArgsDeclModifier() {
+    if (Args) delete[] Args;
+}
+//------------------------------------------------------------------------------
+/*void TExtraArgsDeclModifier::Read() {
+    ArgCnt = ReadUIndex();
+    Args   = new TExtraProcArgs[ArgCnt * sizeof(TExtraProcArg)];
+    for (int j = 0; j < ArgCnt; ++j) {
+        Args[j]->Name = ReadNDXStrRef();
+        Args[j]->V    = ReadUIndex();
+        Args[j]->V1   = ReadUIndex();
+        Args[j]->hDT  = ReadUIndex();
+    }
+}*/
+//------------------------------------------------------------------------------
+void TExtraArgsDeclModifier::Show(String &OutS) {
+    String S;
+    OutS = "extra_parameters";
+    OutLog1("extra_parameters");
+    if (ArgCnt > 0) {
+        for (int j = 0; j < ArgCnt; j++) {
+            OutS += "(";
+            OutLog1("(");
+            if (j > 0) OutLog1("\n");
+            S = Args[j]->Name->S();
+            OutS += S;
+            OutLog2("%s", S.c_str());
+            OutLog3("(V:#%x,V1:#%x): ", Args[j]->V, Args[j]->V1);
+            S = ShowTypeName(Args[j]->hDT);
+            OutS += S;
+            OutLog2("%s", S.c_str());
+            OutS += ";";
+            OutLog1(";");
+        }
+        OutS += ")";
+        OutLog1(")");
+    }
+}
+//------------------------------------------------------------------------------
+TTemplateParmsDeclModifier::TTemplateParmsDeclModifier() : TDeclModifier() {
+    // The list of the template formal parameters of the data type or procedure
+    Cnt = ReadUIndex();
+    Tbl = static_cast<PNDXTbl>(AllocMem(Cnt * sizeof(TNDX)));
+    for (int i = 0; i < Cnt; ++i) {
+        (*Tbl)[i] = ReadUIndex();
+
+        if (FVer >= verD12 && FVer < verK1) {
+            ReadSomeNameInfo28();
+        }
+    }
+}
+//------------------------------------------------------------------------------
+TTemplateParmsDeclModifier::~TTemplateParmsDeclModifier() {
+    if (Tbl) {
+        delete[] Tbl;
+        Tbl = nullptr;
+    }
+}
+//------------------------------------------------------------------------------
+void TTemplateParmsDeclModifier::Read(TDCURec *Owner) {
+    int hDT = ReadUIndex();
+
+    TTemplateParmsDeclModifier *ParmInf = new TTemplateParmsDeclModifier();
+
+    ParmInf->hFn = hDT;
+
+    if (hDT != 0) {
+        Owner = static_cast<TDCURec *>(GetLastAddedTypeDef());
+    }
+
+    if (TTypeDef *TypeDefOwner = dynamic_cast<TTypeDef *>(Owner)) {
+        TypeDefOwner->AddModifier(ParmInf);
+    } else if (TNameDecl *NameDeclOwner = dynamic_cast<TNameDecl *>(Owner)) {
+        NameDeclOwner->AddModifier(ParmInf);
+    } else {
+        printf("[Warning] TTemplateParmsDeclModifier::Read: The type #%x is a %s and not a TTypeDef", hDT, AnsiString(Owner->ClassName()).c_str()); // DCUWarningFmt
+        delete ParmInf;
+    }
+}
+//------------------------------------------------------------------------------
+void TTemplateParmsDeclModifier::Show(String &OutS) {}
+//------------------------------------------------------------------------------
+bool TTemplateParmsDeclModifier::ShowBefore() { return TDeclModifier::ShowBefore(); }
+//------------------------------------------------------------------------------
+/**
+ * TNameDecl.Create;
+ */
+TNameDecl::TNameDecl() : TDCURec() {
+    hDecl   = AddAddrDef(this);
+    Def     = reinterpret_cast<PNameDef>(DefStart);
+    PName N = ReadName();
+}
+//------------------------------------------------------------------------------
+/**
+ * TNameDecl.Create0
+ * TNameDecl.Create00 (when All=false)
+ */
 TNameDecl::TNameDecl(bool All) : TDCURec() {
     hDecl = AddAddrDef(this);
     if (All) {
         Def     = reinterpret_cast<PNameDef>(DefStart);
         PName N = ReadName();
         // !!!
-        if (strlen("TAction") == N->Len && !memcmp(N->Name, "TAction", strlen("TAction"))) N = N;
+        // if (strlen("TAction") == N->Len && !memcmp(N->GetStr(), "TAction", strlen("TAction"))) N = N;
     }
-};
+}
 //------------------------------------------------------------------------------
-TNameDecl::~TNameDecl() {}
+TNameDecl::~TNameDecl() {
+    ClearAddrDef(this);
+    delete FModifiers;
+}
+//------------------------------------------------------------------------------
+void TNameDecl::Visit(TDCURecVisitor *Visitor) { Visitor->visitNameDecl(this); }
 //------------------------------------------------------------------------------
 void __fastcall TNameDecl::ShowName(String &OutS) {
+    // DCU32: PutDCURecStr(Self,hDecl,false);
     OutS = GetDCURecStr(this, hDecl);
     OutLog2("%s", OutS.c_str());
-    if (SameText(OutS, "TAction")) OutS = "TAction";
+    // if (SameText(OutS, "TAction")) OutS = "TAction";
 }
 //------------------------------------------------------------------------------
 void __fastcall TNameDecl::Show(String &OutS) { ShowName(OutS); }
 //------------------------------------------------------------------------------
-void __fastcall TNameDecl::ShowDef(bool All, String &OutS) { Show(OutS); }
+// todo:
+void TNameDecl::ShowConstAddInfo(String &OutS) {
+    const int symDeprecated = 0x1;
+    const int symPlatform   = 0x2;
+    const int symLibrary    = 0x4;
+    const int symInline     = 0x80000;
+
+    ShowModifiers(false);
+    if (ConstAddInfoFlags == 0) return;
+
+    // The newer versions use modifier for deprecated
+    if ((ConstAddInfoFlags & symDeprecated) != 0 && ((FVer >= verD6 && FVer < verD2009) || FVer >= verK1)) {
+        // PutSpace;
+        // PutKW('deprecated');
+        OutS += " deprecated";
+    }
+    if ((ConstAddInfoFlags & symPlatform) != 0) {
+        // PutSpace;
+        // PutKW('platform');
+        OutS += " platform";
+    }
+    if ((ConstAddInfoFlags & symLibrary) != 0) {
+        // PutSpace;
+        // PutKW('library');
+        OutS += " library";
+    }
+}
+//------------------------------------------------------------------------------
+void __fastcall TNameDecl::ShowDef(bool All, String &OutS) {
+    ShowModifiers(true);
+    // MarkDefStart(hDecl);
+    Show(OutS);
+    // ShowConstAddInfo;
+}
+//------------------------------------------------------------------------------
+/**
+ * Get Exportable name
+ * @return
+ */
+PName TNameDecl::GetExpName() {
+    if (!Def) return &NoName;
+    return &Def->Name;
+}
 //------------------------------------------------------------------------------
 PName __fastcall TNameDecl::GetName() {
-    if (!Def)
-        return &NoName;
-    else
-        return &Def->Name;
+    // if (!Def) return &NoName;
+    // return &Def->Name;
+
+    return GetExpName();
 }
 //------------------------------------------------------------------------------
 DWord __fastcall TNameDecl::SetMem(DWord MOfs, DWord MSz) { return 0; }
-//------------------------------------------------------------------------------
-Byte __fastcall TNameDecl::GetTag() { return FixTag(Def->Tag); }
 //------------------------------------------------------------------------------
 Byte __fastcall TNameDecl::GetSecKind() { return skNone; }
 //------------------------------------------------------------------------------
 bool __fastcall TNameDecl::IsVisible(Byte LK) { return true; }
 //------------------------------------------------------------------------------
+TDCURecTag __fastcall TNameDecl::GetTag() {
+    return FixTag(Def->Tag);
+}
+//------------------------------------------------------------------------------
+void __fastcall TNameDecl::AddModifier(TDeclModifier *M) {
+    TDeclModifier *MP = FModifiers;
+    while (MP) {
+        MP = MP->Next;
+    }
+    MP = M;
+}
+//------------------------------------------------------------------------------
+void __fastcall TNameDecl::ShowModifiers(bool Before) {
+    TDeclModifier *M = FModifiers;
+    while (M) {
+        String OutS;
+        if (M->ShowBefore() == Before) M->Show(OutS);
+        M = M->Next;
+    }
+}
+//------------------------------------------------------------------------------
+TDeclModifier *TNameDecl::GetModifierOfClass(TDeclModifierClass *Cl) {
+    return GetDeclModifierOfClass(FModifiers, Cl);
+}
+//------------------------------------------------------------------------------
 TNameFDecl::TNameFDecl(bool NoInf) : TNameDecl(true) {
     F = ReadUIndex();
-    if (FVer >= verD8 && FVer < verK1) F1 = ReadUIndex();
-    if (FVer >= verD2009 && FVer < verK1) int F4 = ReadUIndex();
-    if (!NoInf && ((F & 0x40) != 0)) Inf = ReadULong();
+    if (FVer == verD6)
+        ConstAddInfoFlags = (F >> 9) & 0x07; // Deprecated,Platform,Library were introduced in this version and were stored here
+    if (FVer >= verD8 && FVer < verK1)
+        F1 = ReadUIndex();
+    if (FVer >= verD2009 && FVer < verK1)
+        int F4 = ReadUIndex();
+    if (!NoInf && (F & 0x40) != 0)
+        Inf = ReadULong();
+
+    PkgNdx = -1;
+
     if (FVer >= verD8 && FVer < verK1) {
         // Could be valid for MSIL only
         if ((F1 & 0x80) != 0) {
             B2 = ReadUIndex();
-            if (FVer == verD8 && ((F & 8) != 0)) int F3 = ReadUIndex();
+            if (FVer == verD8 && (F & 0x8) != 0)
+                int F3 = ReadUIndex();
         }
     }
-};
+}
 //------------------------------------------------------------------------------
-void __fastcall TNameFDecl::Show(String& OutS) {
+void __fastcall TNameFDecl::Visit(TDCURecVisitor *Visitor) { Visitor->visitNameFDecl(this); }
+//------------------------------------------------------------------------------
+void __fastcall TNameFDecl::Show(String &OutS) {
     TNameDecl::Show(OutS);
+    // if (PkgNdx >= 0) PutSFmt(',Pkg:%x',[PkgNdx]);
 }
 //------------------------------------------------------------------------------
 bool __fastcall TNameFDecl::IsVisible(Byte LK) {
-    if (LK == dlMain) return ((F & 0x40) != 0);
-    if (LK == dlMainImpl) return ((F & 0x40) == 0);
+    if (LK == dlMain) return (F & 0x40) != 0;
+    if (LK == dlMainImpl) return (F & 0x40) == 0;
     return true;
+}
+//------------------------------------------------------------------------------
+void __fastcall TNameFDecl::ShowStamps() {}
+//------------------------------------------------------------------------------
+/**
+ * It looks like that the field is processed AFTER reading
+ * some data in the ancestor classes
+ */
+void TNameFDecl::ReadPkgNdx() {
+    int M;
+    if (FromPackage && ((FVer >= verD3 && FVer <= verD8) || FVer >= verK1)) {
+        if (FVer < verD6) M = 0x80;
+        else M = 0x100;
+
+        if ((F & M) != 0)
+            PkgNdx = ReadUIndex();
+    }
 }
 //------------------------------------------------------------------------------
 TTypeDecl::TTypeDecl() : TNameFDecl(false) {
@@ -244,17 +745,34 @@ TTypeDecl::TTypeDecl() : TNameFDecl(false) {
     AddTypeName(hDef, hDecl, &Def->Name);
 }
 //------------------------------------------------------------------------------
+/**
+ *
+ * @param LK TDeclListKind
+ * @return
+ */
 bool __fastcall TTypeDecl::IsVisible(Byte LK) {
-    return TNameFDecl::IsVisible(LK);
+    auto Result = TNameFDecl::IsVisible(LK);
+    // return TNameFDecl::IsVisible(LK);
+    if (!Result)
+        return false;
+    if (!Def)
+        return false;
+
+    PName RefName = &Def->Name;
+    AnsiChar ch = RefName->Get1stChar();
+
+    Result = !(ch == '.' || ch == ':') && (FVer >= verD2009 && FVer < verK1);
+    return Result;
 }
 //------------------------------------------------------------------------------
-int M = 0;
-
-void __fastcall TTypeDecl::Show(String& OutS) {
+void TTypeDecl::Visit(TDCURecVisitor *Visitor) { Visitor->visitTypeDecl(this); }
+//------------------------------------------------------------------------------
+void __fastcall TTypeDecl::Show(String &OutS) {
     String S;
     PName RefName;
 
     OutS = "";
+
     PTYPEINFO typeInfo   = new TYPEINFO;
     typeInfo->Size       = GetTypeSize(hDef);
     typeInfo->ModuleID   = ModuleID;
@@ -268,12 +786,21 @@ void __fastcall TTypeDecl::Show(String& OutS) {
     typeInfo->Methods    = new TList;
     TNameFDecl::Show(S);
     typeInfo->Name = S;
+
     OutS += S;
 
-    if (!Def)
-        RefName = NULL;
-    else
+    if (!Def) {
+        RefName = nullptr;
+    } else {
+        // @Def^. changed for templates in Ver>=verD12
         RefName = &Def->Name;
+    }
+
+    // dcu32:
+    // D := CurUnit.GetLocalTypeDef(hDef);
+    // if D<>Nil then
+    //   D.ShowModifiers(true{Before});
+
     OutS += "=";
     OutLog1("=");
 
@@ -324,6 +851,7 @@ void __fastcall TTypeDecl::Show(String& OutS) {
     pDumpSize      = &typeInfo->RTTISz;
     FixupsList     = typeInfo->Fixups;
     S              = ShowTypeDef(hDef, RefName);
+
     pDumpOffset    = 0;
     pDumpSize      = 0;
     FixupsList     = 0;
@@ -333,9 +861,10 @@ void __fastcall TTypeDecl::Show(String& OutS) {
 
     typeInfo->Decl = S;
     OutS += S;
-    if (TypeList)
+
+    if (TypeList) {
         TypeList->Add(static_cast<void *>(typeInfo));
-    else {
+    } else {
         delete typeInfo->Fixups;
         delete typeInfo->Fields;
         delete typeInfo->Properties;
@@ -371,13 +900,27 @@ DWord __fastcall TTypeDecl::SetMem(DWord MOfs, DWord MSz) {
 Byte __fastcall TTypeDecl::GetSecKind() {
     return skType;
 }
+
+//------------------------------------------------------------------------------
+void TTypeDecl::ShowStamps() { TNameFDecl::ShowStamps(); }
 //------------------------------------------------------------------------------
 TVarDecl::TVarDecl() : TNameFDecl(false) {
     hDT = ReadUIndex();
     Ofs = ReadUIndex();
 }
 //------------------------------------------------------------------------------
-void __fastcall TVarDecl::Show(String& OutS) {
+void TVarDecl::Visit(TDCURecVisitor *Visitor) { Visitor->visitVarDecl(this); }
+//------------------------------------------------------------------------------
+/*
+procedure TVarDecl.Show;
+begin
+  inherited Show;
+  PutS(': ');
+  CurUnit.ShowTypeDef(hDT,Nil);
+  PutSFmtRemAux('Ofs:$%x',[Ofs]);
+end ;
+ */
+void __fastcall TVarDecl::Show(String &OutS) {
     String S;
 
     PVARINFO vInfo  = new VARINFO;
@@ -394,28 +937,91 @@ void __fastcall TVarDecl::Show(String& OutS) {
     OutLog1(":");
     pDumpOffset = &vInfo->DumpOfs;
     pDumpSize = &vInfo->DumpSz;
-    S = ShowTypeDef(hDT, NULL);
-    pDumpOffset = 0;
-    pDumpSize = 0;
+    S = ShowTypeDef(hDT, nullptr);
+    pDumpOffset = nullptr;
+    pDumpSize = nullptr;
 
     vInfo->TypeDef = S;
     OutS += S;
     VarList->Add(static_cast<void *>(vInfo));
 }
 //------------------------------------------------------------------------------
-void __fastcall TVarDecl::EnumUsedTypes(TTypeUseAction Action, DWord *IP) {
-    Action(this, hDT, IP);
+void __fastcall TVarDecl::EnumUsedTypes(TTypeUseAction Action, DWord *IP) { Action(this, hDT, IP); }
+//------------------------------------------------------------------------------
+Byte __fastcall TVarDecl::GetSecKind() { return skVar; }
+//------------------------------------------------------------------------------
+TVarVDecl::TVarVDecl() { Sz = static_cast<DWord>(-1); }
+//------------------------------------------------------------------------------
+void TVarVDecl::Visit(TDCURecVisitor *Visitor) { Visitor->visitVarVDecl(this); }
+//------------------------------------------------------------------------------
+void TVarVDecl::Show(String &OutS) {
+    DWord DS;
+    TFixupMemState MS;
+    String S;
+
+    TVarDecl::Show(S);
+
+    if (Sz == static_cast<DWord>(-1)) return;
+
+    OutLog1("=");
+    if (Sz == static_cast<DWord>(-1)) {
+        // constInfo->Value = "?";
+        OutLog1("?");
+    } else {
+        Byte *DP = GetBlockMem(Ofs, Sz, &DS);
+        if (DP) {
+            SaveFixupMemState(&MS);
+            SetCodeRange(FDataBlPtr, DP, DS);
+            int Fix0 = GetStartFixup(Ofs);
+            SetStartFixupInfo(Fix0);
+        }
+        ShowGlobalTypeValue(hDT, DP, DS, true, -1, false, S);
+        // constInfo->Value = S;
+        if (DP) RestoreFixupMemState(&MS);
+    }
 }
 //------------------------------------------------------------------------------
-Byte __fastcall TVarDecl::GetSecKind() {
-    return skVar;
+DWord TVarVDecl::SetMem(DWord MOfs, DWord MSz) {
+    DWord Result = 0;
+    if (Sz == static_cast<DWord>(-1)) {
+        Sz = MSz;
+    } else if (Sz != MSz) {
+        // Changed for StrConstRec
+        printf("[Error] Trying to change variable %s{$%x} memory to $%x[$%x]\n", Name->GetStr().c_str(), hDecl, MOfs, MSz); // DCUErrorFmt
+    }
+
+    if (Ofs == static_cast<DWord>(-1)) {
+        Ofs = MOfs;
+    } else if (Ofs != MOfs) {
+        printf("[Error] variable %s{$%x}: memory ofs mismatch ($%x<>$%x)\n", Name->GetStr().c_str(), hDecl, Ofs, MOfs); // DCUErrorFmt
+    }
+
+    return Result;
+}
+//------------------------------------------------------------------------------
+void TVarCDecl::SetPDataLinks() {
+    TWin64UnwindInfo *UnwindInfo = new TWin64UnwindInfo;
+    if (UnwindInfo->InitPData(hDecl)) UnwindInfo->SetPDataLinks(hDecl);
+}
+//------------------------------------------------------------------------------
+bool TVarCDecl::IsSpecialConst() {
+    TTypeDef *DT = GetLocalTypeDef(hDT);
+    return ((DT->ClassType() == __classid(TVoidDef)) && (DT->Sz == Sz));
+}
+//------------------------------------------------------------------------------
+void TVarCDecl::SetSegKind(TSegKind V) {
+    FSeg = V;
+    if (FPlatform == dcuplWin64 && FSeg == TSegKind::PData && IsSpecialConst())
+        SetPDataLinks();
 }
 //------------------------------------------------------------------------------
 TVarCDecl::TVarCDecl(bool OfsValid) : TVarDecl() {
-    Sz   = -1;
+    Sz   = static_cast<DWord>(-1);
     OfsR = Ofs;
-    if (!OfsValid) Ofs = -1;
+    if (!OfsValid) Ofs = static_cast<DWord>(-1);
 }
+//------------------------------------------------------------------------------
+void TVarCDecl::Visit(TDCURecVisitor *Visitor) { Visitor->visitVarCDecl(this); }
 //------------------------------------------------------------------------------
 int       CodeFixupCnt;
 PFixupRec CodeFixups;
@@ -426,7 +1032,7 @@ Byte     *FixUpEnd;
 
 void __fastcall ClearFixupInfo() {
     CodeFixupCnt = 0;
-    CodeFixups   = NULL;
+    CodeFixups   = nullptr;
 }
 //------------------------------------------------------------------------------
 void __fastcall SetFixupInfo(int ACodeFixupCnt, PFixupRec ACodeFixups) {
@@ -493,7 +1099,7 @@ void __fastcall TVarCDecl::Show(String &OutS) {
     TNameFDecl::Show(S);
     constInfo->Name = S;
     OutLog1(":");
-    constInfo->TypeDef = ShowTypeDef(hDT, NULL);
+    constInfo->TypeDef = ShowTypeDef(hDT, nullptr);
     OutLog1("=");
 
     if (Sz == static_cast<DWord>(-1)) {
@@ -507,13 +1113,15 @@ void __fastcall TVarCDecl::Show(String &OutS) {
             int Fix0 = GetStartFixup(Ofs);
             SetStartFixupInfo(Fix0);
         }
-        ShowGlobalTypeValue(hDT, DP, DS, true, -1, S);
+        ShowGlobalTypeValue(hDT, DP, DS, true, -1, true, S);
         constInfo->Value = S;
         if (DP) RestoreFixupMemState(&MS);
     }
+
     pDumpOffset = 0;
     pDumpSize   = 0;
     FixupsList  = 0;
+
     if (ConstList)
         ConstList->Add(static_cast<void *>(constInfo));
     else {
@@ -540,7 +1148,9 @@ TAbsVarDecl::TAbsVarDecl() : TVarDecl() {
     RefAddrDef(Ofs); // forward references could happen e.g. by referencing Self in embedded proc
 }
 //------------------------------------------------------------------------------
-void __fastcall TAbsVarDecl::Show(String& OutS) {
+void TAbsVarDecl::Visit(TDCURecVisitor *Visitor) { Visitor->visitAbsVarDecl(this); }
+//------------------------------------------------------------------------------
+void __fastcall TAbsVarDecl::Show(String &OutS) {
     String S;
 
     PVARINFO vInfo = new VARINFO;
@@ -555,25 +1165,26 @@ void __fastcall TAbsVarDecl::Show(String& OutS) {
     OutLog1(":");
     pDumpOffset = &vInfo->DumpOfs;
     pDumpSize = &vInfo->DumpSz;
-    S = ShowTypeDef(hDT, NULL);
+    S = ShowTypeDef(hDT, nullptr);
     pDumpOffset = 0;
     pDumpSize = 0;
 
     vInfo->TypeDef = S;
     OutS += S;
 
-    S = GetAddrStr(static_cast<int>(Ofs));
+    S = GetAddrStr(static_cast<int>(Ofs), false);
     vInfo->AbsName = S;
     OutS += " absolute " + S;
     OutLog2(" absolute %s", S.c_str());
-    
+
     VarList->Add(static_cast<void *>(vInfo));
 }
 //------------------------------------------------------------------------------
-TTypePDecl::TTypePDecl() : TVarCDecl(false) {
-}
+TTypePDecl::TTypePDecl() : TVarCDecl(false) {}
 //------------------------------------------------------------------------------
-void __fastcall TTypePDecl::Show(String& OutS) {
+void TTypePDecl::Visit(TDCURecVisitor *Visitor) { Visitor->visitTypePDecl(this); }
+//------------------------------------------------------------------------------
+void __fastcall TTypePDecl::Show(String &OutS) {
     DWord DS;
     TFixupMemState MS;
     String S;
@@ -596,9 +1207,9 @@ void __fastcall TTypePDecl::Show(String& OutS) {
     constInfo->Name = S;
     OutLog1(":");
     constInfo->TypeDef = ShowTypeDef(hDT, NULL);
-
     OutLog1("=");
-    if (Sz == (DWord) -1) {
+
+    if (Sz == static_cast<DWord>(-1)) {
         constInfo->Value = "?";
         OutLog1("?");
     } else {
@@ -609,14 +1220,14 @@ void __fastcall TTypePDecl::Show(String& OutS) {
             int Fix0 = GetStartFixup(Ofs);
             SetStartFixupInfo(Fix0);
         }
-        ShowGlobalTypeValue(hDT, DP, DS, true, -1, S);
+        ShowGlobalTypeValue(hDT, DP, DS, true, -1, false, S);
         constInfo->Value = S;
         if (DP) RestoreFixupMemState(&MS);
     }
 
     pDumpOffset = 0;
-    pDumpSize = 0;
-    FixupsList = 0;
+    pDumpSize   = 0;
+    FixupsList  = 0;
 
     if (ConstList)
         ConstList->Add(static_cast<void *>(constInfo));
@@ -631,19 +1242,44 @@ bool __fastcall TTypePDecl::IsVisible(Byte LK) {
     return true;
 }
 //------------------------------------------------------------------------------
-TThreadVarDecl::TThreadVarDecl() : TVarDecl() {
-}
+void TTypePDecl::ShowStamps() { TVarCDecl::ShowStamps(); }
+//------------------------------------------------------------------------------
+TThreadVarDecl::TThreadVarDecl() : TVarDecl() {}
 //------------------------------------------------------------------------------
 Byte __fastcall TThreadVarDecl::GetSecKind() {
     return skThreadVar;
 }
 //------------------------------------------------------------------------------
-TStrConstDecl::TStrConstDecl():TNameFDecl(false) {
-    Sz = ReadUIndex();
-    hDT = ReadUIndex();
-    if (FVer >= verDXE1 && FVer < verK1) int X = ReadUIndex();
-    if (!Sz) Sz = static_cast<DWord>(-1);
-    Ofs = static_cast<DWord>(-1);
+void TThreadVarDecl::Visit(TDCURecVisitor *Visitor) { Visitor->visitThreadVarDecl(this); }
+//------------------------------------------------------------------------------
+void TMemBlockRef::MemRefFound() {}
+//------------------------------------------------------------------------------
+void TMemBlockRef::Visit(TDCURecVisitor *Visitor) { Visitor->visitMemBlockRef(this); }
+//------------------------------------------------------------------------------
+TStrConstDecl::TStrConstDecl() : TMemBlockRef(false) {
+    TNDX X;
+    if (FVer >= verDXE1 && FVer < verK1) {
+        FX = Ofs;
+        Ofs = ReadUIndex();
+        if (Ofs == 0) Ofs = static_cast<DWord>(-1);
+        Sz  = ReadUIndex();
+        hDT = -1;
+    } else {
+        FX = ReadUIndex();
+        Ofs = static_cast<DWord>(-1);
+        X = ReadUIndex();
+        if (IsMSIL) {
+            FX1 = X;
+            Sz = static_cast<DWord>(-1);
+        } else {
+            Sz = X;
+        }
+        hDT = -1;
+    }
+
+    if (FVer >= verDXE1 && FVer < verK1) {
+        X = ReadByte(); // ReadUIndex() - it was detected in verD_XE2 and Ok for verD_XE
+    }
 }
 //------------------------------------------------------------------------------
 DWord __fastcall TStrConstDecl::SetMem(DWord MOfs, DWord MSz) {
@@ -655,9 +1291,12 @@ DWord __fastcall TStrConstDecl::SetMem(DWord MOfs, DWord MSz) {
 Byte __fastcall TStrConstDecl::GetSecKind() {
     if (GenVarCAsVars)
         return skVar;
-    else
-        return skConst;
+    return skConst;
 }
+//------------------------------------------------------------------------------
+void TStrConstDecl::MemRefFound() { TMemBlockRef::MemRefFound(); }
+//------------------------------------------------------------------------------
+void TStrConstDecl::Visit(TDCURecVisitor *Visitor) { Visitor->visitStrConstDecl(this); }
 //------------------------------------------------------------------------------
 void __fastcall TStrConstDecl::Show(String &OutS) {
     DWord          DS;
@@ -679,7 +1318,7 @@ void __fastcall TStrConstDecl::Show(String &OutS) {
             int Fix0 = GetStartFixup(Ofs);
             SetStartFixupInfo(Fix0);
         }
-        ShowGlobalTypeValue(hDT, DP, DS, true, -1, S);
+        ShowGlobalTypeValue(hDT, DP, DS, true, -1, false, S);
         if (DP) RestoreFixupMemState(&MS);
     }
 }
@@ -688,14 +1327,17 @@ void __fastcall TStrConstDecl::EnumUsedTypes(TTypeUseAction Action, DWord *IP) {
     Action(this, hDT, IP);
 }
 //------------------------------------------------------------------------------
-TLabelDecl::TLabelDecl() :TNameDecl(true) {
+TLabelDecl::TLabelDecl() : TNameDecl(true) {
     Ofs = ReadUIndex();
-    if (FVer >= verD8 && FVer < verK1) ReadUIndex();
+    if (FVer >= verD8 && FVer < verK1) ReadUIndex(); // =0
     if (FVer >= verD2009 && FVer < verK1) ReadUIndex();
 }
 //------------------------------------------------------------------------------
-void __fastcall TLabelDecl::Show(String& OutS) {
+void TLabelDecl::Visit(TDCURecVisitor *Visitor) { Visitor->visitLabelDecl(this); }
+//------------------------------------------------------------------------------
+void __fastcall TLabelDecl::Show(String &OutS) {
     TNameDecl::Show(OutS);
+    // DCU32: PutSFmtRem('at $%x',[Ofs]);
 }
 //------------------------------------------------------------------------------
 Byte __fastcall TLabelDecl::GetSecKind() {
@@ -703,60 +1345,104 @@ Byte __fastcall TLabelDecl::GetSecKind() {
 }
 //------------------------------------------------------------------------------
 bool __fastcall TLabelDecl::IsVisible(Byte LK) {
-    return (LK != dlMain);
+    return LK != dlMain;
 }
 //------------------------------------------------------------------------------
-TExportDecl::TExportDecl() :TNameDecl(true) {
+TExportDecl::TExportDecl() : TNameDecl() {
     hSym = ReadUIndex();
     Index = ReadUIndex();
 }
 //------------------------------------------------------------------------------
+void TExportDecl::Visit(TDCURecVisitor *Visitor) { Visitor->visitExportDecl(this); }
+//------------------------------------------------------------------------------
 void __fastcall TExportDecl::Show(String &OutS) {
     TDCURec *D = GetAddrDef(hSym);
-    PName    N = NULL;
+    PName    N = nullptr;
 
     if (!D) {
         OutLog1("?");
     } else {
         D->ShowName(OutS);
-        N = D->GetName();
+        N = D->Name;
     }
-    String sN    = PName2String(N);
-    PName  Name  = GetName();
-    String sName = PName2String(Name);
-    if (N && Name && sN != sName) {
+
+    // was:
+    // String sN    = PName2String(N);
+    // String sName = PName2String(Name);
+
+    if (N && Name && !N->Eq(Name)) {
+        AnsiString sName = Ansistrings::AnsiQuotedStr(Name->GetStr(), '\'');
         OutLog1(" name ");
-        ShowName(OutS);
+        // DCU32: PutAddrDefStr(sName,hDecl); // todo?
+        ShowName(OutS); // todo? comment this out?
     }
     if (Index) {
         OutLog2(" index %lX", Index);
     }
 }
 //------------------------------------------------------------------------------
-Byte __fastcall TExportDecl::GetSecKind() {
-    return skExport;
-}
+Byte __fastcall TExportDecl::GetSecKind() { return skExport; }
 //------------------------------------------------------------------------------
-TLocalDecl::TLocalDecl(Byte LK) : TNameDecl(true) {
-    Byte tg  = GetTag();
-    bool M   = (tg == arMethod || tg == arConstr || tg == arDestr);
-    bool M2  = ((FVer == verD2) & M);
+bool TExportDecl::IsVisible(Byte LK) { return LK != dlMain; /* let`s show everything in implementation */ }
+//------------------------------------------------------------------------------
+TLocalDeclBase::TLocalDeclBase() : TNameDecl() {
     LocFlags = ReadUIndex();
 
     if (FVer >= verD8 && FVer < verK1) {
         LocFlagsX = ReadUIndex();
         // To make the constants compatible with the previous versions
-        LocFlagsX = ((LocFlagsX & ~lfClassV8up) << 1) | ((LocFlagsX & lfClassV8up) >> 4);
-    } else
+        LocFlagsX = ((LocFlagsX & ~lfClassV8up ) << 1) | ((LocFlagsX & lfClassV8up) >> 4);
+    } else {
         LocFlagsX = LocFlags; // To simplify the rest of the code
-
+    }
+    // Just in case - it should be 0 anyway
     LocFlagsX &= ~lfauxPropField;
 
-    if (FVer >= verD2009 && FVer < verK1) ReadUIndex();
+    if (FVer >= verD2009 && FVer < verK1)
+        ReadUIndex(); // B3
+}
+//------------------------------------------------------------------------------
+Byte __fastcall TLocalDeclBase::GetLocFlagsSecKind() {
+    switch (LocFlags & lfScope) {
+        case lfPrivate: return skPrivate;
+        case lfProtected: return skProtected;
+        case lfPublic: return skPublic;
+        case lfPublished: return skPublished;
+    }
+    return skNone;
+}
+//------------------------------------------------------------------------------
+/**
+ *
+ * @param LK List Kind (TDeclListKind)
+ */
+TLocalDecl::TLocalDecl(Byte LK) : TLocalDeclBase() {
+    if (FVer >= verDXE4 && FVer < verK1 && (LK == dlArgs || LK == dlArgsT) && ((LocFlags & 0x40) != 0))
+        ReadULong(); // it was observed after the [REF] decorator
 
-    if (!M2)
+    TDCURecTag tg  = TNameDecl::GetTag();
+
+    bool M   = (tg == arMethod || tg == arConstr || tg == arDestr);
+    bool M2  = ((FVer == verD2) & M);
+    LocFlags = ReadUIndex();
+
+    /*if (FVer >= verD8 && FVer < verK1) {
+        LocFlagsX = ReadUIndex();
+        // To make the constants compatible with the previous versions
+        LocFlagsX = ((LocFlagsX & ~lfClassV8up) << 1) | ((LocFlagsX & lfClassV8up) >> 4);
+    } else
+        LocFlagsX = LocFlags; // To simplify the rest of the code*/
+
+    // LocFlagsX &= ~lfauxPropField;
+    // if (FVer >= verD2009 && FVer < verK1) ReadUIndex();
+
+    if (!M2) {
         hDT = ReadUIndex();
-    else if (M)
+        if (M)
+            Ndx = ReadIndex();
+        else
+            Ndx = ReadUIndex();
+    } else if (M)
         Ndx = ReadUIndex();
     else
         Ndx = ReadIndex();
@@ -782,14 +1468,43 @@ TLocalDecl::TLocalDecl(Byte LK) : TNameDecl(true) {
         RefAddrDef(Ndx); // forward references could happen e.g. by referencing Self in embedded proc
 }
 //------------------------------------------------------------------------------
+void TLocalDecl::Visit(TDCURecVisitor *Visitor) { Visitor->visitLocalDecl(this); }
+//------------------------------------------------------------------------------
+String __fastcall TLocalDecl::GetPrefix(bool &IsConst) {
+    TDCURecTag Tag = GetTag(); // Byte
+    IsConst = false;
+
+    String Result;
+
+    // if (ShowAuxValues) // always true
+
+    switch (Tag) {
+        case arVal: Result = "val"; break;
+        case arVar: Result = "var"; break;
+        case drVar: Result = "local"; break;
+        case arResult: Result = "result"; break;
+        case arAbsLocVar: Result = "local absolute"; break;
+        case arFld: Result = "field"; break;
+        // case arMethod: Result = "method"; break;
+        // case arConstr: Result = "constructor"; break;
+        // case arDestr: Result = "destructor"; break;
+    }
+    if ((Tag == arVal || Tag == arVar) && (LocFlags & 0x7) == 0x1) {
+        IsConst = true;
+    }
+
+    return "";
+}
+//------------------------------------------------------------------------------
 String RegName[7] = {"EAX", "EDX", "ECX", "EBX", "ESI", "EDI", "EBP"};
 
-void __fastcall TLocalDecl::Show(String& OutS) {
-    Byte Tg = GetTag();
-    String MS, S;
+void __fastcall TLocalDecl::Show(String &OutS) {
+    TDCURecTag Tg = GetTag();
+    String S;
 
     OutS = "";
 
+    // IDR:
     PLOCALDECLINFO info = new LOCALDECLINFO;
     info->Scope         = ActiveScope;
     info->Tag           = Tg;
@@ -798,6 +1513,16 @@ void __fastcall TLocalDecl::Show(String& OutS) {
     info->NdxB          = NdxB;
     info->Case          = CaseN;
 
+    ShowModifiers(true);
+    // bool IsConst;
+    // MS = GetPrefix(IsConst);
+    // if (IsConst) {
+    //     MS = "const";
+    // }
+
+    AnsiString MS;
+
+    // Part of GetPrefix:
     switch (Tg) {
         case arVal: MS = "val "; break;
         case arVar: MS = "var "; break;
@@ -808,8 +1533,7 @@ void __fastcall TLocalDecl::Show(String& OutS) {
         default: MS = ""; break;
     }
 
-    if (MS != "")
-    {
+    if (MS != "") {
         OutS += MS;
         OutLog2("%s", MS.c_str());
     }
@@ -835,7 +1559,7 @@ void __fastcall TLocalDecl::Show(String& OutS) {
         OutLog2("{Ofs:%d}", static_cast<int>(Ndx));
 
     if (Tg == arAbsLocVar) {
-        S = GetAddrStr(static_cast<int>(Ndx));
+        S = GetAddrStr(static_cast<int>(Ndx), false);
         OutS += " absolute " + S;
         OutLog2(" absolute %s", S.c_str());
         info->AbsName = S;
@@ -849,24 +1573,17 @@ void __fastcall TLocalDecl::Show(String& OutS) {
         LocalsList->Add(static_cast<void *>(info));
     else
         delete info;
+
+    // todo?
+    // ShowConstAddInfo(OutS);
 }
 //------------------------------------------------------------------------------
 void __fastcall TLocalDecl::EnumUsedTypes(TTypeUseAction Action, DWord *IP) {
     Action(this, hDT, IP);
 }
 //------------------------------------------------------------------------------
-Byte __fastcall TLocalDecl::GetLocFlagsSecKind() {
-    switch (LocFlags & lfScope) {
-        case lfPrivate: return skPrivate;
-        case lfProtected: return skProtected;
-        case lfPublic: return skPublic;
-        case lfPublished: return skPublished;
-    }
-    return skNone;
-}
-//------------------------------------------------------------------------------
 Byte __fastcall TLocalDecl::GetSecKind() {
-    Byte tg = GetTag();
+    TDCURecTag tg = GetTag();
     if (tg == arFld || tg == arMethod || tg == arConstr || tg == arDestr || tg == arProperty || tg == arClassVar)
         return GetLocFlagsSecKind();
     tg = GetTag();
@@ -874,29 +1591,94 @@ Byte __fastcall TLocalDecl::GetSecKind() {
     return skNone;
 }
 //------------------------------------------------------------------------------
-TMethodDecl::TMethodDecl(Byte LK) : TLocalDecl(LK) {
-    InIntrf = (LK == dlInterface || LK == dlDispInterface);
-    if (!InIntrf) {
-        if (IsMSIL && Ndx) ReadByteIfEQ(1); // I was unable to find something less perverse to skip this byte
-        if (FVer >= verD2009 && FVer < verK1 && GetTag() != arMethod) ReadByte();
-
-        PName name = TNameDecl::GetName();
-        if (FVer >= verD7 && FVer < verK1 || name->Len == 0)
-            hImport = ReadUIndex(); // then hDT seems to be valid index in the parent class unit
-
-        if (FVer >= verD2009 && FVer < verK1 && GetTag() == arMethod) {
-            while (ReadByteFrom(FVer >= verD2010) >= 0);
-        }
+TLocalValDecl::TLocalValDecl(Byte lk) : TLocalDecl(lk) {
+    // printf("Debug: TLocalValDecl init\n");
+}
+//------------------------------------------------------------------------------
+void TLocalValDecl::Show(String &OutS) {
+    TLocalDecl::Show(OutS);
+    if (hDeftVal > 0) {
+        OutLog1("=");
+        ShowGlobalConstValue(hDeftVal, OutS);
     }
 }
 //------------------------------------------------------------------------------
-void __fastcall ShowFlags() {
+TMethodDecl::TMethodDecl(Byte LK) : TLocalDecl(LK) {
+    // todo
+    const TByteSet cS12  = TByteSet() << 0 << 2 << 4 << 8 << 0x10 << 0x18 << 0x20 << 0x80 << 0x84 << static_cast<int>(' ') << static_cast<int>('!') << static_cast<int>('a');
+    const TByteSet cS12a = cS12  + (TByteSet() << 1);
+    const TByteSet cS12b = cS12a + (TByteSet() << 0x28 << 0x38);
+    const TByteSet cS12c = cS12b + (TByteSet() << 0x42 << 0x22 << 0x9);
+    const TByteSet cS17  = cS12c + (TByteSet() << 0x47 << 0x4F);
+    const TByteSet cS20  = cS17  + (TByteSet() << 0x60);
+    const TByteSet cS21  = cS20  + (TByteSet() << 0xA1);
+    const TByteSet cS24  = cS21  + (TByteSet() << 0x7 << 0x41);
+
+    // Array of sets
+    const TByteSet sSkip[8] = {
+        cS12, cS12a, cS12b, cS12c, cS17, cS20, cS21, cS24
+    };
+
+    int nSkip = 0;
+
+    InIntrf = LK == dlInterface || LK == dlDispInterface;
+    if (!InIntrf) {
+        if (IsMSIL && Ndx)
+            ReadByteIfEQ(1); // I was unable to find something less perverse to skip this byte
+
+        PName name = TNameDecl::GetName();
+
+        if (FVer >= verD2009 && FVer < verK1 && name->IsEmpty() ) // && GetTag() != arMethod
+            ReadByte();
+
+        if ((FVer >= verD7 && FVer < verK1) || name->IsEmpty())
+            hImport = ReadUIndex(); // then hDT seems to be valid index in the parent class unit
+
+        // clever
+        /*if (FVer >= verD2009 && FVer < verK1 && GetTag() == arMethod) {
+            while (ReadByteFrom(FVer >= verD2010) >= 0);
+        }*/
+
+        if (FVer >= verD2009 && FVer < verK1 && GetTag() == arMethod) {
+            nSkip = 0;
+            if (FVer >= verD2010) {
+                nSkip++;
+                if (FVer >= verDXE2) {
+                    nSkip++;
+                    if (FVer >= verDXE3) {
+                        nSkip++;
+                        if (FVer >= verDXE4) {
+                            nSkip++;
+                            if (FVer >= verDXE7) {
+                                nSkip++;
+                                if (FVer >= verDXE8) {
+                                    nSkip++;
+                                    if (FVer >= verD10_2) nSkip++;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        while (ReadByteFrom(sSkip[nSkip]) >= 0);
+    }
 }
 //------------------------------------------------------------------------------
+void TMethodDecl::Visit(TDCURecVisitor *Visitor) { Visitor->visitMethodDecl(this); }
+//------------------------------------------------------------------------------
 void __fastcall TMethodDecl::Show(String &OutS) {
+
+    auto ShowFlags = [&]() {
+        if (Name && Name->IsEmpty() && hImport != 0) {
+            OutS += "hImp: #" + IntToStr(hImport);
+        }
+    };
+
     String   MS, PS, S;
     TDCURec *D;
-    Byte     Tg = GetTag(); // TMethodKind
+    TDCURecTag Tg = GetTag(); // TMethodKind
 
     PMETHODDECLINFO MethodDeclInfo = new METHODDECLINFO;
     MethodDeclInfo->Scope          = ActiveScope;
@@ -911,13 +1693,13 @@ void __fastcall TMethodDecl::Show(String &OutS) {
 
     if (Ndx || !IsMSIL) {
         D = GetAddrDef(Ndx);
-        if (D && !D->InheritsFrom(__classid(TProcDecl))) D = NULL;
+        if (D && !D->InheritsFrom(__classid(TProcDecl))) D = nullptr;
         if (D) {
             Byte MK;
             switch (Tg) {
                 case arMethod: MK = mkMethod; break;
                 case arConstr: MK = mkConstructor; break;
-                case arDestr: MK = mkDestructor; break;
+                case arDestr:  MK = mkDestructor; break;
             }
             static_cast<TProcDecl *>(D)->MethodKind = MK;
         }
@@ -928,7 +1710,7 @@ void __fastcall TMethodDecl::Show(String &OutS) {
             if (!D) {
                 MS = "method ";
                 MethodDeclInfo->MethodKind = 'M';
-            } else if (((TProcDecl *) D)->IsProc()) {
+            } else if (static_cast<TProcDecl *>(D)->IsProc()) {
                 MS                         = "procedure ";
                 MethodDeclInfo->MethodKind = 'P';
             } else {
@@ -969,7 +1751,7 @@ void __fastcall TMethodDecl::Show(String &OutS) {
         if (D)
             static_cast<TProcDecl *>(D)->ShowArgs(S, 0);
         else {
-            S = GetAddrStr(Ndx);
+            S = GetAddrStr(Ndx, false);
             OutLog2("%s", S.c_str());
         }
 
@@ -1009,7 +1791,7 @@ void __fastcall TMethodDecl::Show(String &OutS) {
             D = GetTypeDef(Ndx);
 
         if (D && D->InheritsFrom(__classid(TProcTypeDef))) {
-            S = ((TProcTypeDef *) D)->ProcStr();
+            S = static_cast<TProcTypeDef *>(D)->ProcStr();
             if (S[1] == 'p')
                 MethodDeclInfo->MethodKind = 'P';
             else if (S[1] == 'f')
@@ -1020,7 +1802,7 @@ void __fastcall TMethodDecl::Show(String &OutS) {
             ShowName(S);
             PS += S;
             OutS += S;
-            ((TProcTypeDef *) D)->ShowDecl("()", S);
+            static_cast<TProcTypeDef *>(D)->ShowDecl("()", S);
             PS += S;
             OutS += S;
             ShowFlags();
@@ -1040,10 +1822,11 @@ void __fastcall TMethodDecl::Show(String &OutS) {
     if (MethodsList) MethodsList->Add(static_cast<void *>(MethodDeclInfo));
 }
 //------------------------------------------------------------------------------
-TClassVarDecl::TClassVarDecl(Byte LK) : TLocalDecl(LK) {
-}
+TClassVarDecl::TClassVarDecl(Byte LK) : TLocalDecl(LK) {}
 //------------------------------------------------------------------------------
-void __fastcall TClassVarDecl::Show(String& OutS) {
+void TClassVarDecl::Visit(TDCURecVisitor *Visitor) { Visitor->visitClassVarDecl(this); }
+//------------------------------------------------------------------------------
+void __fastcall TClassVarDecl::Show(String &OutS) {
     OutLog1("class var ");
     TLocalDecl::Show(OutS);
 }
@@ -1052,7 +1835,7 @@ Byte __fastcall TClassVarDecl::GetSecKind() {
     return GetLocFlagsSecKind();
 }
 //------------------------------------------------------------------------------
-TPropDecl::TPropDecl() : TNameDecl(true) {
+TPropDecl::TPropDecl() : TLocalDeclBase() {
     LocFlags = ReadIndex();
     if (FVer >= verD8 && FVer < verK1) {
         LocFlagsX = ReadUIndex();
@@ -1091,10 +1874,12 @@ String __fastcall TPropDecl::PutOp(String Name, int hOp) {
     String V;
 
     if (!hOp) return "";
-    V = GetAddrStr(hOp);
+    V = GetAddrStr(hOp, false);
     OutLog3(" %s %s", Name.c_str(), V.c_str());
     return V;
 }
+//------------------------------------------------------------------------------
+void TPropDecl::Visit(TDCURecVisitor *Visitor) { Visitor->visitPropDecl(this); }
 //------------------------------------------------------------------------------
 void __fastcall TPropDecl::Show(String &OutS) {
     String S;
@@ -1131,19 +1916,23 @@ void __fastcall TPropDecl::EnumUsedTypes(TTypeUseAction Action, DWord *IP) {
 }
 //------------------------------------------------------------------------------
 Byte __fastcall TPropDecl::GetSecKind() {
-    switch (LocFlags & lfScope) {
+    return GetLocFlagsSecKind();
+
+    /*switch (LocFlags & lfScope) {
         case lfPrivate: return skPrivate;
         case lfProtected: return skProtected;
         case lfPublic: return skPublic;
         case lfPublished: return skPublished;
     }
-    return skNone;
+    return skNone;*/
 }
 //------------------------------------------------------------------------------
 TDispPropDecl::TDispPropDecl(Byte LK) : TLocalDecl(LK) {
 }
 //------------------------------------------------------------------------------
-void __fastcall TDispPropDecl::Show(String& OutS) {
+void TDispPropDecl::Visit(TDCURecVisitor *Visitor) { Visitor->visitDispPropDecl(this); }
+//------------------------------------------------------------------------------
+void __fastcall TDispPropDecl::Show(String &OutS) {
     String S;
 
     PPROPERTYINFO pInfo = new PROPERTYINFO;
@@ -1173,11 +1962,20 @@ void __fastcall TDispPropDecl::Show(String& OutS) {
     OutS = "";
 }
 //------------------------------------------------------------------------------
-TConstDeclBase::TConstDeclBase() : TNameFDecl(false) {
-}
+TConstDeclBase::TConstDeclBase() : TNameFDecl(false) {}
 //------------------------------------------------------------------------------
 void __fastcall TConstDeclBase::ReadConstVal() {
-    ValSz = ReadUIndex();
+    Value.ValSz = ReadUIndex();
+    if (!Value.ValSz) {
+        Value.ValPtr = 0;
+        Value.Val    = ReadIndex();
+        Value.ValSz  = NDXHi;
+    } else {
+        Value.ValPtr = CurPos;
+        SkipBlock(Value.ValSz);
+        Value.Val = 0;
+    }
+    /*ValSz = ReadUIndex();
     if (!ValSz) {
         ValPtr = 0;
         Val    = ReadIndex();
@@ -1186,7 +1984,7 @@ void __fastcall TConstDeclBase::ReadConstVal() {
         ValPtr = CurPos;
         SkipBlock(ValSz);
         Val = 0;
-    }
+    }*/
 }
 //------------------------------------------------------------------------------
 void __fastcall TConstDeclBase::ShowValue(String &OutS) {
@@ -1196,18 +1994,18 @@ void __fastcall TConstDeclBase::ShowValue(String &OutS) {
     String    S, SV;
 
     OutS = "";
-    if (!ValPtr) {
-        V.Hi = ValSz;
-        V.Lo = Val;
+    if (!Value.ValPtr) {
+        V.Hi = Value.ValSz;
+        V.Lo = Value.Val;
         DP   = reinterpret_cast<Byte *>(&V);
         DS   = 8;
     } else {
-        DP = ValPtr;
-        DS = ValSz;
+        DP = Value.ValPtr;
+        DS = Value.ValSz;
     }
-    bool MemVal = (ValPtr != NULL);
-    if (ShowGlobalTypeValue(hDT, DP, DS, MemVal, Kind, S) < 0 && !MemVal) {
-        S     = ShowTypeName(hDT);
+    bool MemVal = (Value.ValPtr != NULL);
+    if (ShowGlobalTypeValue(Value.hDT, DP, DS, MemVal, Value.Kind, false, S) < 0 && !MemVal) {
+        S     = ShowTypeName(Value.hDT);
         NDXHi = V.Hi;
         SV    = NDXToStr(V.Lo);
         OutLog2("%s", SV.c_str());
@@ -1216,7 +2014,10 @@ void __fastcall TConstDeclBase::ShowValue(String &OutS) {
     OutS += S;
 }
 //------------------------------------------------------------------------------
+void TConstDeclBase::Visit(TDCURecVisitor *Visitor) { Visitor->visitConstDeclBase(this); }
+//------------------------------------------------------------------------------
 void __fastcall TConstDeclBase::Show(String &OutS) {
+    // TInlineDeclModifier *InlineCode;
     String S;
 
     PCONSTINFO constInfo = new CONSTINFO;
@@ -1228,21 +2029,34 @@ void __fastcall TConstDeclBase::Show(String &OutS) {
     constInfo->Fixups    = new TList;
 
     OutS = "";
-    TNameFDecl::Show(S);
+    TNameFDecl::Show(S); // inherited Show;
     constInfo->Name = S;
+
+    ShowTypeName(Value.hDT);
+
     OutS += S + "=";
     OutLog1("=");
 
     pDumpOffset = &constInfo->RTTIOfs;
     pDumpSize   = &constInfo->RTTISz;
     FixupsList  = constInfo->Fixups;
+
     ShowValue(S);
+
     pDumpOffset = 0;
     pDumpSize   = 0;
     FixupsList  = 0;
 
     constInfo->Value = S;
     OutS += S;
+
+    // todo?
+    // if (FVer > verD4 && Value.Kind != 0)
+    //     PutSFmtRemAux('Kind:#%x',[Value.Kind]);
+    // InlineCode := TInlineDeclModifier(GetModifierOfClass(TInlineDeclModifier));
+    // if (InlineCode) InlineCode.ShowInline(false);
+    // Value.Show(!Name->IsEmpty || Def->Name->EqS('.'));
+
     if (ConstList)
         ConstList->Add(static_cast<void *>(constInfo));
     else {
@@ -1252,7 +2066,7 @@ void __fastcall TConstDeclBase::Show(String &OutS) {
 }
 //------------------------------------------------------------------------------
 void __fastcall TConstDeclBase::EnumUsedTypes(TTypeUseAction Action, DWord *IP) {
-    Action(this, hDT, IP);
+    Action(this, Value.hDT, IP);
 }
 //------------------------------------------------------------------------------
 Byte __fastcall TConstDeclBase::GetSecKind() {
@@ -1260,30 +2074,35 @@ Byte __fastcall TConstDeclBase::GetSecKind() {
 }
 //------------------------------------------------------------------------------
 TConstDecl::TConstDecl() : TConstDeclBase() {
-    hDT = ReadUIndex();
+    Value.hDT = ReadUIndex();
+    Value.Read();
+
+    /*hDT = ReadUIndex();
     if (FVer > verD4) {
         Kind = ReadUIndex();
         if (Kind < 0 || Kind > 5 || (Kind == 5 && !(FVer >= verD2009 && FVer < verK1)))
-            printf("Unknown const kind: #%d\n", Kind);
+            printf("[Errorr] TConstDecl: Unknown const kind: #%d\n", Kind);
     }
-    ReadConstVal();
+    ReadConstVal(); // Value.Read;*/
 }
 //------------------------------------------------------------------------------
 bool __fastcall TConstDecl::IsVisible(Byte LK) {
-    if (!Inf && (FVer <= verD4 || Kind == 1) && ValPtr && ValSz > 8 && (int) (*ValPtr) == -1) {
+    if (!Inf && (FVer <= verD4 || Value.Kind == 1) && Value.ValPtr && Value.ValSz > 8 && (int) (*Value.ValPtr) == -1) {
         PName NP = GetName();
         // The resource string value looks like this - it should be ignored
-        if (NP && NP->Name[0] == '.') return false;
+        if (NP && NP->Get1stChar() == '.') return false;
     }
-    return TNameFDecl::IsVisible(LK);
+    return !Adopted && TNameFDecl::IsVisible(LK);
 }
+//------------------------------------------------------------------------------
+void TConstDecl::Visit(TDCURecVisitor *Visitor) { Visitor->visitConstDecl(this); }
 //------------------------------------------------------------------------------
 TResStrDef::TResStrDef() : TVarCDecl(false) {
     OfsR = Ofs;
     Ofs  = -1;
 }
 //------------------------------------------------------------------------------
-void __fastcall TResStrDef::Show(String& OutS) {
+void __fastcall TResStrDef::Show(String &OutS) {
     String S;
 
     PRESSTRINFO rsInfo = new RESSTRINFO;
@@ -1305,60 +2124,103 @@ Byte __fastcall TResStrDef::GetSecKind() {
     return skResStr;
 }
 //------------------------------------------------------------------------------
-TSetDeftInfo::TSetDeftInfo() : TNameDecl() {
-    Def = reinterpret_cast<PNameDef>(DefStart);
-    hDecl = -1;
+TSetDeftInfo::TSetDeftInfo() : TDCURec() {
     hConst = ReadUIndex();
     hArg = ReadUIndex();
+
+    TDCURec *DR = GetAddrDef(hArg);
+
+    if (TLocalValDecl *lvd = dynamic_cast<TLocalValDecl *>(DR)) {
+        lvd->hDeftVal = hConst;
+        Adopted = true;
+
+        DR = GetAddrDef(hConst);
+
+        if (TConstDecl *cd = dynamic_cast<TConstDecl *>(DR)) {
+            cd->Adopted = true;
+        }
+    }
 }
 //------------------------------------------------------------------------------
-void __fastcall TSetDeftInfo::Show(String& OutS) {
-    OutLog2("Let %s := ", GetAddrStr(hArg).c_str());
+void TSetDeftInfo::Visit(TDCURecVisitor *Visitor) { Visitor->visitSetDeftInfo(this); }
+//------------------------------------------------------------------------------
+void __fastcall TSetDeftInfo::Show(String &OutS) {
+    OutLog2("Let %s := ", GetAddrStr(hArg, false).c_str());
     ShowGlobalConstValue(hConst, OutS);
     OutLog1("\n");
 }
 //------------------------------------------------------------------------------
+bool TSetDeftInfo::IsVisible(Byte LK) { return TDCURec::IsVisible(LK); }
+//------------------------------------------------------------------------------
+/**
+ * These kind of records were observed in DRIntf.dcu of D2006 where the
+ * unit has several records of the same structure:
+ *   TID         = record Reserved: array[$1..$6] of Byte; end;
+ *   TDatabaseID = record Reserved: array[$1..$6] of Byte; end;
+ *   TTableID    = --//--
+ *   TFieldID    = --//--
+ *   TAttrID     = --//--
+ * Now they use drCopyDecl to point to the 1st Reserved declaration instead of duplicating it
+ */
 TCopyDecl::TCopyDecl() : TNameDecl(false) {
+    // inherited Create00; => TNameDecl(false);
+
+    if (FVer < verD11) {
+        hDecl = AppendAddrDef(this); // It looks like this tag always adds to the end of the address table and ignores hNextAddr
+    }
+
     hBase = ReadUIndex(); // index of the address to copy from
     TDCURec *SrcDef = GetAddrDef(hBase);
     if (!SrcDef)
-        printf("Error: CopyDecl index #%lX not found\n", hBase);
+        printf("[Error] CopyDecl index #%lX not found\n", hBase); // DCUErrorFmt
+
     if (!SrcDef->InheritsFrom(__classid(TNameDecl)))
-        printf("Error: CopyDecl index #%lX(%s) is not a TNameDecl\n", hBase);
+        // printf("[Error] CopyDecl index #%lX(%s) is not a TNameDecl\n", hBase, SrcDef->Name->GetStr().c_str()); // DCUErrorFmt
+        printf("[Error] CopyDecl index #%lX(%s) is not a TNameDecl\n", hBase);
 
     Base = static_cast<TNameDecl *>(SrcDef);
     Def = Base->Def;
 }
 //------------------------------------------------------------------------------
-void __fastcall TCopyDecl::Show(String& OutS) {
-    Base->Show(OutS);
-}
+void TCopyDecl::Visit(TDCURecVisitor *Visitor) { Visitor->visitCopyDecl(this); }
 //------------------------------------------------------------------------------
-Byte __fastcall TCopyDecl::GetSecKind() {
-    return Base->GetSecKind();
-}
+void __fastcall TCopyDecl::Show(String &OutS) { Base->Show(OutS); }
 //------------------------------------------------------------------------------
-extern Byte *FMemPtr;
+Byte __fastcall TCopyDecl::GetSecKind() { return Base->GetSecKind(); }
+//------------------------------------------------------------------------------
+// extern Byte *FMemPtr;
 
-TProcDecl::TProcDecl(TNameDecl *AnEmbedded, bool NoInf) : TNameFDecl(NoInf) {
-    CodeOfs     = -1;
+TProcDecl::TProcDecl(TDCURec *AnEmbedded, bool NoInf) : TMemBlockRef(NoInf) {
+    Ofs         = -1;
     Embedded    = AnEmbedded;
     bool NoName = IsUnnamed();
+    int DataF;
+
+    switch (FVer) {
+        case verD6: DataF = 0x8000; break; // The flag 1st appears here
+        case verD7: DataF = 0x800;  break; // Then it changes
+        default:    DataF = 0;      break; // And then the StrConstDecl had been introduced
+    }
+
+    JustData    = (F & DataF) != 0;
     MethodKind  = mkProc;
-    Locals      = NULL;
+    Locals      = nullptr;
     B0          = ReadUIndex();
     Sz          = ReadUIndex();
 
-    if (FVer >= verDXE1 && FVer < verK1) int X = ReadUIndex();
+    if (FVer >= verDXE1 && FVer < verK1)
+        int X = ReadByte(); // ReadUIndex() - it was detected in verDXE2 and Ok for verDXE
+
     if (!NoName) {
         if (FVer > verD2) VProc = ReadUIndex();
         hDTRes = ReadUIndex();
-        if (FVer >= verDXE1 && FVer < verK1 && VProc == 0x4F && ((F1 & 0x40) != 0)) return;
+        // if (FVer >= verDXE1 && FVer < verK1 && VProc == 0x4F && ((F1 & 0x40) != 0)) return;
         if (FVer > verD7 && FVer < verK1) hClass = ReadUIndex();
         Tag      = ReadTag();
         CallKind = ReadCallKind();
 
-        if (FVer > verD2009 && FVer < verK1) {
+        // try {
+        if (FVer >= verD2009 && FVer < verK1) {
             // Read template parameters
             if (Tag == drA5Info) Tag = ReadTag(); // always precedes drA6Info
             if (Tag == drA6Info) {
@@ -1367,43 +2229,67 @@ TProcDecl::TProcDecl(TNameDecl *AnEmbedded, bool NoInf) : TNameFDecl(NoInf) {
             }
         }
 
-        ReadDeclList(dlArgs, &Args);
+        ReadDeclList(dlArgs, this, &Args);
+        // } catch {
+        // todo: catch exception
+        // E.Message := SysUtils.Format('%s in proc %s',[E.Message,Name^.GetStr]);
+        // }
 
-        if (Tag != drStop1) printf("Error: Stop Tag\n");
+        if (Tag != drStop1) printf("[Error] TProcDecl: Stop Tag\n"); // TagError
 
-        TNameDecl **ArgP = &Args;
+        PDCURec *ArgP = &Args;
 
         while (*ArgP) {
-            TNameDecl *Loc = *ArgP;
-            Byte       tg  = Loc->GetTag();
+            TDCURec *Loc = *ArgP;
+            TDCURecTag tg  = Loc->GetTag();
             if (tg != arVal && tg != arVar) break;
-            ArgP = reinterpret_cast<TNameDecl **>(&Loc->Next);
-            // ArgP = &(TNameDecl*)Loc->Next;
+            ArgP = &Loc->Next;
         }
         Locals = *ArgP;
-        *ArgP  = NULL;
+        *ArgP  = nullptr;
     }
 }
 //------------------------------------------------------------------------------
 TProcDecl::~TProcDecl() {
-    FreeDCURecList((TDCURec*)Locals);
-    FreeDCURecList((TDCURec*)Args);
-    FreeDCURecList((TDCURec*)Embedded);
+    FreeDCURecList(Locals);
+    FreeDCURecList(Args);
+    FreeDCURecList(Embedded);
 }
 //------------------------------------------------------------------------------
 // In Kylix are used the names of the kind '.<X>.'
 // In Delphi 6 were noticed only names '..'
 // In Delphi 9 were noticed names of the kind '.<X>'
+// In Delphi XE3 were noticed names of the kind '$thunk_'
 bool __fastcall TProcDecl::IsUnnamed() {
-    bool Result = (Def->Name.Len == 0) || (Def->Name.Len == 1 && Def->Name.Name[0] == '.')
-        || (FVer >= verD6) && (FVer < verK1) && (Def->Name.Len == 2 && Def->Name.Name[0] == '.' && Def->Name.Name[1] == '.')
-        || ((FVer >= verK1) || (FVer >= verD8)) && (Def->Name.Name[0] == '.');
-    return Result;
+    if (Def->Name.IsEmpty() || Def->Name.EqS(".")) return true;
+    // todo: verify
+    // was:
+    // if (FVer >= verD6 && FVer < verK1 && (Def->Name.Len == 2 && Def->Name.Name[0] == '.' && Def->Name.Name[1] == '.')) return true;
+    if (FVer >= verD6 && FVer < verK1 && Def->Name.EqS("..")) return true;
+    if (FVer >= verK1 || FVer >= verD8) {
+        AnsiChar ch = Def->Name.Get1stChar();
+        if (ch == '.') return true;
+        if (ch == '$' && FVer >= verDXE1 && FVer < verK1) return true;
+    }
+    return false;
+    /*    bool Result = (Def->Name.Len == 0) || (Def->Name.Len == 1 && Def->Name.Name[0] == '.')
+        || ((FVer >= verD6) && (FVer < verK1) && (Def->Name.Len == 2 && Def->Name.Name[0] == '.' && Def->Name.Name[1] == '.'))
+        || (((FVer >= verK1) || (FVer >= verD8)) && (Def->Name.Name[0] == '.'));
+    return Result;*/
 }
 //------------------------------------------------------------------------------
 DWord __fastcall TProcDecl::SetMem(DWord MOfs, DWord MSz) {
-    CodeOfs = MOfs;
-    return MSz - Sz;
+    if (Ofs != -1)
+        printf("[Error] Trying to change procedure %s memory to $%x[$%x]", Name->GetStr().c_str(), MOfs, MSz); // DCUErrorFmt
+
+    if (FromPackage) {
+        Sz = MSz; // MSz means something else here
+    } else if (Sz > MSz) {
+        printf("[Error] Procedure %s: memory size mismatch (.[$%x]>$%x[$%x])", Name->GetStr().c_str(), Sz, MOfs, MSz);
+    }
+
+    Ofs = MOfs;
+    return MSz - Sz; // it can happen for ($L file) with several procedures
 }
 //------------------------------------------------------------------------------
 Byte __fastcall TProcDecl::GetSecKind() {
@@ -1425,7 +2311,7 @@ void __fastcall TProcDecl::ShowArgs(String &OutS, PPROCDECLINFO pInfo) {
 
     bool NoName = IsUnnamed();
 
-    TNameDecl *ArgL = Args;
+    TDCURec *ArgL = Args;
 
     if (ArgL) {
         OutS += "(";
@@ -1440,7 +2326,7 @@ void __fastcall TProcDecl::ShowArgs(String &OutS, PPROCDECLINFO pInfo) {
     if (!IsProc()) {
         OutS += ":";
         OutLog1(":");
-        S = ShowTypeDef(hDTRes, NULL);
+        S = ShowTypeDef(hDTRes, nullptr);
         if (pInfo) pInfo->TypeDef = S;
         OutS += S;
     }
@@ -1449,7 +2335,7 @@ void __fastcall TProcDecl::ShowArgs(String &OutS, PPROCDECLINFO pInfo) {
         OutLog1(";");
         S = CallKindName[CallKind];
         OutS += S;
-        OutLog2("%s", S.c_str());
+        OutLog2("%s", AnsiString(S).c_str());
     }
     if (FVer > verD3) {
         if (FVer < verD2005) {
@@ -1470,11 +2356,19 @@ void __fastcall TProcDecl::ShowArgs(String &OutS, PPROCDECLINFO pInfo) {
     }
 }
 //------------------------------------------------------------------------------
-bool __fastcall TProcDecl::IsProc() {
-    return TypeIsVoid(hDTRes);
+void TProcDecl::AddLocal(TDCURec *Loc) {
+    // Loc.Add(Locals);
+    // LocalsList->Add(static_cast<void *>(info));
+    LocalsList->Add(Locals);
 }
 //------------------------------------------------------------------------------
+bool __fastcall TProcDecl::IsProc() { return TypeIsVoid(hDTRes); }
+//------------------------------------------------------------------------------
+void __fastcall TProcDecl::Visit(TDCURecVisitor *Visitor) { Visitor->visitProcDecl(this); }
+//------------------------------------------------------------------------------
 void __fastcall TProcDecl::ShowDef(bool All, String &OutS) {
+    // DCU32: ShowProc(TShowProcCtx(Ord(All)));
+
     String S = "";
 
     PPROCDECLINFO pInfo = new PROCDECLINFO;
@@ -1507,7 +2401,7 @@ void __fastcall TProcDecl::ShowDef(bool All, String &OutS) {
     TNameFDecl::Show(S);
     pInfo->Name = S;
 
-    if (Def->Name.Len == 0) OutLog1("?");
+    if (Def->Name.IsEmpty()) OutLog1("?");
 
     pInfo->Args = new TList;
     ArgsList    = pInfo->Args;
@@ -1537,11 +2431,11 @@ void __fastcall TProcDecl::ShowDef(bool All, String &OutS) {
         if (!IsUnnamed()) {
             pInfo->DumpType = 'C';
             OutLog1("code\n");
-            ShowCodeBl(AddrBase, CodeOfs, Sz);
+            ShowCodeBl(AddrBase, Ofs, Sz);
         } else {
             pInfo->DumpType = 'D';
             OutLog1("data\n");
-            ShowDataBl(AddrBase, CodeOfs, Sz);
+            ShowDataBl(AddrBase, Ofs, Sz);
         }
         pDumpOffset = 0;
         pDumpSize   = 0;
@@ -1557,7 +2451,8 @@ void __fastcall TProcDecl::ShowDef(bool All, String &OutS) {
     OutLog1("\n");
 }
 //------------------------------------------------------------------------------
-void __fastcall TProcDecl::Show(String& OutS) {
+void __fastcall TProcDecl::Show(String &OutS) {
+    // ShowProc(spcOther);
     ShowDef(true, OutS);
 }
 //------------------------------------------------------------------------------
@@ -1571,41 +2466,52 @@ bool __fastcall TProcDecl::IsVisible(Byte LK) {
     return true;
 }
 //------------------------------------------------------------------------------
+void __fastcall TProcDecl::MemRefFound() {
+    if (IsUnnamed()) JustData = true; // Mark the procedure as having no code
+}
+//------------------------------------------------------------------------------
+bool TProcDecl::IsStaticMethod() {
+    TDCURec *ArgL = Args;
+    return FVer >= verDXE7 && MethodKind != mkProc && (!ArgL || !ArgL->Name->EqS("Self"));
+}
+//------------------------------------------------------------------------------
 TSysProcDecl::TSysProcDecl() : TNameDecl(true) {
     F = ReadUIndex();
     Ndx = ReadIndex();
 }
 //------------------------------------------------------------------------------
-void __fastcall TSysProcDecl::Show(String& OutS) {
+void TSysProcDecl::Visit(TDCURecVisitor *Visitor) { Visitor->visitSysProcDecl(this); }
+//------------------------------------------------------------------------------
+void __fastcall TSysProcDecl::Show(String &OutS) {
     OutLog1("sysproc ");
     TNameDecl::Show(OutS);
 }
 //------------------------------------------------------------------------------
-Byte __fastcall TSysProcDecl::GetSecKind() {
-    return skProc;
-}
+Byte __fastcall TSysProcDecl::GetSecKind() { return skProc; }
 //------------------------------------------------------------------------------
-TSysProc8Decl::TSysProc8Decl() : TProcDecl(NULL, true) {
-}
+TSysProc8Decl::TSysProc8Decl() : TProcDecl(NULL, true) {}
+//------------------------------------------------------------------------------
+void TSysProc8Decl::Visit(TDCURecVisitor *Visitor) { Visitor->visitSysProc8Decl(this); }
 //------------------------------------------------------------------------------
 TUnitAddInfo::TUnitAddInfo() : TNameFDecl(false) {
     B = ReadUIndex();
     Tag = ReadTag();
-    ReadDeclList(dlUnitAddInfo, &Sub);
+    ReadDeclList(dlUnitAddInfo, nullptr, &Sub);
 }
 //------------------------------------------------------------------------------
 TUnitAddInfo::~TUnitAddInfo() {
-    FreeDCURecList((TDCURec*)Sub);    
+    FreeDCURecList((TDCURec*)Sub);
 }
 //------------------------------------------------------------------------------
-bool __fastcall TUnitAddInfo::IsVisible(Byte LK) {
-    return  false;
-}
+bool __fastcall TUnitAddInfo::IsVisible(Byte LK) { return false; }
 //------------------------------------------------------------------------------
-TSpecVar::TSpecVar() : TVarDecl() {
-}
+void TUnitAddInfo::Visit(TDCURecVisitor *Visitor) { Visitor->visitUnitAddInfo(this); }
 //------------------------------------------------------------------------------
-void __fastcall TSpecVar::Show(String& OutS) {
+TSpecVar::TSpecVar() : TVarDecl() {}
+//------------------------------------------------------------------------------
+void TSpecVar::Visit(TDCURecVisitor *Visitor) { Visitor->visitSpecVar(this); }
+//------------------------------------------------------------------------------
+void __fastcall TSpecVar::Show(String &OutS) {
     String  S;
 
     OutLog1("spec var ");
@@ -1623,7 +2529,7 @@ void __fastcall TSpecVar::Show(String& OutS) {
     OutLog1(":");
     pDumpOffset = &vInfo->DumpOfs;
     pDumpSize = &vInfo->DumpSz;
-    S = ShowTypeDef(hDT, NULL);
+    S = ShowTypeDef(hDT, nullptr);
     pDumpOffset = 0;
     pDumpSize = 0;
 
@@ -1632,23 +2538,28 @@ void __fastcall TSpecVar::Show(String& OutS) {
     VarList->Add(static_cast<void *>(vInfo));
 }
 //------------------------------------------------------------------------------
-TTypeDef::TTypeDef() : TBaseDef(NULL, (PNameDef) DefStart, -1) {
+TTypeDef::TTypeDef() : TBaseDef(nullptr, reinterpret_cast<PDef>(DefStart), -1) {
     RTTISz   = ReadUIndex();
     Sz       = ReadIndex();
     hAddrDef = ReadUIndex();
+
     if (IsMSIL) {
         ReadUIndex();
         ReadUIndex();
-    } else if (FVer >= verD2005 && FVer < verK1)
+    } else if (FVer >= verD2005 && FVer < verK1) {
         X = ReadUIndex();
+    }
 
-    AddTypeDef(this);
+    FhDT = AddTypeDef(this);
     RTTIOfs = -1;
 }
 //------------------------------------------------------------------------------
 TTypeDef::~TTypeDef() {
-    // ???
+    ClearLastTypeDef(this);
+    delete FModifiers;
 }
+//------------------------------------------------------------------------------
+void TTypeDef::Visit(TDCURecVisitor *Visitor) { Visitor->visitTypeDef(this); }
 //------------------------------------------------------------------------------
 void __fastcall TTypeDef::ShowBase() {
     if (RTTISz > 0) ShowDataBl(0, RTTIOfs, RTTISz);
@@ -1657,11 +2568,12 @@ void __fastcall TTypeDef::ShowBase() {
 int __fastcall TTypeDef::ShowValue(Byte* DP, DWord DS, String& OutS) {
     OutS = "";
     if (Sz > DS) return -1;
-    ShowDump(DP, NULL, 0, 0, Sz, 0, 0, 0, 0, NULL);
+    // ShowDump(DP, NULL, 0, 0, Sz, 0, 0, 0, 0, NULL);
+    ShowDataBlP(DP, Sz, 0);
     return Sz;
 }
 //------------------------------------------------------------------------------
-void __fastcall TTypeDef::Show(String& OutS) {
+void __fastcall TTypeDef::Show(String &OutS) {
     ShowBase();
     OutS = "";
 }
@@ -1673,25 +2585,38 @@ DWord __fastcall TTypeDef::SetMem(DWord MOfs, DWord MSz) {
 //------------------------------------------------------------------------------
 String __fastcall TTypeDef::GetOfsQualifier(int Ofs) {
     if (Ofs == 0) return "";
-    if (Ofs < Sz) return Format(".byte[%d]", ARRAYOFCONST((Ofs)));
-    return Format(".?%d", ARRAYOFCONST((Ofs))); // Error
+    if (Ofs < Sz) return Sysutils::Format(".byte[%d]", ARRAYOFCONST((Ofs)));
+    return Sysutils::Format(".?%d", ARRAYOFCONST((Ofs))); // Error
 }
 //------------------------------------------------------------------------------
 String __fastcall TTypeDef::GetRefOfsQualifier(int Ofs) {
     if (Ofs == 0) return "^";
-    return Format(".?%d", ARRAYOFCONST((Ofs))); // Error
+    return Sysutils::Format(".?%d", ARRAYOFCONST((Ofs))); // Error
 }
 //------------------------------------------------------------------------------
-TRangeBaseDef::TRangeBaseDef() : TTypeDef() {
+void TTypeDef::AddModifier(TDeclModifier *M) {
+    TDeclModifier *MP = FModifiers;
+    while (MP) {
+        M = M->Next;
+    }
+    MP = M;
 }
+//------------------------------------------------------------------------------
+TDeclModifier *TTypeDef::GetModifierOfClass(TDeclModifierClass *Cl) {
+    return GetDeclModifierOfClass(FModifiers, Cl);
+}
+//------------------------------------------------------------------------------
+TRangeBaseDef::TRangeBaseDef() : TTypeDef() {}
 //------------------------------------------------------------------------------
 void __fastcall TRangeBaseDef::GetRange(PInt64Rec Lo, PInt64Rec Hi) {
-    Byte *Tmp = CurPos;
+    Byte *Tmp = CurPos; // ChangeScanState(CP0,LH,18);
     CurPos = LH;
     ReadIndex64(Lo);
     ReadIndex64(Hi);
-    CurPos = Tmp;
+    CurPos = Tmp; // ChangeScanState(CP0,Enum.LH,18);
 }
+//------------------------------------------------------------------------------
+void TRangeBaseDef::Visit(TDCURecVisitor *Visitor) { Visitor->visitRangeBaseDef(this); }
 //------------------------------------------------------------------------------
 String __fastcall WCharStr(wchar_t WCh) {
     wchar_t WStr[2];
@@ -1721,7 +2646,7 @@ String __fastcall WCharStr(wchar_t WCh) {
 String __fastcall BoolStr(char *DP, DWord DS) {
     char *CP = DP + DS - 1;
     while (CP > DP && *CP == 0) CP--;
-    if (CP = DP) {
+    if ((CP = DP)) {
         if (*CP == 0) return "false";
         if (*CP == 1) return "true";
     }
@@ -1788,8 +2713,23 @@ String __fastcall IntLStr(Byte* DP, DWord Sz, bool Neg) {
     return Result;
 }
 //------------------------------------------------------------------------------
+bool TRangeBaseDef::IsChar() {
+    if (!Def) return false;
+    // todo: verify
+    TDCURecTag Tag = reinterpret_cast<TDCURecTag>(Def);
+    // was: TDCURecTag Tag = Def->Tag;
+    return Tag == drChRangeDef || Tag == drWCharRangeDef;
+}
+//------------------------------------------------------------------------------
+/**
+ *
+ * @param DP
+ * @param DS
+ * @param OutS
+ * @return Size used
+ */
 int __fastcall TRangeBaseDef::ShowValue(Byte* DP, DWord DS, String& OutS) {
-    Byte Tag;
+    TDCURecTag Tag;
     OutS = "";
 
     if (Sz > DS) return -1;
@@ -1799,7 +2739,7 @@ int __fastcall TRangeBaseDef::ShowValue(Byte* DP, DWord DS, String& OutS) {
     if (!Def)
         Tag = drRangeDef;
     else
-        Tag = Def->Tag;
+        Tag = reinterpret_cast<TDCURecTag>(Def); // Tag = Def->Tag; // todo: verify
 
     switch (Tag) {
         case drChRangeDef:
@@ -1823,7 +2763,7 @@ int __fastcall TRangeBaseDef::ShowValue(Byte* DP, DWord DS, String& OutS) {
     }
     Byte *Tmp = CurPos;
     CurPos = LH;
-    int  Lo   = ReadIndex();
+    TNDX Lo   = ReadIndex();
     bool Neg  = (NDXHi < 0);
     CurPos = Tmp;
     OutS = IntLStr(DP, Sz, Neg);
@@ -1831,7 +2771,7 @@ int __fastcall TRangeBaseDef::ShowValue(Byte* DP, DWord DS, String& OutS) {
     return Sz;
 }
 //------------------------------------------------------------------------------
-void __fastcall TRangeBaseDef::Show(String& OutS) {
+void __fastcall TRangeBaseDef::Show(String &OutS) {
     TInt64Rec Lo, Hi;
     String Value, S;
 
@@ -1840,22 +2780,22 @@ void __fastcall TRangeBaseDef::Show(String& OutS) {
     GetRange(&Lo, &Hi);
     TTypeDef *T = GetGlobalTypeDef(hDTBase);
 
-    if (!T || ShowTypeValue(T, reinterpret_cast<Byte *>(&Lo), 8, 0, S) < 0) {
+    if (!T || ShowTypeValue(T, reinterpret_cast<Byte *>(&Lo), 8, 0, false, S) < 0) {
         NDXHi = Lo.Hi;
         Value = NDXToStr(Lo.Lo);
         S     = Value;
-        OutLog2("%s", Value.c_str());
+        OutLog2("%s", AnsiString(Value).c_str());
     }
 
     OutS += S;
     OutS += "..";
     OutLog1("..");
 
-    if (!T || ShowTypeValue(T, reinterpret_cast<Byte *>(&Hi), 8, 0, S) < 0) {
+    if (!T || ShowTypeValue(T, reinterpret_cast<Byte *>(&Hi), 8, 0, false, S) < 0) {
         NDXHi = Hi.Hi;
         Value = NDXToStr(Hi.Lo);
         S     = Value;
-        OutLog2("%s", Value.c_str());
+        OutLog2("%s", AnsiString(Value).c_str());
     }
     OutS += S;
 }
@@ -1872,16 +2812,18 @@ TRangeDef::TRangeDef() : TRangeBaseDef() {
     if (FVer >= verD8 && FVer < verK1)
         B = ReadUIndex();
     else
-        B = ReadByte(); // It could be index too, but I'm not sure
+        B = ReadByte(); // It could be an index too, but I'm not sure
 }
+//------------------------------------------------------------------------------
+void TRangeDef::Visit(TDCURecVisitor *Visitor) { Visitor->visitRangeDef(this); }
 //------------------------------------------------------------------------------
 TEnumDef::TEnumDef() : TRangeBaseDef() {
     hDTBase = ReadUIndex();
     if (FVer >= verD2009 && FVer < verK1) ReadUIndex();
     Ndx = ReadIndex();
     LH = CurPos;
-    DWord Lo = ReadIndex();
-    DWord Hi = ReadIndex();
+    TNDX Lo = ReadIndex();
+    TNDX Hi = ReadIndex();
     if (FVer >= verD8 && FVer < verK1)
         B = ReadUIndex();
     else
@@ -1897,28 +2839,48 @@ TEnumDef::~TEnumDef() {
 //------------------------------------------------------------------------------
 int __fastcall TEnumDef::ShowValue(Byte *DP, DWord DS, String &OutS) {
     DWord  V;
+    DWord  V0;
     String S;
+    TConstDecl *C = nullptr;
 
     OutS = "";
     if (Sz > DS) return -1;
-    if (!MemToUInt(DP, Sz, &V) || V < 0 || !NameTbl || V >= NameTbl->Count) {
+    if (!MemToUInt(DP, Sz, &V)) {
+        if (!NameTbl || V >= NameTbl->Count) { // || V < 0
+            V0 = static_cast<TConstDecl *>(NameTbl->Items[0])->Value.Val;
+            V--;
+            V0--;
+            if (V >= 0 && V < NameTbl->Count) {
+                C = static_cast<TConstDecl *>(NameTbl->Items[V]);
+            }
+        } else {
+            C = CStart;
+            while (!C) {
+                if (C->Value.Val == V) {
+                    break;
+                }
+                C = static_cast<TConstDecl *>(C->Next);
+            }
+        }
+    }
+
+    if (!C) {
         ShowName(S);
         OutS += S + "(";
         OutLog1("(");
         TRangeBaseDef::ShowValue(DP, DS, S);
         OutS += S + ")";
         OutLog1(")");
-        return Sz;
     }
-    ((TConstDecl *) (NameTbl->Items[V]))->ShowName(OutS);
+    // ((TConstDecl *) (NameTbl->Items[V]))->ShowName(OutS);
+    C->ShowName(OutS);
     return Sz;
 }
 //------------------------------------------------------------------------------
-void __fastcall TEnumDef::Show(String& OutS) {
-    TNameDecl *EnumConst;
-    String Name;
+void __fastcall TEnumDef::Show(String &OutS) {
+    AnsiString Name;
 
-    if (!NameTbl) {
+    if (!CStart) {
         TRangeBaseDef::Show(OutS);
         return;
     }
@@ -1927,26 +2889,105 @@ void __fastcall TEnumDef::Show(String& OutS) {
     OutS = "(";
     OutLog1("(");
 
-    for (int i = 0; i < NameTbl->Count; i++) {
+    TConstDecl *EnumConst = CStart;
+
+    int V = 0;
+    int i = 0;
+
+    while (!EnumConst) {
         if (i > 0) {
             OutS += ",";
             OutLog1(",");
         }
-        EnumConst = (TNameDecl *) NameTbl->Items[i];
-        Name      = PName2String(EnumConst->GetName());
+        Name = EnumConst->Name->GetStr();
+        OutS += Name;
+        OutLog2("%s", Name.c_str());
+
+        if (EnumConst->Value.Val != V) {
+            OutS += "=";
+            OutLog1("=");
+            V = EnumConst->Value.Val;
+            OutS += V;
+            OutLog2("%d", V);
+        }
+        V++;
+        i++;
+
+        EnumConst = static_cast<TConstDecl *>(EnumConst->Next);
+    }
+    OutS += ")";
+    OutLog1(");");
+
+    // was:
+    /*for (int i = 0; i < NameTbl->Count; i++) {
+        if (i > 0) {
+            OutS += ",";
+            OutLog1(",");
+        }
+        EnumConst = (TConstDecl *) NameTbl->Items[i];
+        Name      = EnumConst->Name->GetStr();
         OutS += Name;
         OutLog2("%s", Name.c_str());
     }
     OutS += ")";
-    OutLog1(");");
+    OutLog1(");");*/
 }
 //------------------------------------------------------------------------------
+void TEnumDef::Visit(TDCURecVisitor *Visitor) { Visitor->visitEnumDef(this); }
+//------------------------------------------------------------------------------
+// todo: review
 TFloatDef::TFloatDef() : TTypeDef() {
+
     Byte B = ReadByte();
-    Kind   = B;
+
+    const std::uint32_t FloatSz[fkCurrency + 1] = {
+        10, // sizeof(System::Real) // todo: this depends, can be 6 or 10
+        sizeof(Single),
+        sizeof(Double),
+        10, // sizeof(Extended)
+        sizeof(Comp),
+        sizeof(Currency)
+    };
+
+    // typedef long double          Extended;         // 10 byte real
+    // typedef float                Single;           // 4 byte real
+    // typedef Single*              PSingle;          //
+    // typedef double               Double;           // 8 byte real
+
+    if (FVer >= verDXE3) {
+        if ((B & fkExtra) != 0) {
+            B = B & ~fkExtra;
+            ReadByte();
+        }
+    }
+
+    if (B > fkCurrency) {
+        printf("Unknown float kind: %d\n", B);
+        // DCUErrorFmt('Unknown float kind: %d',[B]);
+        return;
+    }
+
+    Kind   = B; // TFloatKind
+    DWord KindSz = FloatSz[Kind];
+
+    if (Kind == fkExtended) {
+        switch (FPlatform) {
+            case dcuplOsx32:
+            case dcuplOsx64:
+            case dcuplLinux64:
+                if (FVer >= verD10_1) {
+                    KindSz = 16;
+                }
+                break;
+        }
+    }
+    if (KindSz != Sz)
+        printf("[Error] Float kind and size mismatch: SizeOf(%s)=%d\n", GetKindName().c_str(), Sz); // DCUErrorFmt
+
 }
 //------------------------------------------------------------------------------
-String __fastcall TFloatDef::GetKindName() {
+AnsiString __fastcall TFloatDef::GetKindName() { // was String
+    // return GetEnumName(TypeInfo(TFloatKind), Ord(Kind));
     switch (Kind) {
         case 0: return "fkReal48";
         case 1: return "fkSingle";
@@ -1956,6 +2997,8 @@ String __fastcall TFloatDef::GetKindName() {
         case 5: return "fkCurrency";
     }
 }
+//------------------------------------------------------------------------------
+void TFloatDef::Visit(TDCURecVisitor *Visitor) { Visitor->visitFloatDef(this); }
 //------------------------------------------------------------------------------
 int __fastcall TFloatDef::ShowValue(Byte *DP, DWord DS, String &OutS) {
     long double E;
@@ -1969,29 +3012,40 @@ int __fastcall TFloatDef::ShowValue(Byte *DP, DWord DS, String &OutS) {
             E = *reinterpret_cast<float *>(DP);
             break;
         case 8: // SizeOf(Double)
-            N = GetName();
+            N = Name;
             if (!N)
                 Ok = false;
             else {
-                if (!CompareText(PName2String(N), "Double"))
+                if (!CompareText(N->GetStr(), "Double")) {
                     E = *reinterpret_cast<double *>(DP);
-                else if (!CompareText(PName2String(N), "Currency")) {
-                    // E = *((Currency*)DP);
-                    Int64 rawCurrency = *reinterpret_cast<Int64 *>(DP);
-                    E = static_cast<long double>(rawCurrency) / 10000.0L;
-                } else if (!CompareText(PName2String(N), "Comp"))
+                } else if (!CompareText(N->GetStr(), "Currency")) {
+                    // if (FVer <= verD4 && DS == 10) {
+                        Int64 rawCurrency = *reinterpret_cast<Int64 *>(DP);
+                        E = static_cast<long double>(rawCurrency) / 10000.0L;
+                        // or: E = *reinterpret_cast<Extended *>(DP) * 0.0001;
+                    // } else {}
+                } else if (!CompareText(N->GetStr(), "Comp"))
                     E = *reinterpret_cast<Comp *>(DP);
-                else
+                else {
                     Ok = false;
+                }
             }
             break;
         case 10: // SizeOf(Extended)
             E = *reinterpret_cast<long double *>(DP);
             break;
-        default: Ok = false; break;
+        case 16: // Extended128 of Linux 64 and OSX 64
+            // todo
+            DP += 6; // The Extended128 just adds 6 bytes to the mantissa
+                     // in comparison with Extended80, the rest is the same, so we just skip these bytes here
+            // E = *reinterpret_cast<TExtended80Rec *>(DP);
+            break;
+        default:
+            Ok = false;
+            break;
     }
     if (Ok) {
-        OutS = Format("%g", ARRAYOFCONST((E)));
+        OutS = Sysutils::Format("%g", ARRAYOFCONST((E)));
         OutLog2("%s", OutS.c_str());
         return Sz;
     }
@@ -2011,16 +3065,20 @@ TPtrDef::TPtrDef() : TTypeDef() {
     if (FVer >= verD2009 && FVer < verK1) ReadUIndex();
 }
 //------------------------------------------------------------------------------
+// From DCU_In.pas:
 // Set FixUpEnd to the max(FixUpEnd,CodeFixups^.Ofs+4 if CodeFixups^.F is not fxStart or fxEnd
 void __fastcall SetFixEnd() {
     DWord CurOfs;
     CurOfs = CodeFixups->OfsF;
     Byte F = reinterpret_cast<Byte *>(&CurOfs)[3];
     CurOfs = CurOfs & FixOfsMask;
-    if (F < fxStart) {
-        Byte *EP;
-        EP = CodeStart + CurOfs + 4;
-        if (EP > FixUpEnd) FixUpEnd = EP;
+    if (fxValid.Contains(F)) {
+        // if (F < fxStart) {
+        int Sz = fxSize[F];
+        if (Sz >= 0) {
+            Byte *EP = CodeStart + CurOfs + Sz; // 4
+            if (EP > FixUpEnd) FixUpEnd = EP;
+        }
     }
 }
 //------------------------------------------------------------------------------
@@ -2038,8 +3096,7 @@ void __fastcall SkipFixups(DWord Ofs) {
 PFixupRec __fastcall CurFixup(DWord Ofs) {
     if (CodeFixupCnt > 0 && ((CodeFixups->OfsF & FixOfsMask) == Ofs))
         return CodeFixups;
-    else
-        return NULL;
+    return nullptr;
 }
 //------------------------------------------------------------------------------
 // Move CodeFixups to the next fixup, Return true if the next fixup has the Offset<=Ofs
@@ -2054,22 +3111,19 @@ bool __fastcall NextFixup(DWord Ofs) {
 }
 //------------------------------------------------------------------------------
 bool __fastcall GetFixupFor(Byte *CodePtr, DWord Size, bool StartOk, PFixupRec *Fix) {
-    PFixupRec Fx;
-    Byte      F;
-
-    *Fix = NULL;
+    *Fix = nullptr;
     if (CodePtr + Size > CodeEnd) return false;
     DWord Ofs = CodePtr - CodeStart;
-    if (Size == 4) {
+    if (Size == 4 || (fx8Byte && Size == 8)) { // All fixups are 4 bytes
         SkipFixups(Ofs);
         if (CodePtr < FixUpEnd) return false;
         do {
-            Fx = CurFixup(Ofs);
+            PFixupRec Fx = CurFixup(Ofs);
             if (!Fx) break;
-            F = reinterpret_cast<Byte *>(&Fx->OfsF)[3];
-            if (F < fxStart) {
+            Byte F = reinterpret_cast<Byte *>(&Fx->OfsF)[3];
+            if (fxValid.Contains(F)) { // F < fxStart
                 if (*Fix) return false;
-                *Fix = Fx;
+                *Fix = Fx; // The difference between fxAddr and fxJmpAddr could also be taken into account
             } else if (F != fxStart || !StartOk)
                 return false;
         } while (NextFixup(Ofs));
@@ -2080,19 +3134,13 @@ bool __fastcall GetFixupFor(Byte *CodePtr, DWord Size, bool StartOk, PFixupRec *
     return true;
 }
 //------------------------------------------------------------------------------
-PName __fastcall GetAddrName(int hDef) {
-    TDCURec *D = GetAddrDef(hDef);
-    if (!D) return &NoName;
-    return D->GetName();
-}
-//------------------------------------------------------------------------------
 String __fastcall ShowOfsQualifier(int hDef, int Ofs) {
     TTypeDef *TD = GetGlobalTypeDef(hDef);
     if (!TD) {
         if (Ofs > 0)
-            return Format("+%d", ARRAYOFCONST((Ofs)));
+            return Sysutils::Format("+%d", ARRAYOFCONST((Ofs)));
         else if (Ofs < 0)
-            return Format("%d", ARRAYOFCONST((Ofs)));
+            return Sysutils::Format("%d", ARRAYOFCONST((Ofs)));
     }
     return "";
 }
@@ -2111,9 +3159,14 @@ int __fastcall TryShowPCharConst(Byte *DP, DWord DS) {
 bool __fastcall ReportFixup(PFixupRec Fix, int Ofs, bool UseHAl) {
     DWord  Sz;
     String OutS;
+    TDCURec *Member = nullptr;
+    TBaseDef *TD = nullptr;
 
     if (!Fix) return false;
-    OutLog2("K%d ", reinterpret_cast<Byte *>(&Fix->OfsF)[3]);
+
+    Byte K = reinterpret_cast<Byte *>(&Fix->OfsF)[3];
+    OutLog2("K%d ", K);
+
     TDCURec *D   = GetGlobalAddrDef(Fix->Ndx);
     int hDT = -1;
     int L   = -1;
@@ -2122,37 +3175,91 @@ bool __fastcall ReportFixup(PFixupRec Fix, int Ofs, bool UseHAl) {
         if (D->InheritsFrom(__classid(TVarDecl)))
             hDT = static_cast<TVarDecl *>(D)->hDT;
         else if (UseHAl && Ofs > 0 && D->InheritsFrom(__classid(TProcDecl))) {
-            Byte *DP = GetBlockMem(static_cast<TProcDecl *>(D)->CodeOfs, static_cast<TProcDecl *>(D)->Sz, &Sz);
+            Byte *DP = GetBlockMem(static_cast<TProcDecl *>(D)->Ofs, static_cast<TProcDecl *>(D)->Sz, &Sz);
             if (DP && Ofs <= Sz) {
                 if (Ofs >= 8) L = ShowStrConst(DP + Ofs - 8, Sz - Ofs + 8, OutS);
                 if (L < 0) L = TryShowPCharConst(DP + Ofs, Sz - Ofs);
             }
         }
     }
+
     if (L > 0) OutLog1(" {");
-    OutLog2("%s", GetAddrStr(Fix->Ndx).c_str());
+
+    // todo:
+    // if TUnit(FixUnit).IsMSIL and(K=fxVirtMethodMSIL) then begin
+
+    String S;
+
+    if (IsMSIL && K == fxVirtMethodMSIL) {
+        Member = nullptr;
+        if (D) {
+            if (TTypeDecl *D = dynamic_cast<TTypeDecl *>(D)) {
+                hDT = D->hDef;
+
+                TD = nullptr;
+
+                if (hDT >= 0)
+                    TD = GetTypeDef(hDT);
+
+                if (TD) {
+                    if (TRecBaseDef *TBD = dynamic_cast<TRecBaseDef *>(TD)) {
+                        Member = static_cast<TRecBaseDef *>(TBD->GetMemberByNum(Ofs - 1));
+
+                        if (Member)
+                            Member->ShowName(S);
+                    }
+                }
+
+            }
+        }
+    }
+
+    OutLog2("%s", GetAddrStr(Fix->Ndx, false).c_str());
     OutLog2("%s", ShowOfsQualifier(hDT, Ofs).c_str());
+
     if (L > 0) OutLog1("}");
+
     return true;
 }
 //------------------------------------------------------------------------------
-void __fastcall ShowPointer(Byte *DP, String NilStr, String &OutS) {
+typedef bool __fastcall (__closure *TShowPtrValProc)(TNDX Ndx, DWord Ofs, String &OutS);
+
+void __fastcall ShowPointer(Byte *DP, AnsiString NilStr, String &OutS, TShowPtrValProc ShowVal) {
     PFixupRec Fix;
 
     char HexVal[32];
 
     OutS = "";
     Byte *V = *reinterpret_cast<Byte **>(DP);
-    if (GetFixupFor(DP, 4, true, &Fix) && Fix) {
+
+    if (GetFixupFor(DP, FPtrSize, true, &Fix) && Fix) {
+        if (FPtrSize == 8) {
+            // For 64-bit mode I suppose that the Hi part of offset should be 0 and use the same code as for 32-bit mode
+            if (reinterpret_cast<PInt64Rec>(DP)->Hi != 0) {
+                printf("[Error] Nonzero fixup offset high part: $%8.8x\n", reinterpret_cast<PInt64Rec>(DP)->Hi); // DCUErrorFmt
+            }
+        }
         PName FxName = GetAddrName(Fix->Ndx);
+        bool vOK = (!FxName ||  FxName->IsEmpty()) && ShowVal && ShowVal(Fix->Ndx, reinterpret_cast<DWord>(V), OutS);
+
         OutS += "@";
         OutLog1("@");
+
         if (!ReportFixup(Fix, reinterpret_cast<DWord>(V), false)) {
             if (V) {
                 sprintf(HexVal, "+$%lX", reinterpret_cast<DWord>(V));
                 OutS += String(HexVal);
                 OutLog2("%s", HexVal);
             }
+        }
+    } else if (FPtrSize == 8) {
+        PInt64Rec p64 = reinterpret_cast<PInt64Rec>(DP);
+        if (p64->Lo == 0 && p64->Hi == 0) {
+            OutS += NilStr;
+        } else {
+            sprintf(HexVal, "%8.8x%8.8x", p64->Hi, p64->Lo);
+            OutS += String(HexVal);
+            OutLog2("%s", HexVal);
         }
     } else if (!V) {
         OutS += NilStr;
@@ -2169,31 +3276,37 @@ char *__fastcall StrLEnd(char *Str, DWord L) {
     return Str + strlen(Str) - 1;
 }
 //------------------------------------------------------------------------------
-bool __fastcall TPtrDef::ShowRefValue(int Ndx, DWord Ofs, String& OutS) {
+bool __fastcall TPtrDef::ShowRefValue(TNDX Ndx, DWord Ofs, String& OutS) {
+    DWord Sz;
+    // if (!FixUnit) return false; // TUnit->FixUnit
     TTypeDef *DT = GetGlobalTypeDef(hRefDT);
-    if (!DT || !DT->Def || DT->Def->Tag != drChRangeDef) return false;
+    // todo: verify:
+    if (!DT || !DT->Def || reinterpret_cast<TDCURecTag>(DT->Def) != drChRangeDef) return false;
     TDCURec *AR = GetGlobalAddrDef(Ndx);
-    if (!AR || !(AR->InheritsFrom(__classid(TProcDecl)))) return false;
-    char *DP = reinterpret_cast<char *>(GetBlockMem(static_cast<TProcDecl *>(AR)->CodeOfs,
-                                                    static_cast<TProcDecl *>(AR)->Sz, reinterpret_cast<DWord *>(&Sz)));
+    if (!AR || !(AR->InheritsFrom(__classid(TMemBlockRef)))) return false;
+    TMemBlockRef* memBlock = static_cast<TMemBlockRef*>(AR);
+    char *DP = reinterpret_cast<char *>(GetBlockMem(memBlock->Ofs,memBlock->Sz, &Sz));
     if (Ofs >= Sz) return false;
     char *EP = StrLEnd(DP + Ofs, Sz - Ofs);
     if (EP - DP == Sz) return false;
+    // We could also check that there are no fixups in the DP+Ofs..EP range
     OutS = StrConstStr(DP + Ofs, EP - (DP + Ofs));
     return true;
 }
 //------------------------------------------------------------------------------
+void TPtrDef::Visit(TDCURecVisitor *Visitor) { Visitor->visitPtrDef(this); }
+//------------------------------------------------------------------------------
 int __fastcall TPtrDef::ShowValue(Byte *DP, DWord DS, String &OutS) {
     OutS = "";
     if (Sz > DS) return -1;
-    if (Sz == 4) {
-        ShowPointer(DP, "Nil", OutS);
+    if (Sz == FPtrSize) {
+        ShowPointer(DP, "Nil", OutS, ShowRefValue);
         return Sz;
     }
     return TTypeDef::ShowValue(DP, Sz, OutS);
 }
 //------------------------------------------------------------------------------
-void __fastcall TPtrDef::Show(String& OutS) {
+void __fastcall TPtrDef::Show(String &OutS) {
     String S;
     OutS = "";
     TTypeDef::Show(S);
@@ -2212,7 +3325,9 @@ String __fastcall TPtrDef::GetRefOfsQualifier(int Ofs) {
 //------------------------------------------------------------------------------
 TTextDef::TTextDef() : TTypeDef() {}
 //------------------------------------------------------------------------------
-void __fastcall TTextDef::Show(String& OutS) {
+void TTextDef::Visit(TDCURecVisitor *Visitor) { Visitor->visitTextDef(this); }
+//------------------------------------------------------------------------------
+void __fastcall TTextDef::Show(String &OutS) {
     String S;
     TTypeDef::Show(S);
     OutS = "text";
@@ -2223,7 +3338,9 @@ TFileDef::TFileDef() : TTypeDef() {
     hBaseDT = ReadUIndex();
 }
 //------------------------------------------------------------------------------
-void __fastcall TFileDef::Show(String& OutS) {
+void TFileDef::Visit(TDCURecVisitor *Visitor) { Visitor->visitFileDef(this); }
+//------------------------------------------------------------------------------
+void __fastcall TFileDef::Show(String &OutS) {
     String S;
     TTypeDef::Show(S);
     OutS = "file of ";
@@ -2239,6 +3356,8 @@ TSetDef::TSetDef() : TTypeDef() {
     BStart  = ReadByte();
     hBaseDT = ReadUIndex();
 }
+//------------------------------------------------------------------------------
+void TSetDef::Visit(TDCURecVisitor *Visitor) { Visitor->visitSetDef(this); }
 //------------------------------------------------------------------------------
 int __fastcall TSetDef::ShowValue(Byte *DP, DWord DS, String &OutS) {
     int    K;
@@ -2276,13 +3395,13 @@ int __fastcall TSetDef::ShowValue(Byte *DP, DWord DS, String &OutS) {
                     OutLog1(",");
                 }
                 Cnt++;
-                ShowTypeValue(T, reinterpret_cast<Byte *>(&V0), sizeof(V0), 0, S);
+                ShowTypeValue(T, reinterpret_cast<Byte *>(&V0), sizeof(V0), 0, false, S);
                 OutS += S;
                 Lo.Lo--;
                 if (V0.Lo != Lo.Lo) {
                     OutS += "..";
                     OutLog1("..");
-                    ShowTypeValue(T, reinterpret_cast<Byte *>(&Lo), sizeof(Lo), 0, S);
+                    ShowTypeValue(T, reinterpret_cast<Byte *>(&Lo), sizeof(Lo), 0, false, S);
                     OutS += S;
                 }
                 Lo.Lo++;
@@ -2297,13 +3416,13 @@ int __fastcall TSetDef::ShowValue(Byte *DP, DWord DS, String &OutS) {
             OutLog1(",");
         }
         Cnt++;
-        ShowTypeValue(T, reinterpret_cast<Byte *>(&V0), sizeof(V0), 0, S);
+        ShowTypeValue(T, reinterpret_cast<Byte *>(&V0), sizeof(V0), 0, false, S);
         OutS += S;
         Lo.Lo--;
         if (V0.Lo != Lo.Lo) {
             OutS += "..";
             OutLog1("..");
-            ShowTypeValue(T, reinterpret_cast<Byte *>(&Lo), sizeof(Lo), 0, S);
+            ShowTypeValue(T, reinterpret_cast<Byte *>(&Lo), sizeof(Lo), 0, false, S);
             OutS += S;
         }
         Lo.Lo++;
@@ -2313,7 +3432,7 @@ int __fastcall TSetDef::ShowValue(Byte *DP, DWord DS, String &OutS) {
     return Sz;
 }
 //------------------------------------------------------------------------------
-void __fastcall TSetDef::Show(String& OutS) {
+void __fastcall TSetDef::Show(String &OutS) {
     String S;
     TTypeDef::Show(S);
     OutS = "set of ";
@@ -2332,6 +3451,8 @@ TArrayDef0::TArrayDef0(bool IsStr) : TTypeDef() {
     hDTEl  = ReadUIndex();
     if (!IsStr && IsMSIL) ReadUIndex();
 }
+//------------------------------------------------------------------------------
+void TArrayDef0::Visit(TDCURecVisitor *Visitor) { Visitor->visitArrayDef0(this); }
 //------------------------------------------------------------------------------
 int __fastcall TArrayDef0::ShowValue(Byte *DP, DWord DS, String &OutS) {
     String S;
@@ -2355,7 +3476,7 @@ int __fastcall TArrayDef0::ShowValue(Byte *DP, DWord DS, String &OutS) {
             OutS += ",";
             OutLog1(",");
         }
-        if (ShowTypeValue(T, DP, Rest, -1, S) < 0) {
+        if (ShowTypeValue(T, DP, Rest, -1, false, S) < 0) {
             return -1;
         }
         OutS += S;
@@ -2368,16 +3489,16 @@ int __fastcall TArrayDef0::ShowValue(Byte *DP, DWord DS, String &OutS) {
     return Sz;
 }
 //------------------------------------------------------------------------------
-void __fastcall TArrayDef0::Show(String& OutS) {
+void __fastcall TArrayDef0::Show(String &OutS) {
     OutS = "array";
     OutLog1("array");
     ShowBase();
     OutS += "[";
     OutLog1("[");
-    OutS += ShowTypeDef(hDTNdx, NULL);
+    OutS += ShowTypeDef(hDTNdx, nullptr);
     OutS += "] of ";
     OutLog1("] of ");
-    OutS += ShowTypeDef(hDTEl, NULL);
+    OutS += ShowTypeDef(hDTEl, nullptr);
 }
 //------------------------------------------------------------------------------
 void __fastcall TArrayDef0::EnumUsedTypes(TTypeUseAction Action, DWord *IP) {
@@ -2394,19 +3515,40 @@ String __fastcall TArrayDef::GetOfsQualifier(int Ofs) {
         return TTypeDef::GetOfsQualifier(Ofs);
     else {
         int ElSz = TD->Sz;
-        return Format("[%d]%s", ARRAYOFCONST((Ofs / ElSz, ShowOfsQualifier(hDTEl, Ofs % ElSz))));
+        return Sysutils::Format("[%d]%s", ARRAYOFCONST((Ofs / ElSz, ShowOfsQualifier(hDTEl, Ofs % ElSz))));
     }
+}
+//------------------------------------------------------------------------------
+void TArrayDef::Visit(TDCURecVisitor *Visitor) { Visitor->visitArrayDef(this); }
+//------------------------------------------------------------------------------
+// todo: review:
+TTypeValKind TArrayDef::ValKind() {
+    TTypeDef *TD = GetGlobalTypeDef(hDTEl);
+    if (TRangeDef *RD = dynamic_cast<TRangeDef*>(TD)) {
+        if (RD->IsChar()) return TTypeValKind::vkStr;
+    }
+    return TTypeValKind::vkComplex;
 }
 //------------------------------------------------------------------------------
 TShortStrDef::TShortStrDef() : TArrayDef(true) {
     if (FVer >= verD2009 && FVer < verK1) CP = ReadUIndex();
 }
 //------------------------------------------------------------------------------
+void TShortStrDef::Visit(TDCURecVisitor *Visitor) { Visitor->visitShortStrDef(this); }
+//------------------------------------------------------------------------------
+/**
+ *
+ * @param DP
+ * @param DS
+ * @param OutS
+ * @return Size used
+ */
 int __fastcall TShortStrDef::ShowValue(Byte *DP, DWord DS, String &OutS) {
-    int L;
     OutS = "";
     if (Sz > DS) return -1;
-    L = reinterpret_cast<PName>(DP)->Len;
+    // was: int L = reinterpret_cast<PName>(DP)->Len;
+    // todo: verify:
+    int L = strlen(reinterpret_cast<const char *>(reinterpret_cast<PShortString>(DP)));
     if (L >= Sz)
         return TArrayDef::ShowValue(DP, DS, OutS);
     else {
@@ -2431,29 +3573,45 @@ TStringDef::TStringDef() : TArrayDef(true) {
     if (FVer >= verD2009 && FVer < verK1) CP = ReadUIndex();
 }
 //------------------------------------------------------------------------------
-bool __fastcall TStringDef::ShowRefValue(int Ndx, DWord Ofs, String& OutS) {
+void TStringDef::Visit(TDCURecVisitor *Visitor) { Visitor->visitStringDef(this); }
+//------------------------------------------------------------------------------
+bool __fastcall TStringDef::ShowRefValue(TNDX Ndx, DWord Ofs, String& OutS) {
+    DWord Sz;
+    int L;
+
     if (Ofs < 8) return false;
     TDCURec *AR = GetGlobalAddrDef(Ndx);
-    TProcDecl *Proc = static_cast<TProcDecl *>(AR);
-    if (!AR || !(AR->InheritsFrom(__classid(TProcDecl)))) return false;
-    char *DP = reinterpret_cast<char *>(GetBlockMem(Proc->CodeOfs, Proc->Sz, reinterpret_cast<DWord *>(&Sz)));
-    if (Ofs >= Sz) return false;
-    if (Proc->IsUnnamed()) Proc->JustData = true; // Mark the procedure as having no code
-    int L = ShowStrConst(reinterpret_cast<Byte *>(DP + Ofs - 8), reinterpret_cast<DWord>(Sz - Ofs + 8), OutS);
+    if (!AR || !(AR->InheritsFrom(__classid(TMemBlockRef)))) return false;
+    TMemBlockRef *Proc = static_cast<TMemBlockRef *>(AR);
+    char *DP = reinterpret_cast<char *>(GetBlockMem(Proc->Ofs, Proc->Sz, &Sz));
+    if (!DP || Ofs >= Sz) return false;
+    Proc->MemRefFound();
+    // if (Proc->IsUnnamed()) Proc->JustData = true; // Mark the procedure as having no code
+    int ChSz = -1;
+    if (FVer >= verD2009 && FVer < verK1) {
+        ChSz = GetTypeSize(hDTEl);
+    }
+    if (ChSz == 2) {
+        if (Ofs < 12) return false;
+        L = ShowUnicodeStrConst(reinterpret_cast<Byte *>(DP + Ofs - 12), reinterpret_cast<DWord>(Sz - Ofs + 12), OutS);
+    } else {
+        if (Ofs < 8) return false;
+        L = ShowStrConst(reinterpret_cast<Byte *>(DP + Ofs - 8), reinterpret_cast<DWord>(Sz - Ofs + 8), OutS);
+    }
     return (L > 0);
 }
 //------------------------------------------------------------------------------
 int __fastcall TStringDef::ShowValue(Byte* DP, DWord DS, String& OutS) {
     OutS = "";
     if (Sz > DS) return -1;
-    if (Sz == 4) {
-        ShowPointer(DP, "''", OutS);
+    if (Sz == FPtrSize) {
+        ShowPointer(DP, "''", OutS, ShowRefValue);
         return Sz;
     }
     return TArrayDef::ShowValue(DP, Sz, OutS);
 }
 //------------------------------------------------------------------------------
-void __fastcall TStringDef::Show(String& OutS) {
+void __fastcall TStringDef::Show(String &OutS) {
     OutS = "String";
     OutLog1("String");
     ShowBase();
@@ -2473,7 +3631,9 @@ TVariantDef::TVariantDef() : TTypeDef() {
     if (FVer > verD2) B = ReadByte();
 }
 //------------------------------------------------------------------------------
-void __fastcall TVariantDef::Show(String& OutS) {
+void TVariantDef::Visit(TDCURecVisitor *Visitor) { Visitor->visitVariantDef(this); }
+//------------------------------------------------------------------------------
+void __fastcall TVariantDef::Show(String &OutS) {
     OutLog1("variant");
     TTypeDef::Show(OutS);
     OutS = "variant";
@@ -2485,8 +3645,9 @@ TObjVMTDef::TObjVMTDef() : TTypeDef() {
     if (IsMSIL) ReadUIndex();
 }
 //------------------------------------------------------------------------------
-void __fastcall TObjVMTDef::Show(String& OutS)
-{
+void TObjVMTDef::Visit(TDCURecVisitor *Visitor) { Visitor->visitObjVMTDef(this); }
+//------------------------------------------------------------------------------
+void __fastcall TObjVMTDef::Show(String &OutS) {
     TTypeDef::Show(OutS);
     OutS += "class of ";
     OutLog1("class of ");
@@ -2499,20 +3660,29 @@ TRecBaseDef::~TRecBaseDef() { FreeDCURecList((TDCURec *) Fields); }
 //------------------------------------------------------------------------------
 void __fastcall TRecBaseDef::ReadFields(Byte LK) {
     Tag = ReadTag();
-    ReadDeclList(LK, &Fields);
-    if (Tag != drStop1) printf("Error: Stop Tag\n");
+    ReadDeclList(LK, nullptr, &Fields);
+    if (Tag != drStop1) printf("[Error] TRecBaseDef::ReadFields: Stop Tag\n"); // TagError
 }
 //------------------------------------------------------------------------------
+void TRecBaseDef::Visit(TDCURecVisitor *Visitor) { Visitor->visitRecBaseDef(this); }
+//------------------------------------------------------------------------------
+
+/**
+ * Attention: records with variants may be incorrectly shown (see readme.txt for details)}
+ * @param DP
+ * @param DS
+ * @param OutS
+ * @return Size used
+ */
 int __fastcall TRecBaseDef::ShowFieldValues(Byte *DP, DWord DS, String &OutS) {
-    int        Ofs;
-    TNameDecl *Decl;
+    TDCURec *Decl;
+    TDCURec *DeclL = Fields;
     String S;
 
     OutS = "";
     if (Sz > DS) return -1;
     int Cnt = 0;
-    bool Ok  = true;
-    TNameDecl *DeclL = Fields;
+    bool Ok = true;
     OutS += "(";
     OutLog1("(");
 
@@ -2527,9 +3697,9 @@ int __fastcall TRecBaseDef::ShowFieldValues(Byte *DP, DWord DS, String &OutS) {
             Decl->ShowName(S);
             OutS += S + ":";
             OutLog1(":");
-            Ofs = static_cast<TLocalDecl *>(Decl)->Ndx;
+            int Ofs = static_cast<TLocalDecl *>(Decl)->Ndx;
             if (Ofs < 0 || Ofs > Sz ||
-                ShowGlobalTypeValue(static_cast<TLocalDecl *>(Decl)->hDT, DP + Ofs, Sz - Ofs, false, -1, S) < 0) {
+                ShowGlobalTypeValue(static_cast<TLocalDecl *>(Decl)->hDT, DP + Ofs, Sz - Ofs, false, -1, false, S) < 0) {
                 OutS += "?";
                 OutLog1("?");
                 Ok = false;
@@ -2537,7 +3707,8 @@ int __fastcall TRecBaseDef::ShowFieldValues(Byte *DP, DWord DS, String &OutS) {
             OutS += S;
             Cnt++;
         }
-        DeclL = static_cast<TNameDecl *>(DeclL->Next);
+        DeclL = DeclL->Next;
+        // DeclL = static_cast<TNameDecl *>(DeclL->Next);
     }
     OutS += ")";
     OutLog1(")");
@@ -2550,50 +3721,87 @@ int __fastcall TRecBaseDef::ShowFieldValues(Byte *DP, DWord DS, String &OutS) {
 //------------------------------------------------------------------------------
 void __fastcall TRecBaseDef::EnumUsedTypes(TTypeUseAction Action, DWord *IP) { EnumUsedTypeList(Fields, Action, IP); }
 //------------------------------------------------------------------------------
-int __fastcall TRecBaseDef::GetParentType() { return -1; }
+TNDX __fastcall TRecBaseDef::GetParentType() { return -1; }
 //------------------------------------------------------------------------------
 // This procedure is required to find properties corresponding to unnamed fields
 TPropDecl *__fastcall TRecBaseDef::GetFldProperty(PNameDecl Fld, int hDT) {
-    TDCURec   *Decl;
-    TPropDecl *Result;
+    TDCURec *Decl = Fld->Next; // It should go after the field
 
     while (Decl) {
         if (Decl->InheritsFrom(__classid(TPropDecl)) && static_cast<TPropDecl *>(Decl)->hDT == hDT) {
-            Result = static_cast<TPropDecl *>(Decl);
+            TPropDecl *Result = static_cast<TPropDecl *>(Decl);
             if (Result->hRead && GetAddrDef(Result->hRead) == Fld) return Result;
             if (Result->hWrite && GetAddrDef(Result->hWrite) == Fld) return Result;
         }
         Decl = Decl->Next;
     }
-    return NULL;
+    return nullptr;
 }
 //------------------------------------------------------------------------------
+// For .Net fixups
+TDCURec *GetDCURecListItemByNum(TDCURec *L, int Num) {
+    if (Num < 0) return nullptr;
+    while (Num > 0 && L) {
+        Num--;
+        L = L->Next;
+    }
+    return L;
+}
+//------------------------------------------------------------------------------
+TDCURec *TRecBaseDef::GetMemberByNum(int Num) {
+    return GetDCURecListItemByNum(Fields, Num);
+}
+//------------------------------------------------------------------------------
+// todo?
+// int __fastcall TRecBaseDef::GetFldOfsQualifier(int Ofs, int QSz, PQualInfo QI, int TotSize, bool Sorted, PAnsiString QS)
 String __fastcall TRecBaseDef::GetFldOfsQualifier(int Ofs, int TotSize, bool Sorted) {
-    int       FldOfs;
+    if (Ofs >= TotSize) return ""; // -1
+
+    // todo?
+    // if (QS) *QS = '';
+
     TDCURec  *Decl;
-    TTypeDef *TD;
-    String    FldName;
-
-    if (Ofs >= TotSize) return "";
-
+    TTypeDef *FldTD;
+    AnsiString FldName;
     TDCURec *DeclL = Fields;
+
+    // todo?
+    /*TLocalDecl *FldDecl = GetFldByOfs(Ofs,QSz,TotSize,Sorted);
+    if (QS) {
+        FldName = FldDecl->Name->GetStr();
+        if (FldName == "") {
+            TPropDecl *PropDecl = GetFldProperty(FldDecl,FldDecl.hDT);
+            if (PropDecl) {
+                FldName = PropDecl->Name->GetStr();
+            }
+            if (FldName == "") {
+                FldTD = GetGlobalTypeDef(FldDecl->hDT);
+                if (FldTD) {
+                    FldName = Ansistrings::Format("(:%s)", FldTD->Name->GetStr());
+                } else {
+                    FldName = Ansistrings::Format("(@%d)", FldDecl->Ndx);
+                }
+            }
+        }
+        QS = Ansistrings::Format(".%s%s",FldName,QS);
+    }*/
 
     while (DeclL) {
         Decl = DeclL;
         if (Decl->InheritsFrom(__classid(TCopyDecl))) Decl = static_cast<TCopyDecl *>(Decl)->Base;
         if (Decl->InheritsFrom(__classid(TLocalDecl)) && static_cast<TLocalDecl *>(Decl)->GetTag() == arFld) {
-            FldOfs = static_cast<TLocalDecl *>(Decl)->Ndx;
+            int FldOfs = static_cast<TLocalDecl *>(Decl)->Ndx;
             if (FldOfs >= 0) {
                 if (FldOfs <= Ofs) {
-                    TD = GetGlobalTypeDef(static_cast<TLocalDecl *>(Decl)->hDT);
-                    if (TD && Ofs < FldOfs + TD->Sz) {
-                        FldName = PName2String(static_cast<TLocalDecl *>(Decl)->GetName());
+                    FldTD = GetGlobalTypeDef(static_cast<TLocalDecl *>(Decl)->hDT);
+                    if (FldTD && Ofs < FldOfs + FldTD->Sz) {
+                        FldName = Decl->Name->GetStr();
                         if (FldName == "") {
                             Decl = GetFldProperty(static_cast<TNameDecl *>(Decl), static_cast<TLocalDecl *>(Decl)->hDT);
-                            if (Decl) FldName = PName2String(static_cast<TNameDecl *>(Decl)->GetName());
-                            if (FldName == "") FldName = Format("(:%s)", ARRAYOFCONST((PName2String(TD->GetName()))));
+                            if (Decl) FldName = Decl->Name->GetStr();
+                            if (FldName == "") FldName = Sysutils::Format("(:%s)", ARRAYOFCONST((FldTD->Name->GetStr())));
                         }
-                        return Format(".%s%s", ARRAYOFCONST((FldName, ShowOfsQualifier(((TLocalDecl *) Decl)->hDT, Ofs - FldOfs))));
+                        return Sysutils::Format(".%s%s%s", ARRAYOFCONST((FldName, ShowOfsQualifier(((TLocalDecl *) Decl)->hDT, Ofs - FldOfs))));
                     }
                 } else {
                     if (Sorted) break;
@@ -2604,29 +3812,126 @@ String __fastcall TRecBaseDef::GetFldOfsQualifier(int Ofs, int TotSize, bool Sor
     }
     return "";
 }
+
+//------------------------------------------------------------------------------
+// todo: review:
+TLocalDecl *TRecBaseDef::GetFldByOfs(int Ofs, int QSz, int TotSize, bool Sorted) {
+    if (Ofs >= TotSize) {
+        return nullptr;
+    }
+
+    TLocalDecl *Result = nullptr;
+
+    int dOfsBest  = System::MaxInt; // MaxInt
+    int dRestBest = System::MaxInt; // MaxInt
+
+    TDCURec  *DeclL = Fields;
+    TDCURec  *Decl  = nullptr;
+    TTypeDef *TD    = nullptr;
+
+    int FldOfs = 0;
+    int TSz    = 0;
+    int dOfs   = 0;
+    int dRest  = 0;
+
+    while (DeclL) {
+        Decl = DeclL;
+
+        if (Decl->InheritsFrom(__classid(TCopyDecl))) {
+            Decl = static_cast<TCopyDecl *>(Decl)->Base;
+        }
+
+        if (Decl && Decl->InheritsFrom(__classid(TLocalDecl))) {
+            TLocalDecl *LD = static_cast<TLocalDecl *>(Decl);
+
+            if ((LD->GetTag() == arFld) && ((LD->LocFlagsX & lfauxPropField) == 0)) {
+                FldOfs = LD->Ndx;
+                if (FldOfs >= 0) {
+                    if (FldOfs <= Ofs) {
+                        dOfs = Ofs - FldOfs;
+                        if (dOfs <= dOfsBest) {
+                            TD = GetGlobalTypeDef(LD->hDT);
+                            if (TD) {
+                                TSz = TD->Sz;
+                            } else {
+                                TSz = System::MaxInt - FldOfs;
+                            }
+
+                            if ((Ofs < FldOfs + TSz) && (Ofs + QSz <= FldOfs + TSz)) {
+                                dRest = FldOfs + TSz - (Ofs + QSz);
+
+                                if ((dOfs < dOfsBest) || (dRest < dRestBest)) {
+                                    Result    = LD;
+                                    dOfsBest  = dOfs;
+                                    dRestBest = dRest;
+                                    // break;
+                                }
+                            }
+                        }
+                    } else if (Sorted) {
+                        break;
+                    }
+                }
+            }
+        }
+
+        DeclL = DeclL->Next;
+    }
+
+    return Result;
+}
+//------------------------------------------------------------------------------
+TMethodDecl *TRecBaseDef::GetMethodByVMTNDX(int VMTNDX, int VMTCnt) {
+    if (VMTNDX >= VMTCnt) return nullptr;
+
+    TDCURec *DeclL = Fields;
+    while (DeclL) {
+        TDCURec *Decl = DeclL;
+        if (TCopyDecl *CD = dynamic_cast<TCopyDecl *>(Decl)) {
+            CD = static_cast<TCopyDecl *>(CD->Base);
+        }
+
+        if (TMethodDecl *MD = dynamic_cast<TMethodDecl *>(Decl)) {
+            // or lfOverride
+            if ((MD->LocFlags & lfVirtual) != 0) {
+                if (MD->hDT == VMTNDX) {
+                    return MD;
+                }
+            }
+        }
+
+        DeclL = DeclL->Next;
+    }
+    return nullptr;
+}
 //------------------------------------------------------------------------------
 TRecDef::TRecDef() : TRecBaseDef() {
-    Byte  B1;
-    DWord X0, X, XX;
-
-    if (FVer >= verD2009 && FVer < verK1) ReadUIndex();
     B2 = ReadByte();
+
     if (IsMSIL) {
-        X = ReadUIndex();
+        if (FVer >= verD2006 && FVer < verK1)
+            Byte B1 = ReadByte();
+
+        TNDX X = ReadUIndex();
         // !Temp Skip interface info - should make it stored in recs too
-        ReadClassInterfaces(NULL);
+        ReadClassInterfaces(nullptr);
     } else if (FVer >= verD2005 && FVer < verK1) {
         if (FVer >= verD2006 && FVer < verK1) {
-            B1 = ReadByte();
-            if (FVer >= verD2009 && FVer < verK1) XX = ReadUIndex();
-            if (FVer >= verD2010 && FVer < verK1) XX = ReadUIndex();
-            X0 = ReadUIndex();
+            Byte B1 = ReadByte();
+            TNDX X0 = ReadByte();
         }
-        ReadClassInterfaces(NULL);
-        // X = ReadUIndex();     // ???????????????
+        TNDX X = ReadUIndex();
+        if (FVer >= verD2009) {
+            ReadUIndex();
+            ReadUIndex();
+            if (FVer >= verD2010)
+                ReadUIndex();
+        }
     }
     ReadFields(dlFields);
 }
+//------------------------------------------------------------------------------
+void TRecDef::Visit(TDCURecVisitor *Visitor) { Visitor->visitRecDef(this); }
 //------------------------------------------------------------------------------
 int __fastcall TRecDef::ShowValue(Byte *DP, DWord DS, String &OutS) {
     return ShowFieldValues(DP, DS, OutS);
@@ -2696,7 +4001,7 @@ TNameDecl **__fastcall GetNoCaseEP(TDCURec **L, int OfsRq) {
         if (static_cast<TLocalDecl *>(*L)->Ndx >= OfsRq) return reinterpret_cast<TNameDecl **>(L);
         L = &((*L)->Next);
     }
-    return NULL;
+    return nullptr;
 }
 //------------------------------------------------------------------------------
 // Requires: L-case field
@@ -2710,7 +4015,7 @@ TNameDecl **__fastcall GetNoCaseEP(TDCURec **L, int OfsRq) {
 //    0: (B: double@8);
 //    1: (C: Byte@4))
 // end ;
-
+// function GetNextEP(var L: TDCURec; OfsRq: integer): PNameDecl;
 TNameDecl **__fastcall GetNextEP(TDCURec *L, int OfsRq) {
     int Ofs;
 
@@ -2726,39 +4031,38 @@ TNameDecl **__fastcall GetNextEP(TDCURec *L, int OfsRq) {
         if (Ofs >= OfsRq && Ofs < OfsMax) return Result;
         Result = reinterpret_cast<TNameDecl **>(&((*Result)->Next));
     }
-    return NULL;
+    return nullptr;
 }
 //------------------------------------------------------------------------------
-void __fastcall ShowCase(TNameDecl *Start, Byte SK) {
-    TNameDecl *EP0;
+// procedure ShowCase(Ofs0: Cardinal; Start: TDCURec{TNameDecl}; Sep: TDeclSepFlags; SK: TDeclSecKind);
+void __fastcall ShowCase(TDCURec *Start, Byte SK) {
+    TNameDecl *EP0 = nullptr;
     String     S;
 
     int CaseOfs = GetCaseOfs(Start);
 
-    TNameDecl **EP = NULL;
+    TNameDecl **EP = nullptr;
 
-    if (CaseOfs < MAXINT) EP = GetNoCaseEP(reinterpret_cast<TDCURec **>(&Start), CaseOfs);
+    if (CaseOfs < MAXINT) EP = GetNoCaseEP(&Start, CaseOfs);
     if (EP) {
         EP0 = *EP;
-        *EP = NULL;
+        *EP = nullptr;
     }
 
     ShowDeclList(dlFields, Start, S);
 
     if (EP) {
         int hCase;
-        TNameDecl *CaseP;
-
         OutLog1("case Integer of\n");
         CaseN = hCase = 0;
         while (true) {
             *EP = EP0;
             OutLog2("%d:(", hCase); // The actual case labels and case data type are not stored in DCUs
-            CaseP = EP0;
-            EP    = GetNextEP((TDCURec *) CaseP, CaseOfs);
+            TNameDecl *CaseP = EP0;
+            EP    = GetNextEP(CaseP, CaseOfs);
             if (EP) {
                 EP0 = *EP;
-                *EP = NULL;
+                *EP = nullptr;
             }
             ShowCase(CaseP, SK);
             hCase++;
@@ -2784,7 +4088,9 @@ String __fastcall TRecDef::GetOfsQualifier(int Ofs) {
 }
 //------------------------------------------------------------------------------
 TProcTypeDef::TProcTypeDef() : TRecBaseDef() {
-    if (FVer > verD2) Ndx0 = ReadUIndex();
+    if (FVer > verD2)
+        Ndx0 = ReadUIndex();
+
     hDTRes   = ReadUIndex();
     AddSz    = 0;
     AddStart = CurPos;
@@ -2793,21 +4099,37 @@ TProcTypeDef::TProcTypeDef() : TRecBaseDef() {
     // 99.99% that instead of WHILE it would be enough to use IF
     while (Tag != drEmbeddedProcStart) {
         if (Tag == drStop1) return;
-        Byte CK = ReadCallKind();
-        if (CK == pcRegister)
-            Tag = ReadTag();
-        else
+        if (Byte CK = ReadCallKind(); CK == pcRegister) {
+            if (FVer >= verD2009 && FVer < verK1) {
+                Tag = ReadTag();
+
+                switch (Tag) {
+                    case drA5Info:
+                        //Data.Bind.Components DXE3 Win64
+                        break;
+                    case drA7Info:
+                        TTemplateParmsDeclModifier::Read(this);
+                        break;
+                    case drA8Info:
+                        ReadUIndex();  //!!!M.b. some DCU record to be created
+                        break;
+                }
+            }
+        } else {
             CallKind = CK;
+        }
         AddSz++;
     }
     ReadFields(dlArgsT);
 }
 //------------------------------------------------------------------------------
+void TProcTypeDef::Visit(TDCURecVisitor *Visitor) { Visitor->visitProcTypeDef(this); }
+//------------------------------------------------------------------------------
 int __fastcall TProcTypeDef::ShowValue(Byte *DP, DWord DS, String &OutS) {
     OutS = "";
     if (Sz > DS) return -1;
-    if (Sz == 4) {
-        ShowPointer(DP, "Nil", OutS);
+    if (Sz == FPtrSize) {
+        ShowPointer(DP, "Nil", OutS, nullptr);
         return Sz;
     }
     return TRecBaseDef::ShowValue(DP, Sz, OutS);
@@ -2852,6 +4174,7 @@ void __fastcall TProcTypeDef::ShowDecl(char *Braces, String &OutS) {
 }
 //------------------------------------------------------------------------------
 void __fastcall TProcTypeDef::Show(String &OutS) {
+    // if (FVer>=verD13)and(FVer<verK1)and(NDX0 & ptfReference!=0) PutKWSp('reference to');
     String S;
     OutS = ProcStr();
     OutLog2("%s", OutS.c_str());
@@ -2863,15 +4186,74 @@ void __fastcall TProcTypeDef::EnumUsedTypes(TTypeUseAction Action, DWord *IP) {
     TRecBaseDef::EnumUsedTypes(Action, IP);
     if (!IsProc()) Action(this, hDTRes, IP);
 }
+
 //------------------------------------------------------------------------------
-__fastcall TObjDef::TObjDef() : TRecBaseDef() {
-    B03     = ReadByte();
+TTypeValKind TProcTypeDef::ValKind() {
+    if ((Ndx0 & 0x10) != 0) {
+        return TTypeValKind::vkMethod;
+    }
+    return TTypeValKind::vkPointer;
+}
+//------------------------------------------------------------------------------
+void TOOTypeDef::Visit(TDCURecVisitor *Visitor) { Visitor->visitOOTypeDef(this); }
+//------------------------------------------------------------------------------
+
+/**
+ * This is unused.
+ *
+ * @param Ofs
+ * @return
+ */
+/*TMethodDecl * TOOTypeDef::GetMethodByVMTOfs(int Ofs) {
+    if (!hasVMT())
+        return nullptr;
+
+    if ((Ofs & 0x3) != 0)
+        return nullptr;
+
+    Ofs /= 4;
+
+    if (Ofs >= VMCnt)
+        return nullptr;
+
+    if (TMethodDecl *Result = GetMethodByVMTNDX(Ofs, VMCnt); Result || hParent == 0)
+        return Result;
+
+    TTypeDef *TD = GetGlobalTypeDef(hParent);
+    TOOTypeDef *OOTD = dynamic_cast<TOOTypeDef *>(TD);
+
+    if (OOTD == nullptr)
+        return nullptr;
+
+    return OOTD->GetMethodByVMTOfs(Ofs * 4);
+}*/
+//------------------------------------------------------------------------------
+bool __fastcall TOOTypeDef::hasVMT() { return true; }
+//------------------------------------------------------------------------------
+TObjDef::TObjDef() : TOOTypeDef() {
+    B03 = ReadByte();
+
+    if (FVer >= verD2006 && FVer < verK1)
+        TNDX BX = ReadUIndex();
+
+    if (FVer >= verDXE1 && FVer < verK1)
+        Byte BX1 = ReadByte();
+
     hParent = ReadUIndex();
-    BFE     = ReadByte();
-    Ndx1    = ReadIndex();
-    B00     = ReadByte();
+    VMTOfs  = ReadUIndex();
+    hVMT    = ReadIndex();
+    VMCnt   = ReadIndex();
+
+    if (FVer >= verDXE2 && FVer < verK1)
+        TNDX BX2 = ReadUIndex();
+
+    // BFE     = ReadByte();
+    // Ndx1    = ReadIndex();
+    // B00     = ReadByte();
     ReadFields(dlFields);
 }
+//------------------------------------------------------------------------------
+void TObjDef::Visit(TDCURecVisitor *Visitor) { Visitor->visitObjDef(this); }
 //------------------------------------------------------------------------------
 int __fastcall TObjDef::ShowValue(Byte *DP, DWord DS, String &OutS) { return ShowFieldValues(DP, DS, OutS); }
 //------------------------------------------------------------------------------
@@ -2889,7 +4271,7 @@ void __fastcall TObjDef::EnumUsedTypes(TTypeUseAction Action, DWord *IP) {
     if (hParent) Action(this, hParent, IP);
 }
 //------------------------------------------------------------------------------
-int __fastcall TObjDef::GetParentType() { return hParent; }
+TNDX __fastcall TObjDef::GetParentType() { return hParent; }
 //------------------------------------------------------------------------------
 String __fastcall TObjDef::GetOfsQualifier(int Ofs) {
     String Result = GetFldOfsQualifier(Ofs, Sz, true);
@@ -2898,10 +4280,22 @@ String __fastcall TObjDef::GetOfsQualifier(int Ofs) {
     return TRecBaseDef::GetOfsQualifier(Ofs);
 }
 //------------------------------------------------------------------------------
-TClassDef::TClassDef() : TRecBaseDef() {
-    if (FVer >= verD2009 && FVer < verK1) ReadUIndex();
-    if (FVer >= verD2006 && FVer < verK1) Byte BX = ReadByte(); // Some flags
-    if (FVer >= verD2009 && FVer < verK1) ReadByte();      // SomeFlags???
+bool TObjDef::hasVMT() { return VMTOfs >= 0; }
+//------------------------------------------------------------------------------
+TClassDef::TClassDef() : TOOTypeDef() {
+    TNDX Msk;
+
+    if (FVer >= verD2006 && FVer < verK1)
+        Byte BX = ReadByte(); // Some flags
+
+    if (FVer >= verD2009 && FVer < verK1) {
+        if (FVer >= verDXE2 && FVer < verK1)
+            ReadByte();
+        else
+            ReadUIndex(); // It could be byte too, but it's to be checked // BX1
+
+        ReadByte(); // BX2
+    }
 
     hParent        = ReadUIndex();
     InstBaseRTTISz = ReadUIndex();
@@ -2909,29 +4303,46 @@ TClassDef::TClassDef() : TRecBaseDef() {
     InstBaseV      = ReadUIndex();
     VMCnt          = ReadUIndex();
     NdxFE          = ReadUIndex();
-    Ndx00a         = ReadUIndex();
+    PropCnt        = ReadUIndex();
 
-    if (FVer >= verD8 && FVer < verK1)
-        B04 = ReadUIndex();
-    else
-        B04 = ReadByte();
-    if (FVer >= verD2010 && FVer < verK1) ReadUIndex();
+    if (FVer >= verD8 && FVer < verK1) {
+        Flags = ReadUIndex();
+        Msk = 0x08;
+    } else {
+        Flags = ReadByte();
+        Msk = 0x10;
+    }
+
+    if (FVer >= verD2010 && FVer < verK1)
+        ReadUIndex(); // BX3
+
+    if (FromPackage && ((Flags & Msk) > 0) && !IsMSIL) {
+        ReadUIndex(); // Usually #1
+        const int N = ReadUIndex(); // Usually #1
+        for (int i = 1; i <= N; i++)
+            ReadUIndex(); // Usually #1
+    }
+
     if (FVer > verD2) {
-        ReadBeforeIntf(); // Fo
+        ReadBeforeIntf(); // For TMetaClassDef
         ICnt = ReadClassInterfaces(&ITbl);
     }
+
     ReadFields(dlClass);
+    // MarkAuxFields();
 }
 //------------------------------------------------------------------------------
 TClassDef::~TClassDef() {
     if (ITbl) delete[] ITbl;
 }
 //------------------------------------------------------------------------------
+void TClassDef::Visit(TDCURecVisitor *Visitor) { Visitor->visitClassDef(this); }
+//------------------------------------------------------------------------------
 int __fastcall TClassDef::ShowValue(Byte *DP, DWord DS, String &OutS) {
     OutS = "";
     if (Sz > DS) return -1;
-    if (Sz == 4) {
-        ShowPointer(DP, "Nil", OutS);
+    if (Sz == FPtrSize) {
+        ShowPointer(DP, "Nil", OutS, nullptr);
         return Sz;
     }
     return TRecBaseDef::ShowValue(DP, Sz, OutS);
@@ -2941,6 +4352,16 @@ void __fastcall TClassDef::Show(String &OutS) {
     String S;
     OutS = "class";
     OutLog1("class");
+    if (FVer >= verD8 && FVer < verK1) {
+        if ((Flags & 0x04) != 0) {
+            OutS += " abstract";
+            OutLog1(" abstract");
+        }
+        if ((Flags & 0x40) != 0) {
+            OutS += " sealed";
+            OutLog1(" sealed");
+        }
+    }
     if (hParent || ICnt) {
         OutS += "(";
         OutLog1("(");
@@ -2956,7 +4377,7 @@ void __fastcall TClassDef::Show(String &OutS) {
                 OutS += ",";
                 OutLog1(",");
             }
-            S = ShowTypeName(ITbl[2 * j]);
+            S = ShowTypeName(*ITbl[2 * j]);
             OutS += S;
         }
         OutS += ")";
@@ -2965,11 +4386,12 @@ void __fastcall TClassDef::Show(String &OutS) {
     OutLog2("VMCnt:%d\n", VMCnt);
     TRecBaseDef::Show(S);
     CaseN = -1;
+    // dcu32: ShowDeclList(dlClass,Self{MainRec},Fields,Ofs0,2,[dsLast],ClassSecKinds[(CurUnit.Ver>=verD8)and(CurUnit.Ver<verK1)],skNone);
     ShowDeclList(dlClass, Fields, S);
     OutLog1("end");
 }
 //------------------------------------------------------------------------------
-int __fastcall TClassDef::GetParentType() { return hParent; }
+TNDX __fastcall TClassDef::GetParentType() { return hParent; }
 //------------------------------------------------------------------------------
 String __fastcall TClassDef::GetRefOfsQualifier(int Ofs) {
     String Result;
@@ -2982,23 +4404,128 @@ String __fastcall TClassDef::GetRefOfsQualifier(int Ofs) {
         return TRecBaseDef::GetRefOfsQualifier(Ofs);
 }
 //------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
 void __fastcall TClassDef::ReadBeforeIntf() {}
 //------------------------------------------------------------------------------
+// todo: review
+TLocalDecl *TClassDef::GetObjFldByOfs(int Ofs, int QSz, Byte *ObjUnit) {
+    Byte *U = nullptr; // TUnit
+    Byte *U0 = nullptr; // TUnit
+    TTypeDef *TD = nullptr;
+
+    TLocalDecl *Result = GetFldByOfs(Ofs, QSz, InstBaseSz, true);
+
+    if ((Result != nullptr) || (hParent == 0)) {
+        // ObjUnit = CurUnit; // CurUnit
+        return Result;
+    }
+
+    ObjUnit = nullptr;
+    TD = GetGlobalTypeDef(hParent);
+
+    if ((!TD) || !(TD->InheritsFrom(__classid(TClassDef)))) {
+        return nullptr;
+    }
+
+    // U0      = CurUnit;
+    // CurUnit = U;
+
+    try {
+        Result = static_cast<TClassDef *>(TD)->GetObjFldByOfs(Ofs, QSz, ObjUnit);
+    } __finally {
+        // CurUnit = U0;
+    }
+
+    return Result;
+}
+//------------------------------------------------------------------------------
+void TLocalDecl::ShowName(String &OutS) {
+    // todo: review: necessary?
+    /*auto ShowAuxFieldQualifier[]() {
+        TLocalDecl *RefFld = reinterpret_cast<TLocalDecl *>(NdxB);
+
+        if (RefFld) {
+            RefFld->ShowName();
+        }
+
+        int TSz = GetTypeSize(hDT);
+        if (TSz < 0) {
+            TSz = 0;
+        }
+
+        int dOfs = NDX - (RefFld ? RefFld->Ndx : 0);
+
+        TUnit *RefU = GetDCUOfMemory(RefFld != nullptr ? RefFld->Def : nullptr);
+        if (!RefU) {
+            if (dOfs > 0) {
+                // PutSFmt(L"+%d", ARRAYOFCONST((dOfs)));
+            }
+        } else {
+            AnsiString sQ;
+            RefU->GetOfsQualifierEx(RefFld->hDT, dOfs, TSz, nullptr, &sQ);
+            // PutS(sQ);
+        }
+    }*/
+
+    // if (((LocFlagsX & lfauxPropField) != 0) && (NdxB != 0))
+    //      ShowAuxFieldQualifier();
+    // else
+        TLocalDeclBase::ShowName(OutS);
+}
+//------------------------------------------------------------------------------
+
+/**
+ * Set the lfauxPropField flags
+ */
+void TClassDef::MarkAuxFields() {
+    TDCURec   *DeclL    = Fields;
+    TDCURec   *Decl     = nullptr;
+    TPropDecl *PropDecl = nullptr;
+
+    int TSz = 0;
+    // TUnit     *FldUnit  = nullptr;
+
+    while (DeclL) {
+        Decl = DeclL;
+        if (Decl->InheritsFrom(__classid(TLocalDecl))) {
+            TLocalDecl *LD = static_cast<TLocalDecl *>(Decl);
+            if ((LD->GetTag() == arFld) && (!LD->Name || LD->Name->IsEmpty())) {
+                PropDecl = GetFldProperty(LD, LD->hDT);
+                if (PropDecl) {
+                    LD->LocFlagsX = LD->LocFlagsX | lfauxPropField;
+                    TSz = GetTypeSize(LD->hDT);
+                    if (TSz < 0) {
+                        TSz = 0; // to fit anywhere
+                    }
+                    TLocalDecl *temp = reinterpret_cast<TLocalDecl*>(LD->NdxB);
+                    temp = GetObjFldByOfs(LD->Ndx, TSz, nullptr);
+                }
+            }
+        }
+
+        DeclL = DeclL->Next;
+    }
+}
+//------------------------------------------------------------------------------
 TMetaClassDef::TMetaClassDef() : TClassDef() {}
+//------------------------------------------------------------------------------
+void TMetaClassDef::Visit(TDCURecVisitor *Visitor) { Visitor->visitMetaClassDef(this); }
 //------------------------------------------------------------------------------
 void __fastcall TMetaClassDef::ReadBeforeIntf() {
     hCl = ReadUIndex();
     ReadUIndex(); // Ignore - was always 0
 }
 //------------------------------------------------------------------------------
-TInterfaceDef::TInterfaceDef() : TRecBaseDef() {
+TInterfaceDef::TInterfaceDef() : TOOTypeDef() {
     Byte LK;
 
-    if (FVer >= verD2009 && FVer < verK1) ReadUIndex();
+    if (FVer >= verD2009 && FVer < verK1) {
+        ReadByte(); // ReadUIndex();
+    }
 
     hParent = ReadUIndex();
     VMCnt   = ReadIndex();
-    GUID    = reinterpret_cast<PGUID>(ReadMem(16));
+    GUID    = reinterpret_cast<PGUID>(ReadMem(16)); // sizeof(TGUID)
     B       = ReadByte();
 
     if ((B & 4) == 0)
@@ -3007,19 +4534,25 @@ TInterfaceDef::TInterfaceDef() : TRecBaseDef() {
         LK = dlDispInterface;
 
     if (FVer >= verD8 && FVer < verK1) {
-        if (FVer >= verD2010 && FVer < verK1) ReadUIndex();
-        /*
-        Cnt = ReadUIndex();
-        for (int i = 0; i < Cnt; i++)
-        {
+        if (FVer >= verD2010 && FVer < verK1)
+            ReadUIndex();
+
+        int Cnt = ReadUIndex();
+        for (int i = 1; i <= Cnt; i++) {
             ReadUIndex();
             ReadUIndex();
+            if (IsMSIL && FVer >= verD2006 && FVer < verK1) {
+                ReadUIndex();
+                ReadUIndex();
+            }
         }
-        */
-        ReadClassInterfaces(NULL);
+
+        // ReadClassInterfaces(NULL);
     }
     ReadFields(LK);
 }
+//------------------------------------------------------------------------------
+void TInterfaceDef::Visit(TDCURecVisitor *Visitor) { Visitor->visitInterfaceDef(this); }
 //------------------------------------------------------------------------------
 void __fastcall TInterfaceDef::Show(String &OutS) {
     char   guid[1024];
@@ -3046,6 +4579,8 @@ TVoidDef::TVoidDef() : TTypeDef() {
     if (FVer >= verDXE1 && FVer < verK1) int X = ReadUIndex();
 }
 //------------------------------------------------------------------------------
+void TVoidDef::Visit(TDCURecVisitor *Visitor) { Visitor->visitVoidDef(this); }
+//------------------------------------------------------------------------------
 void __fastcall TVoidDef::Show(String &OutS) {
     String SType;
     OutS = "void";
@@ -3056,15 +4591,17 @@ void __fastcall TVoidDef::Show(String &OutS) {
 //------------------------------------------------------------------------------
 TA6Def::TA6Def() : TDCURec() {
     Tag = ReadTag();
-    ReadDeclList(dlA6, &Args);
+    ReadDeclList(dlA6, nullptr, &Args);
     if (Tag != drStop1) printf("Stop Tag\n");
 }
 //------------------------------------------------------------------------------
 TA6Def::~TA6Def() { FreeDCURecList(Args); }
 //------------------------------------------------------------------------------
+void TA6Def::Visit(TDCURecVisitor *Visitor) { Visitor->visitA6Def(this); }
+//------------------------------------------------------------------------------
 void __fastcall TA6Def::Show(String &OutS) { ShowDeclList(dlA6, Args, OutS); }
 //------------------------------------------------------------------------------
-TA7Def::TA7Def() : TDCURec() {
+/*TA7Def::TA7Def() : TDCURec() {
     hClass = ReadUIndex();
     Cnt    = ReadUIndex();
     Tbl    = new int[Cnt];
@@ -3077,6 +4614,8 @@ TA7Def::~TA7Def() {
     if (Tbl) delete[] Tbl;
 }
 //------------------------------------------------------------------------------
+void TA7Def::Visit(TDCURecVisitor *Visitor) { Visitor->visit }
+//------------------------------------------------------------------------------
 void __fastcall TA7Def::Show(String &OutS) {
     OutS = "";
     OutLog1("A7");
@@ -3086,13 +4625,15 @@ void __fastcall TA7Def::Show(String &OutS) {
         Sep = ',';
     }
     OutLog1("]");
-}
+}*/
 //------------------------------------------------------------------------------
 TDelayedImpRec::TDelayedImpRec() : TNameDecl(true) {
     Inf = ReadULong();
     F   = ReadUIndex();
     RefAddrDef(F);
 }
+//------------------------------------------------------------------------------
+void TDelayedImpRec::Visit(TDCURecVisitor *Visitor) { Visitor->visitDelayedImpRec(this); }
 //------------------------------------------------------------------------------
 void __fastcall TDelayedImpRec::Show(String &OutS) {
     TNameDecl::Show(OutS);
@@ -3106,11 +4647,13 @@ TORecDecl::TORecDecl() : TNameDecl(true) {
     B0  = ReadByte();
     B1  = ReadByte();
     Tag = ReadTag();
-    ReadDeclList(dlA6, &Args);
+    ReadDeclList(dlA6, nullptr, &Args);
     if (Tag != drStop1) printf("Stop Tag\n");
 }
 //------------------------------------------------------------------------------
 TORecDecl::~TORecDecl() { FreeDCURecList(Args); }
+//------------------------------------------------------------------------------
+void TORecDecl::Visit(TDCURecVisitor *Visitor) { Visitor->visitORecDecl(this); }
 //------------------------------------------------------------------------------
 void __fastcall TORecDecl::Show(String &OutS) {
     TNameDecl::Show(OutS);
@@ -3120,6 +4663,8 @@ void __fastcall TORecDecl::Show(String &OutS) {
 }
 //------------------------------------------------------------------------------
 TDynArrayDef::TDynArrayDef() : TPtrDef() {}
+//------------------------------------------------------------------------------
+void TDynArrayDef::Visit(TDCURecVisitor *Visitor) { Visitor->visitDynArrayDef(this); }
 //------------------------------------------------------------------------------
 void __fastcall TDynArrayDef::Show(String &OutS) {
     ShowBase();
@@ -3140,9 +4685,11 @@ String __fastcall TDynArrayDef::GetRefOfsQualifier(int Ofs) {
 //------------------------------------------------------------------------------
 TTemplateArgDef::TTemplateArgDef() : TTypeDef() {
     Cnt = ReadUIndex();
-    Tbl = new int[Cnt];
+    // Tbl = new int[Cnt];
+    // Tbl = AllocMem(Cnt * sizeof(TNDX))
+    Tbl = new TNDXTbl[Cnt];
     for (int i = 0; i < Cnt; i++) {
-        Tbl[i] = ReadUIndex();
+        *Tbl[i] = ReadUIndex();
     }
     V5 = ReadUIndex();
 }
@@ -3150,6 +4697,8 @@ TTemplateArgDef::TTemplateArgDef() : TTypeDef() {
 TTemplateArgDef::~TTemplateArgDef() {
     if (Tbl) delete[] Tbl;
 }
+//------------------------------------------------------------------------------
+void TTemplateArgDef::Visit(TDCURecVisitor *Visitor) { Visitor->visitTemplateArgDef(this); }
 //------------------------------------------------------------------------------
 void __fastcall TTemplateArgDef::Show(String &OutS) {
     TTypeDef::Show(OutS);
@@ -3166,34 +4715,533 @@ void __fastcall TTemplateArgDef::Show(String &OutS) {
 }
 //------------------------------------------------------------------------------
 TTemplateCall::TTemplateCall() : TTypeDef() {
-    if (FVer >= verDXE1 && FVer < verK1) int X = ReadUIndex();
+    if (FVer >= verDXE1 && FVer < verK1)
+        int X = ReadByte(); // ReadUIndex() - it was detected in verD_XE2 and Ok for verD_XE
+
     hDT  = ReadUIndex();
     Cnt  = ReadUIndex();
-    Args = new int[Cnt];
+    // Args = new int[Cnt]; //  AllocMem(Cnt*SizeOf(TNDX));
+    Args = new TNDXTbl[Cnt];
     for (int i = 0; i < Cnt; i++) {
-        Args[i] = ReadUIndex();
+        *Args[i] = ReadUIndex();
+        if (FVer >= verD12 && FVer < verK1) {
+            ReadSomeNameInfo28();
+        }
     }
     hDTFull = ReadUIndex();
+    //!!! FixDTName();
 }
 //------------------------------------------------------------------------------
 TTemplateCall::~TTemplateCall() {
     if (Args) delete[] Args;
+    FreeName(FixedName);
 }
+//------------------------------------------------------------------------------
+void TTemplateCall::Visit(TDCURecVisitor *Visitor) { Visitor->visitTemplateCall(this); }
 //------------------------------------------------------------------------------
 void __fastcall TTemplateCall::Show(String &OutS) {
     TTypeDef::Show(OutS);
     if (hDTFull) OutS += ShowTypeName(hDTFull);
     OutS += ShowTypeName(hDT);
+
+    // needed?
+    /*if Writer.AuxLevel<=0 then begin
+      RemOpen;
+      //CurUnit.ShowTypeName(hDT);
+      if (FixedName<>Nil)and((OldName=Nil)or(not FixedName^.Eq(OldName){FixedName^<>OldName^})) then begin
+        PutCh('|');
+        PutS(FixedName^.GetStr);
+      end ;
+      RemClose;
+      SoftNL;
+    end ;*/
+
     char Sep = '<';
     for (int i = 0; i < Cnt; i++) {
         OutS += String(Sep);
         OutLog2("%c", Sep);
         Sep = ',';
-        OutS += ShowTypeDef(Args[i], NULL);
+        OutS += ShowTypeDef(*Args[i], nullptr);
     }
     OutLog1(">");
     OutS += ">";
+
+    // if (hDTFull<>0)
+    // AuxRemClose();
 }
+//------------------------------------------------------------------------------
+/**
+ *
+ * @param DP
+ * @param DS
+ * @param OutS
+ * @return Size used
+ */
+int __fastcall TTemplateCall::ShowValue(Byte *DP, DWord DS, String &OutS) {
+    int Result = ShowGlobalTypeValue(hDT, DP, DS, false, -1, false, OutS);
+
+    if (Result > 0) {
+        Result = TTypeDef::ShowValue(DP, DS, OutS);
+    }
+
+    return Result;
+;}
 //------------------------------------------------------------------------------
 void __fastcall TTemplateCall::EnumUsedTypes(TTypeUseAction Action, DWord *IP) { Action(this, hDT, IP); }
 //------------------------------------------------------------------------------
+TTypeValKind TTemplateCall::ValKind() { return GetGlobalTypeValKind(hDT); }
+//------------------------------------------------------------------------------
+void TTemplateCall::FixDTName() {
+    TTypeDef *TD = GetLocalTypeDef(hDT);
+    if (!TD) return;
+    if (!OldName) return;
+    AnsiString S = OldName->GetStr();
+    char* EP = Ansistrings::StrScan(S.c_str(), '`');
+    if (!EP) return;
+    S.SetLength(EP - S);
+    char Sep = '<';
+    for (int i=0; i<Cnt; i++) {
+        PName NP = GetTypeName(*Args[i]);
+        if (!NP) return;
+        S += Sep + NP->GetStr();
+        Sep = ',';
+    }
+    S += '>';
+    FixedName = AllocName(S);
+    TD->FName = FixedName;
+}
+//------------------------------------------------------------------------------
+// todo: review
+TAssemblyData::TAssemblyData() {
+    HdrSz = ReadUIndex();
+    TIncPtr HdrStart = CurPos;
+    F = ReadULong();
+    SzPublicKey = ReadULong();
+    PublicKey = ReadMem(SzPublicKey);
+    SzPublicKeyToken = ReadULong();
+    PublicKeyToken = ReadMem(SzPublicKeyToken);
+    Y = ReadULong();
+
+    DWord Sz = ReadULong(); // ulong
+
+    AssemblyName = reinterpret_cast<char *>(ReadMem(Sz));
+    // AssemblyName = ReadMem((Sz+3)and not $3); // align on 4b boundary
+    SomeData = ReadMem(0x18);
+    Sz       = CurPos - HdrStart;
+
+    if ((Sz > HdrSz) || (Sz + 8 < HdrSz)) {
+        printf("[Error] Unexpected AssemblyData header size $%x\n", HdrSz); // DCUErrorFmt
+    }
+
+    SkipBlock(HdrSz-Sz);
+    Descr = ReadShortName();
+    Cnt1 = ReadUIndex();
+    Tbl1 = reinterpret_cast<PulongTbl>(ReadMem(Cnt1 * sizeof(DWord))); // ulong
+    Tbl2 = static_cast<PulongTbl>(AllocMem(Cnt1 * sizeof(DWord))); // ulong
+
+     for (int i = 0; i < Cnt1; i++) {
+         *Tbl2[i] = ReadUIndex();
+     }
+
+    Cnt2 = ReadUIndex();
+    Tbl3 = reinterpret_cast<PulongTbl>(ReadMem(Cnt2 * sizeof(DWord))); // ulong
+    Tbl4 = reinterpret_cast<PulongTbl>(ReadMem(Cnt2 * sizeof(DWord))); // ulong
+    Tbl5 = reinterpret_cast<PulongTbl>(ReadMem(Cnt2 * sizeof(DWord))); // ulong
+    Cnt3 = ReadUIndex();
+    Tbl6 = reinterpret_cast<PulongTbl>(ReadMem(Cnt3 * sizeof(DWord))); // ulong
+}
+//------------------------------------------------------------------------------
+TAssemblyData::~TAssemblyData() {
+    if (Tbl2) {
+        delete[] Tbl2;
+    }
+}
+//------------------------------------------------------------------------------
+void TAssemblyData::Visit(TDCURecVisitor *Visitor) { Visitor->visitAssemblyData(this); }
+//------------------------------------------------------------------------------
+void __fastcall TAssemblyData::Show(String &OutS) {
+    // todo
+    // PutKWSp('AssemblyData');
+    // PutSFmt('(#%d,%x',[HdrSz,F]);
+    // ShiftNLOfs(2);
+    // try
+    //     NL;
+    // PutS('PublicKey:');
+    // PutS(DumpStr(PublicKey^,SzPublicKey));
+    // NL;
+    // PutS('AssemblyName: ');
+    // PutS(AssemblyName);
+    // NL;
+    // PutS('SomeData:');
+    // PutS(DumpStr(SomeData^,$18));
+    // NL;
+    // PutS('Descr: ');
+    // PutS(Descr^);
+    // NL;
+    // PutS('Tbl1: ');
+    // ShowUlongTbl(Tbl1,Cnt1);
+    // NL;
+    // PutS('Tbl2: ');
+    // ShowLongTbl(Tbl2,Cnt1);
+    // NL;
+    // PutS('Tbl3: ');
+    // ShowUlongTbl(Tbl3,Cnt2);
+    // NL;
+    // PutS('Tbl4: ');
+    // ShowUlongTbl(Tbl4,Cnt2);
+    // NL;
+    // PutS('Tbl5: ');
+    // ShowUlongTbl(Tbl5,Cnt2);
+    // NL;
+    // PutS('Tbl6: ');
+    // ShowUlongTbl(Tbl6,Cnt3);
+    // NL;
+    // finally
+    //     ShiftNLOfs(-2);
+    // end ;
+    // PutCh(')');
+}
+//------------------------------------------------------------------------------
+bool __fastcall TAssemblyData::IsVisible(Byte LK) {
+    // TDeclListKind::Main
+    return LK != dlMain; // Show in implementation or other places
+}
+
+/*procedure ShowUlongTblEx(Tbl: PulongTbl; Cnt: Integer; const ValFmt: AnsiString);
+var
+  i: Integer;
+begin
+  PutCh('(');
+  ShiftNLOfs(2);
+  try
+    for i:=0 to Cnt-1 do begin
+      if i>0 then
+        PutS(','+cSoftNL);
+      PutSFmt('%d:',[i]);
+      PutSFmt(ValFmt,[Tbl^[i]]);
+    end ;
+  finally
+    ShiftNLOfs(-2);
+  end ;
+  PutCh(')');
+end;
+
+procedure ShowUlongTbl(Tbl: PulongTbl; Cnt: Integer);
+begin
+  ShowUlongTblEx(Tbl,Cnt,'$%x');
+end;
+
+procedure ShowLongTbl(Tbl: PulongTbl; Cnt: Integer);
+begin
+  ShowUlongTblEx(Tbl,Cnt,'#%d');
+end;*/
+
+//------------------------------------------------------------------------------
+void __fastcall TDCURecVisitor::doVisit(TDCURec *DCURec) {
+    bool SaveVisited = FVisited;
+    SaveVisited = FVisited;
+    FVisited = true;
+    DCURec->Visit(this);
+    if (FVisited) afterVisit(DCURec);
+    FVisited = SaveVisited;
+}
+//------------------------------------------------------------------------------
+void __fastcall TDCURecVisitor::afterVisit(TDCURec *DCURec) {}
+
+void __fastcall TDCURecVisitor::visitDCURec(TDCURec *DCURec) {}
+
+void __fastcall TDCURecVisitor::visitBaseDef(TBaseDef *BaseDef) { visitDCURec(BaseDef); }
+
+void __fastcall TDCURecVisitor::visitImpDef(TImpDef *ImpDef) { visitBaseDef(ImpDef); }
+
+void __fastcall TDCURecVisitor::visitUnitImpDef(TUnitImpDef *UnitImpDef) { visitImpDef(UnitImpDef); }
+
+void __fastcall TDCURecVisitor::visitDLLImpRec(TDLLImpRec *DLLImpRec) { visitBaseDef(DLLImpRec); }
+
+void __fastcall TDCURecVisitor::visitImpTypeDefRec(TImpTypeDefRec *ImpTypeDefRec) { visitImpDef(ImpTypeDefRec); }
+
+void __fastcall TDCURecVisitor::visitNameDecl(TNameDecl *NameDecl) { visitDCURec(NameDecl); }
+
+void __fastcall TDCURecVisitor::visitNameFDecl(TNameFDecl *NameFDecl) { visitNameDecl(NameFDecl); }
+
+void __fastcall TDCURecVisitor::visitTypeDecl(TTypeDecl *TypeDecl) { visitNameFDecl(TypeDecl); }
+
+void __fastcall TDCURecVisitor::visitVarDecl(TVarDecl *VarDecl) { visitNameFDecl(VarDecl); }
+
+void __fastcall TDCURecVisitor::visitVarVDecl(TVarVDecl *VarVDecl) { visitVarDecl(VarVDecl); }
+
+void __fastcall TDCURecVisitor::visitVarCDecl(TVarCDecl *VarCDecl) { visitVarDecl(VarCDecl); }
+
+void __fastcall TDCURecVisitor::visitAbsVarDecl(TAbsVarDecl *AbsVarDecl) { visitVarDecl(AbsVarDecl); }
+
+void __fastcall TDCURecVisitor::visitTypePDecl(TTypePDecl *TypePDecl) { visitVarCDecl(TypePDecl); }
+
+void __fastcall TDCURecVisitor::visitThreadVarDecl(TThreadVarDecl *ThreadVarDecl) { visitVarDecl(ThreadVarDecl); }
+
+void __fastcall TDCURecVisitor::visitMemBlockRef(TMemBlockRef *MemBlockRef) { visitNameFDecl(MemBlockRef); }
+
+void __fastcall TDCURecVisitor::visitStrConstDecl(TStrConstDecl *StrConstDecl) { visitMemBlockRef(StrConstDecl); }
+
+void __fastcall TDCURecVisitor::visitLabelDecl(TLabelDecl *LabelDecl) { visitNameDecl(LabelDecl); }
+
+void __fastcall TDCURecVisitor::visitExportDecl(TExportDecl *ExportDecl) { visitNameDecl(ExportDecl); }
+
+void __fastcall TDCURecVisitor::visitLocalDecl(TLocalDecl *LocalDecl) { visitNameDecl(LocalDecl); }
+
+void __fastcall TDCURecVisitor::visitMethodDecl(TMethodDecl *MethodDecl) { visitLocalDecl(MethodDecl); }
+
+void __fastcall TDCURecVisitor::visitClassVarDecl(TClassVarDecl *ClassVarDecl) { visitLocalDecl(ClassVarDecl); }
+
+void __fastcall TDCURecVisitor::visitPropDecl(TPropDecl *PropDecl) { visitNameDecl(PropDecl); }
+
+void __fastcall TDCURecVisitor::visitDispPropDecl(TDispPropDecl *DispPropDecl) { visitLocalDecl(DispPropDecl); }
+
+void __fastcall TDCURecVisitor::visitConstDeclBase(TConstDeclBase *ConstDeclBase) { visitNameFDecl(ConstDeclBase); }
+
+void __fastcall TDCURecVisitor::visitConstDecl(TConstDecl *ConstDecl) { visitConstDeclBase(ConstDecl); }
+
+void __fastcall TDCURecVisitor::visitResStrDef(TResStrDef *ResStrDef) { visitVarCDecl(ResStrDef); }
+
+void __fastcall TDCURecVisitor::visitSetDeftInfo(TSetDeftInfo *SetDeftInfo) { visitDCURec(SetDeftInfo); }
+
+void __fastcall TDCURecVisitor::visitCopyDecl(TCopyDecl *CopyDecl) { visitNameDecl(CopyDecl); }
+
+void __fastcall TDCURecVisitor::visitProcDecl(TProcDecl *ProcDecl) { visitMemBlockRef(ProcDecl); }
+
+void __fastcall TDCURecVisitor::visitSysProcDecl(TSysProcDecl *SysProcDecl) { visitNameDecl(SysProcDecl); }
+
+void __fastcall TDCURecVisitor::visitSysProc8Decl(TSysProc8Decl *SysProc8Decl) { visitProcDecl(SysProc8Decl); }
+
+void __fastcall TDCURecVisitor::visitUnitAddInfo(TUnitAddInfo *UnitAddInfo) { visitNameFDecl(UnitAddInfo); }
+
+void __fastcall TDCURecVisitor::visitSpecVar(TSpecVar *SpecVar) { visitVarDecl(SpecVar); }
+
+void __fastcall TDCURecVisitor::visitTypeDef(TTypeDef *TypeDef) { visitBaseDef(TypeDef); }
+
+void __fastcall TDCURecVisitor::visitRangeBaseDef(TRangeBaseDef *RangeBaseDef) { visitTypeDef(RangeBaseDef); }
+
+void __fastcall TDCURecVisitor::visitRangeDef(TRangeDef *RangeDef) { visitRangeBaseDef(RangeDef); }
+
+void __fastcall TDCURecVisitor::visitEnumDef(TEnumDef *EnumDef) { visitRangeBaseDef(EnumDef); }
+
+void __fastcall TDCURecVisitor::visitFloatDef(TFloatDef *FloatDef) { visitTypeDef(FloatDef); }
+
+void __fastcall TDCURecVisitor::visitPtrDef(TPtrDef *PtrDef) { visitTypeDef(PtrDef); }
+
+void __fastcall TDCURecVisitor::visitTextDef(TTextDef *TextDef) { visitTypeDef(TextDef); }
+
+void __fastcall TDCURecVisitor::visitFileDef(TFileDef *FileDef) { visitTypeDef(FileDef); }
+
+void __fastcall TDCURecVisitor::visitSetDef(TSetDef *SetDef) { visitTypeDef(SetDef); }
+
+void __fastcall TDCURecVisitor::visitArrayDef0(TArrayDef0 *ArrayDef0) { visitTypeDef(ArrayDef0); }
+
+void __fastcall TDCURecVisitor::visitArrayDef(TArrayDef *ArrayDef) { visitArrayDef0(ArrayDef); }
+
+void __fastcall TDCURecVisitor::visitShortStrDef(TShortStrDef *ShortStrDef) { visitArrayDef(ShortStrDef); }
+
+void __fastcall TDCURecVisitor::visitStringDef(TStringDef *StringDef) { visitArrayDef0(StringDef); }
+
+void __fastcall TDCURecVisitor::visitVariantDef(TVariantDef *VariantDef) { visitTypeDef(VariantDef); }
+
+void __fastcall TDCURecVisitor::visitObjVMTDef(TObjVMTDef *ObjVMTDef) { visitTypeDef(ObjVMTDef); }
+
+void __fastcall TDCURecVisitor::visitRecBaseDef(TRecBaseDef *RecBaseDef) { visitTypeDef(RecBaseDef); }
+
+void __fastcall TDCURecVisitor::visitRecDef(TRecDef *RecDef) { visitRecBaseDef(RecDef); }
+
+void __fastcall TDCURecVisitor::visitProcTypeDef(TProcTypeDef *ProcTypeDef) { visitRecBaseDef(ProcTypeDef); }
+
+void __fastcall TDCURecVisitor::visitOOTypeDef(TOOTypeDef *OOTypeDef) { visitRecBaseDef(OOTypeDef); }
+
+void __fastcall TDCURecVisitor::visitObjDef(TObjDef *ObjDef) { visitOOTypeDef(ObjDef); }
+
+void __fastcall TDCURecVisitor::visitClassDef(TClassDef *ClassDef) { visitOOTypeDef(ClassDef); }
+
+void __fastcall TDCURecVisitor::visitMetaClassDef(TMetaClassDef *MetaClassDef) { visitClassDef(MetaClassDef); }
+
+void __fastcall TDCURecVisitor::visitInterfaceDef(TInterfaceDef *InterfaceDef) { visitOOTypeDef(InterfaceDef); }
+
+void __fastcall TDCURecVisitor::visitVoidDef(TVoidDef *VoidDef) { visitTypeDef(VoidDef); }
+
+void __fastcall TDCURecVisitor::visitA6Def(TA6Def *A6Def) { visitDCURec(A6Def); }
+
+void __fastcall TDCURecVisitor::visitDelayedImpRec(TDelayedImpRec *DelayedImpRec) { visitNameDecl(DelayedImpRec); }
+
+void __fastcall TDCURecVisitor::visitORecDecl(TORecDecl *ORecDecl) { visitNameDecl(ORecDecl); }
+
+void __fastcall TDCURecVisitor::visitDynArrayDef(TDynArrayDef *DynArrayDef) { visitPtrDef(DynArrayDef); }
+
+void __fastcall TDCURecVisitor::visitTemplateArgDef(TTemplateArgDef *TemplateArgDef) { visitTypeDef(TemplateArgDef); }
+
+void __fastcall TDCURecVisitor::visitTemplateCall(TTemplateCall *TemplateCall) { visitTypeDef(TemplateCall); }
+
+void __fastcall TDCURecVisitor::visitAssemblyData(TAssemblyData *AssemblyData) { visitDCURec(AssemblyData); }
+
+//------------------------------------------------------------------------------
+
+bool TNameRec::IsEmpty() {
+    return !this || D.bLen == 0 || this == &NoName;
+}
+
+void __fastcall TNameRec::GetStrInfo(TAnsiStrRec& SR) {
+    if (!this) {
+        SR.CP = nullptr;
+        SR.Len = 0;
+        return;
+    }
+
+    DWord L = D.bLen;
+
+    if (L == 0xFF && FVer >= verDXE2 && FVer < verK1) {
+        printf("Debug: TNameRec::GetStrInfo: over 255\n");
+        SR.CP = reinterpret_cast<PAnsiChar>(&D.lS);
+        SR.Len = D.dwLen;
+    } else {
+        // ShortString is 1-indexed in Pascal, so S[1] maps to S.c_str()[0] or &S[1] in C++Builder
+        SR.CP = &D.S[1];
+        SR.Len = L;
+    }
+}
+
+AnsiChar __fastcall TNameRec::Get1stChar() {
+    TAnsiStrRec SR{};
+    GetStrInfo(SR);
+    if (static_cast<int>(SR.Len) <= 0) {
+        return '\0';
+    }
+    return SR.CP[0];
+}
+
+AnsiString __fastcall TNameRec::GetStr() {
+    TAnsiStrRec SR{};
+    GetStrInfo(SR);
+
+    // SetString(Result, SR.CP, SR.Len)
+    if (SR.CP && SR.Len > 0) {
+        return AnsiString(SR.CP, SR.Len);
+    }
+    return "";
+}
+
+AnsiString __fastcall TNameRec::GetRightStr(std::int32_t dl) {
+    if (!this) {
+        return "";
+    }
+
+    TAnsiStrRec SR{};
+    GetStrInfo(SR);
+
+    int L = static_cast<int>(SR.Len) - dl;
+    if (L <= 0) {
+        return "";
+    }
+
+    // SetString(Result,SR.CP+dl,L);
+    return AnsiString(SR.CP + dl, L);
+}
+
+bool __fastcall TNameRec::Eq(PName N) {
+    if (!this || !N) {
+        return N == this;
+    }
+
+    std::int32_t L = D.bLen;
+    if (L != N->D.bLen) {
+        return false;
+    }
+
+    PAnsiChar CP = nullptr;
+    PAnsiChar CP1 = nullptr;
+
+    if (L == 0xFF && FVer >= verDXE2 && FVer < verK1) {
+        L = D.dwLen;
+        if (L != N->D.dwLen) {
+            return false;
+        }
+        CP = reinterpret_cast<PAnsiChar>(D.lS);
+        CP1 = reinterpret_cast<PAnsiChar>(N->D.lS);
+    } else {
+        CP = reinterpret_cast<PAnsiChar>(&D.S[1]);
+        CP1 = reinterpret_cast<PAnsiChar>(&N->D.S[1]);
+    }
+
+    return CompareMem(CP, CP1, L);
+}
+
+bool __fastcall TNameRec::EqS(const ShortString& S) {
+    return Eq(reinterpret_cast<PName>(const_cast<ShortString*>(&S)));
+}
+
+bool __fastcall TNameRec::HasChar(AnsiChar ch) {
+    TAnsiStrRec SR{};
+    GetStrInfo(SR);
+
+    for (std::uint32_t i = 0; i < SR.Len; ++i) {
+        if (SR.CP[i] == ch) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * The name is aux and shouldn't be shown if not requested
+ * @return boolean
+ */
+bool __fastcall TNameRec::IsAuxName() {
+    AnsiChar ch = Get1stChar();
+    if (ch == '.') {
+        return true;
+    }
+
+    if (FVer >= verD2009 && FVer < verK1) {
+        if (ch == ':') {
+            return true;
+        }
+        if (HasChar('`')) {
+            return true;
+        }
+    }
+
+    return false;
+}
+// int
+static LongInt __fastcall GetStrRecHash(const TAnsiStrRec& SR) {
+    LongInt Result = 0;
+    PAnsiChar CP = SR.CP;
+
+    for (Cardinal i = 0; i < SR.Len; ++i) {
+        Result = Result * 17 + static_cast<Byte>(*CP);
+        ++CP;
+    }
+
+    return Result;
+}
+
+// int
+LongInt __fastcall TNameRec::GetHash() {
+    TAnsiStrRec SR{};
+    GetStrInfo(SR);
+    return GetStrRecHash(SR);
+}
+
+// int
+LongInt __fastcall TNameRec::GetRightHash(Integer Ofs) {
+    TAnsiStrRec SR{};
+    GetStrInfo(SR);
+
+    if (Ofs < 0) {
+        Ofs = 0;
+    }
+
+    if (static_cast<Cardinal>(Ofs) >= SR.Len) {
+        SR.CP = nullptr;
+        SR.Len = 0;
+    } else {
+        SR.CP += Ofs;
+        SR.Len -= Ofs;
+    }
+
+    return GetStrRecHash(SR);
+}

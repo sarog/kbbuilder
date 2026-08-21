@@ -55,6 +55,7 @@ var
   ShowDotTypes: boolean=false;
   ShowSelf: boolean=false;
   ShowVMT: boolean=false;
+  ShowNameHashes: boolean=false;
   ShowHeuristicRefs: boolean=true;
   ShowImpNamesUnits: boolean=false;
   DasmMode: TDasmMode = dasmSeq;
@@ -122,7 +123,7 @@ function ShowStrConst(DP: Pointer; DS: Cardinal): integer {Size used};
 function ShowUnicodeStrConst(DP: Pointer; DS: Cardinal): integer {Size used}; //Ver >=verD12
 function ShowUnicodeResStrConst(DP: Pointer; DS: Cardinal): integer {Size used}; //Ver >=verD12
 function TryShowPCharConst(DP: PAnsiChar; DS: Cardinal): integer {Size used};
-function FixFloatToStr(const E: Extended): AnsiString;
+function FixFloatToStr(const E: Extended; NeedDot: boolean): AnsiString;
 
 const
   cSoftNL=#0;
@@ -195,7 +196,6 @@ type
   THTMWriter = class(TTextFileWriter)
    protected
     FWasStr: boolean;
-    procedure WriteStart; override;
     procedure WriteEnd; override;
     procedure WriteCP(CP: PAnsiChar; Len: integer); override;
     procedure NL; override;
@@ -203,6 +203,8 @@ type
     procedure CloseStrInfo; override;
     procedure MarkDefStart(hDef: integer); override;
     procedure MarkMemOfs(Ofs: integer); override;
+   public
+    procedure WriteStart; override;
   end ;
 
   TStringWriter = class(TBaseWriter)
@@ -1295,15 +1297,23 @@ end ;
 {$IFDEF VER120}
 {$DEFINE D3or4}
 {$ENDIF}
-function FixFloatToStr(const E: Extended): AnsiString;
+function FixFloatToStr(const E: Extended; NeedDot: boolean): AnsiString;
 type
   TExtBytes = array[0..9]of ShortInt;
+var
+  CP: PAnsiChar;
 begin
   Result := FloatToStr(E);
   {$IFDEF D3or4}
   if (Result[1]='I')and(TExtBytes(E)[9]<0) then
     Result := '-'+Result;
   {$ENDIF}
+  if not NeedDot then
+    Exit;
+  CP := PAnsiChar(Result);
+  if (SysUtils.StrScan(CP,'.')<>Nil)or(SysUtils.StrScan(CP,'E')<>Nil) then
+    Exit;
+  Result := Result+'.';
 end ;
 
 

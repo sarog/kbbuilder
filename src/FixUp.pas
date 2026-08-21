@@ -132,7 +132,7 @@ function GetFixupFor(CodePtr: TIncPtr; Size: Cardinal; StartOk: boolean;
   var Fix: PFixupRec): boolean;
 
 function FixupOk(Fix: PFixupRec): boolean;
-function ReportFixup(Fix: PFixupRec; Ofs: LongInt; UseHAl: boolean): boolean;
+function ReportFixup(Fix: PFixupRec; Ofs: LongInt; UseHeuristicAl: boolean): boolean;
 
 type
  {The code was added for reading .pdata of Win64}
@@ -351,7 +351,7 @@ begin
   Result := (Fix<>Nil)and(FixUnit<>Nil);
 end ;
 
-function ReportFixup(Fix: PFixupRec; Ofs: LongInt; UseHAl: boolean): boolean;
+function ReportFixup(Fix: PFixupRec; Ofs: LongInt; UseHeuristicAl: boolean): boolean;
 var
   U: TUnit;
   K: Byte;
@@ -378,7 +378,7 @@ begin
     if D<>Nil then begin
       if D is TVarDecl then
         hDT := TVarDecl(D).hDT
-      else if UseHAl and(Ofs>0{0 Ofs usually means just call})and(D is TMemBlockRef) then begin
+      else if UseHeuristicAl and(Ofs>0{0 Ofs usually means just call})and(D is TMemBlockRef) then begin
         DP := TUnit(FixUnit).GetBlockMem(TMemBlockRef(D).Ofs,TMemBlockRef(D).Sz,Sz);
         if (DP<>Nil)and(Ofs<=Sz) then begin
           if Ofs>=8 then
@@ -422,8 +422,6 @@ end ;
 
 { TFixUpReader. }
 procedure TFixUpReader.Init(ADP: Pointer; ADS: Cardinal);
-var
-  Fix0: Integer;
 begin
   DP := ADP;
   DS := ADS;

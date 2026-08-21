@@ -5,6 +5,7 @@
 #define SHOW    0
 #include <stdio.h>
 #include "DCUClasses.h"
+#include "StackTrace.h"
 //------------------------------------------------------------------------------
 #define     OutLog1(a)          if (fLog) fprintf(fLog, (a))
 #define     OutLog2(a, b)       if (fLog) fprintf(fLog, (a), (b))
@@ -14,67 +15,98 @@
 // #define FIXUP_BEG   0x81
 //------------------------------------------------------------------------------
 int __fastcall          AddAddrDef(TDCURec* ND);
-void __fastcall         AddTypeDef(TTypeDef* TD);
+TNDX __fastcall         AddTypeDef(TTypeDef* TD);
 void __fastcall         AddTypeName(int hDef, int hDecl, PName Name);
-String __fastcall       CharStr(char Ch);
-Byte __fastcall         FixTag(Byte Tag);
-void __fastcall         RegisterEmbeddedTypes(TNameDecl* Embedded, int Depth);
-void _fastcall          BindEmbeddedType(PDCURec UseRec, int hDT, DWord* IP);
+PName __fastcall        AllocName(const AnsiString S); // unused
+void __fastcall         FreeName(PName name);
+AnsiString __fastcall   CharStr(char Ch);
+void __fastcall         ClearAddrDef(TNameDecl *ND);
+void __fastcall         ClearLastTypeDef(TTypeDef *TD);
+TDCURecTag __fastcall   FixTag(TDCURecTag recTag);
+void __fastcall         RegisterEmbeddedTypes(TDCURec* Embedded, int Depth);
+void __fastcall         BindEmbeddedType(PDCURec UseRec, int hDT, DWord* IP);
 void __fastcall         BindEmbeddedTypes();
+void __fastcall         ChkSize(Cardinal Sz);
+TDCURec* __fastcall     ConsumeEmbedded();
 void __fastcall         EnumUsedTypeList(PDCURec L, TTypeUseAction Action, DWord* IP);
 void __fastcall         FreeDCURecList(TDCURec* L);
 TDCURec* __fastcall     GetAddrDef(int hDef);
-String __fastcall       GetAddrStr(int hDef);
+PName __fastcall        GetAddrName(int hDef);
+AnsiString __fastcall   GetAddrStr(int hDef, bool ShowNDX); // was String
 Byte* __fastcall        GetBlockMem(DWord BlOfs, DWord BlSz, DWord* ResSz);
-String __fastcall       GetDCURecStr(TDCURec* D, int hDef);
+AnsiString __fastcall   GetDCURecStr(TDCURec* D, int hDef); // was String
 TDCURec* __fastcall     GetGlobalAddrDef(int hDef);
+TTypeDef * __fastcall   GetLastAddedTypeDef();
 TTypeDef* __fastcall    GetLocalTypeDef(int hDef);
 TTypeDef* __fastcall    GetGlobalTypeDef(int hDef);
+TTypeValKind __fastcall GetGlobalTypeValKind(int hDT);
+TSegKind __fastcall     GetSegKindByName(PName Name);
 int __fastcall          GetStartFixup(DWord Ofs);
+PName __fastcall        GetTypeName(int hDef);
 TTypeDef* __fastcall    GetTypeDef(int hDef);
 int __fastcall          GetTypeSize(int hDef);
 PUnitImpRec __fastcall  GetUnitImpRec(int hUnit);
+PDCURec __fastcall      IncEmbedDepth(TDCURec *&HeadBuf);
+void __fastcall         LoadAddrToSegInfo();
 bool __fastcall         MemToUInt(Byte *DP, DWord Sz, DWord* Res);
-String __fastcall       NDXToStr(int NDXLo);
-String __fastcall       PName2String(PName Name);
+AnsiString __fastcall   NDXToStr(int NDXLo); // was String
+AnsiString __fastcall   PName2String(PName Name); // was String
 Byte __fastcall         ReadByte();
 void __fastcall         ReadByteIfEQ(Byte V);
 int __fastcall          ReadByteFrom(bool b);
+int __fastcall          ReadByteFrom(TByteSet S);
 Byte __fastcall         ReadCallKind();
-int __fastcall          ReadClassInterfaces(int** PITbl);
+int __fastcall          ReadClassInterfaces(PPNDXTbl PITbl);
 int __fastcall          ReadConstAddInfo(TNameDecl* LastProcDecl);
-void __fastcall         ReadDeclList(Byte LK, TNameDecl** Result);
+void __fastcall         ReadDeclList(Byte LK, TDCURec *Owner, TDCURec **Result);
+void __fastcall         ReadDependencyInfo();
 int __fastcall          ReadIndex();
 void __fastcall         ReadIndex64(PInt64Rec Res);
 Byte* __fastcall        ReadMem(DWord Sz);
+PShortName __fastcall   ReadShortName();
 PName __fastcall        ReadName();
-Byte __fastcall         ReadTag();
+TMemStrRef *__fastcall  ReadNDXStrRef();
+void __fastcall         ReadInDcpWin64Info();
+void __fastcall         ReadSomeNameInfo28();
+TDCURecTag __fastcall   ReadTag();
 int __fastcall          ReadUIndex();
+void __fastcall         ReadUIndex64(PInt64Rec Res);
 DWord __fastcall        ReadULong();
+int __fastcall          AppendAddrDef(TDCURec *ND);
 void __fastcall         RefAddrDef(int V);
 bool __fastcall         RegTypeShow(TBaseDef* T);
 void __fastcall         RestoreFixupMemState(TFixupMemState* S);
 void __fastcall         SaveFixupMemState(TFixupMemState* S);
+void __fastcall         SetUnitPackageInfo(int hDecl, String sInfo);
+void __fastcall         SetStartFixupInfo(int Fix0);
 void __fastcall         SetCodeRange(Byte* ACodeStart, Byte* ACodeBase, DWord ABlSz);
 void __fastcall         SetProcAddInfo(int V);
 void __fastcall         ShowDataBl(DWord Ofs0, DWord BlOfs, DWord BlSz);
+void __fastcall         ShowDataBlP(Byte *DP, DWord DS, DWord Ofs0);
 void __fastcall         ShowCodeBl(DWord Ofs0, DWord BlOfs, DWord BlSz);
-void __fastcall         ShowDeclList(Byte LK, TNameDecl* Decl, String& OutS);
+void __fastcall         ShowDeclList(Byte LK, TDCURec* Decl, String& OutS);
 void __fastcall         ShowDump(Byte* DP, Byte* DPFile0, DWord FileSize, DWord SizeDispl, DWord Size, DWord Ofs0Displ, DWord Ofs0, DWord WMin, int FixCnt, TFixupRec* FixTbl);
 bool __fastcall         ShowGlobalConstValue(int hDef, String& OutS);
 String __fastcall       ShowOfsQualifier(int hDef, int Ofs);
-int __fastcall          ShowGlobalTypeValue(int hDef, Byte* DP, DWord DS, bool AndRest, int ConstKind, String& OutS);
+int __fastcall          ShowGlobalTypeValue(int hDef, Byte *DP, DWord DS, bool AndRest, int ConstKind, bool IsNamed, String &OutS);
 int __fastcall          ShowStrConst(Byte* DP, DWord DS, String& OutS);
 int __fastcall          ShowUnicodeStrConst(Byte* DP, DWord DS, String& OutS); // Ver >=verD12
 int __fastcall          ShowUnicodeResStrConst(Byte* DP, DWord DS, String& OutS); // Ver >=verD12
 String __fastcall       ShowRefOfsQualifier(int hDef, int Ofs);
 String __fastcall       ShowTypeDef(int hDef, PName N);
-String __fastcall       ShowTypeName(int hDef);
-int __fastcall          ShowTypeValue(TTypeDef* T, Byte* DP, DWord DS, int ConstKind, String& OutS);
-void __fastcall         SkipBlock(int Sz);
-String __fastcall       StrConstStr(char* CP, int L);
+String __fastcall       ShowTypeName(int hDef); // bool
+int __fastcall          ShowTypeValue(TTypeDef *T, Byte *DP, DWord DS, int ConstKind, bool IsNamed, String &OutS);
+void __fastcall         SkipBlock(Cardinal Sz);
+AnsiString __fastcall   StrConstStr(char* CP, int L); // was String
 bool __fastcall         TypeIsVoid(int hDef);
 void __fastcall         UnRegTypeShow(TBaseDef* T);
+void __fastcall         VisitDeclList(TDCURecVisitor *Visitor, Byte LK, TDCURec *MainRec, TDCURec* Decl);
+
+void __fastcall VisitDecls(TDCURecVisitor *Visitor, bool InterfaceOnly);
+void __fastcall VisitTypes(TDCURecVisitor *Visitor);
+
+void __fastcall ChangeScanState(TScanState State, Byte *DP, DWord MaxSz);
+void __fastcall RestoreScanState(TScanState State);
 
 //------------------------------------------------------------------------------
 // OffsetsInfo
@@ -83,7 +115,7 @@ typedef struct {
     DWord Size;
     int   ModId; // Modules
     int   NamId; // Names
-} OFFSETSINFO, *POFFSETSINFO;
+} OFFSETSINFO, *POFFSETSINFO; // IDR
 
 // Module info
 typedef struct {
@@ -94,16 +126,16 @@ typedef struct {
     String       Name;     // Unit Name
     String       Filename; // Unit Filename
     TStringList *UsesList; // List of Uses
-} MODULEINFO, *PMODULEINFO;
+} MODULEINFO, *PMODULEINFO; // IDR
 
-// Fixup info
+// Fixup info (from KB.pas)
 typedef struct {
     Byte   Type; // A-ADR;J-JMP;D-DAT
     DWord  Ofs;  // Offset from RTTI data begin
     String Name; // Name
-} FIXUPINFO, *PFIXUPINFO;
+} FIXUPINFO, *PFIXUPINFO; // IDR - FIXUP_INFO
 
-// ConstInfo
+// ConstInfo (from KB.pas)
 #define CI_CONSTDECL    'C'
 #define CI_PDECL        'P'
 #define CI_VARCDECL     'V'
@@ -120,7 +152,7 @@ typedef struct {
     DWord  RTTISz;  // Size of RTTI data
     DWord  RTTIOfs; // Offset of RTTI data
     TList *Fixups;  // If VMT
-} CONSTINFO, *PCONSTINFO;
+} CONSTINFO, *PCONSTINFO; // IDR
 
 // TypeInfo
 typedef struct {
@@ -138,7 +170,7 @@ typedef struct {
     TList *Fields;     // List of Fields
     TList *Properties; // List of Properties
     TList *Methods;    // List of Methods
-} TYPEINFO, *PTYPEINFO;
+} TYPEINFO, *PTYPEINFO; // IDR
 
 // VarInfo
 #define VI_VAR          'V'
@@ -156,9 +188,9 @@ typedef struct {
     DWord  DumpSz;  // Size of binary data
     String AbsName;
     String TypeDef;
-} VARINFO, *PVARINFO;
+} VARINFO, *PVARINFO; // IDR
 
-// ResourseStringInfo
+// ResourseStringInfo (from KB.pas)
 typedef struct {
     int    ID;
     DWord  Offset;
@@ -169,7 +201,7 @@ typedef struct {
     DWord  DumpSz;  // Size of binary data
     String TypeDef;
     String Context; // Context of ResStr
-} RESSTRINFO, *PRESSTRINFO;
+} RESSTRINFO, *PRESSTRINFO; // IDR
 
 // LocalDeclInfo
 typedef struct {
@@ -182,7 +214,7 @@ typedef struct {
     String Name;
     String TypeDef;
     String AbsName;
-} LOCALDECLINFO, *PLOCALDECLINFO;
+} LOCALDECLINFO, *PLOCALDECLINFO; // IDR
 
 // PropertyInfo
 typedef struct {
@@ -194,15 +226,80 @@ typedef struct {
     String ReadName;
     String WriteName;
     String StoredName;
-} PROPERTYINFO, *PPROPERTYINFO;
+} PROPERTYINFO, *PPROPERTYINFO; // IDR
 
 // MethodDeclInfo
 typedef struct {
     Byte   Scope;
     Byte   MethodKind; // 'M'-method,'P'-procedure,'F'-function,'C'-constructor,'D'-destructor
     String Prototype;
-} METHODDECLINFO, *PMETHODDECLINFO;
+} METHODDECLINFO, *PMETHODDECLINFO; // IDR
+
 //------------------------------------------------------------------------------
+// From FixUp.pas
+using TFxSizeTbl = SmallInt[fxMax + 1];
+
+//------------------------------------------------------------------------------
+
+// todo?
+class TPDataIterator;
+
+// From Win64SEH.pas
+class TWin64UnwindInfo : public TObject {
+protected:
+    Byte* PDataDP; // Pointer
+    DWord PDataDS; // Cardinal
+    Byte* DP; // Pointer
+    DWord DS; // Cardinal
+    TNDX UnwindNdx, ProcNdx; // TNDX
+    TObject* UnwindDR, *ProcDR;
+    PFixupTbl FPDataFixTbl;
+
+public:
+    void Clear();
+    bool Init0(Byte* APDataDP, DWord APDataDS, Byte* ADP, DWord ADS);
+    bool InitXData(unsigned long hPData, void* ADP, unsigned long ADS);
+    bool InitPData(unsigned long hPData) { return true; } // todo
+    bool Show();
+    void SetPDataLinks(unsigned long hDecl) {} // todo
+    bool FirstPDataRec(TPDataIterator& Iter);
+    bool NextPDataRec(TPDataIterator& Iter);
+
+    // TPDataIterator nested class (moved out for C++ compatibility)
+    class TPDataIterator {
+    protected:
+        int Ofs;
+        // PFixupTbl PDataFixTbl;
+        // TFixUpReader FixRd;
+        unsigned long CurOfs;
+        // PUNWIND_INFO UI;
+        unsigned long UIExcCnt;
+
+    public:
+        // PPDataRec DR;
+        unsigned long hProc, hUnwind;
+
+        // ExcScope section
+        // PExcScope ExcScope;
+        unsigned long hScopeProc, hScopeTable, hScopeTarget;
+        bool NextExcScope();
+
+    private:
+        // ExcDesc section
+        int ExcDescRest;
+        // TFixUpReader ExcFixRd;
+
+    public:
+        int ExcDescCnt;
+        // PExcDescEntry ExcDesc;
+        unsigned long hExcVTable, hExcHandler;
+        bool NextExcDesc();
+    };
+};
+
+typedef TWin64UnwindInfo *PWin64UnwindInfo;
+//------------------------------------------------------------------------------
+
 #endif
 /*
 TDCURec [Next]

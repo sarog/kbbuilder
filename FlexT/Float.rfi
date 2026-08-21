@@ -1,0 +1,77 @@
+// Source: http://geos0.icc.ru/scripts/WWWBinV.dll/ShowR?Float.rfi
+Float data types(Float.rfi):
+Class: General Data Types, Status: Auxiliary, Last change: 21.02.2024 11:43:16
+//Representation of float data in memory
+type bit
+  TBit num+(1)
+  TBit1 num+(1)
+  TBit2 num+(2)
+  TBit3 num+(3)
+  TBit4 num+(4)
+  TBit8 num+(8)
+  TBit11 num+(11)
+  TBit15 num+(15)
+  TBit20 num+(20)
+  TBit23 num+(23)
+  TBit39 num+(39)
+  TBit52 num+(52)
+  TBit63 num+(63)
+  TBit64 num+(64)
+  TBit112 num+(112)
+/*
+  TDoubleHi struc
+    TBit20 M
+    TBit11 P
+    TBit1 S //Sign 1->Neg
+  ends
+*/
+  TSingle struc
+    TBit23 M
+    TBit8 P
+    TBit1 S //Sign 1->Neg
+  ends: displ=(FLOAT(@.M,@.P-0x7F,@.S))//: displ=(INT(1-2*@.S),'.',HEX(@.M*2,6),'*2^',INT(@.P-0x7F));
+
+  TReal48 struc
+    TBit8 P
+    TBit39 M
+    TBit1 S //Sign 1->Neg
+  ends: displ=(FLOAT(@.M,@.P-0x81,@.S))
+
+  TDoubleV struc
+    TBit52 M
+    TBit11 P
+    TBit1 S //Sign 1->Neg
+  ends
+
+  TExtendedV struc
+    TBit64 M
+    //TBit63 M
+    //TBit1 One
+    TBit15 P
+    TBit1 S //Sign 1->Neg
+  ends
+
+  TLongDoubleV struc
+    TBit112 M
+    TBit15 P
+    TBit1 S //Sign 1->Neg
+  ends
+
+type
+/*
+  TDouble struc
+    ulong Lo
+    TDoubleHi Hi
+  ends: displ=(INT(1-2*@.Hi.S),'.',HEX(@.Hi.M,5),HEX(@.Lo,8),'*2^',INT(@.Hi.P-0x3FF));
+*/
+  TDouble struc
+    TDoubleV V
+  ends: displ=(FLOAT(@.V.M,@.V.P-0x3FF,@.V.S))
+
+  TExtended struc
+    TExtendedV V
+  ends: displ=(FLOAT1(@.V.M,@.V.P-0x3FFF,@.V.S))
+
+  TLongDouble struc
+    TLongDoubleV V
+  ends: displ=(FLOAT1(@.V.M,@.V.P-0x3FFF,@.V.S))
